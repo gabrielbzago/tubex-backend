@@ -1,35 +1,11 @@
-let apiKeys = process.env.YOUTUBE_API_KEYS.split(",");
-
-let currentIndex = 0;
-
-function getNextKey() {
-  const key = apiKeys[currentIndex];
-  currentIndex = (currentIndex + 1) % apiKeys.length;
-  return key;
-}
-
-async function fetchWithCluster(urlTemplate) {
-
-  for (let i = 0; i < apiKeys.length; i++) {
-
-    const apiKey = getNextKey();
-    const url = urlTemplate.replace("__KEY__", apiKey);
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data?.error?.errors?.[0]?.reason === "quotaExceeded") {
-      console.log("⚠️ quotaExceeded → tentando próxima key");
-      continue;
-    }
-
-    return data;
-  }
-
-  throw new Error("Todas as keys falharam");
-}
-
 export default async function handler(req, res) {
+
+  // 🔐 BLOQUEIO API
+  const apiKey = req.headers["x-api-key"];
+
+  if (apiKey !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ error: "unauthorized" });
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método não permitido" });

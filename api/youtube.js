@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
+  if (apiKey !== process.env.API_KEY) {
     return res.status(403).json({ error: "unauthorized" });
   }
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     // 🔥 CLUSTER DE KEYS (DO ENV)
-    const keys = process.env.YT_API_KEYS.split(",");
+const keys = [process.env.YOUTUBE_API_KEY];
 
     let data = null;
     let lastError = null;

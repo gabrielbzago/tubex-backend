@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
+  if (apiKey !== process.env.API_KEY) {
     return res.status(403).json({ error: "unauthorized" });
   }
 

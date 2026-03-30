@@ -1,30 +1,44 @@
 export default async function handler(req, res){
 
+  // 🔐 CORS
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+
+  // 🔥 Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if(req.method !== "POST"){
     return res.status(405).json({ error: "Método não permitido" });
   }
 
   try{
 
-    // 🔐 PROTEÇÃO
+    // 🔐 API KEY
     const apiKey = req.headers["x-api-key"];
 
     if(apiKey !== process.env.INTERNAL_API_KEY){
       return res.status(403).json({ error: "unauthorized" });
     }
 
-    let { email } = req.body;
+    // 🔥 BODY SAFE
+    const body = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
+
+    let email = body?.email;
 
     if(!email){
       return res.status(400).json({ plan: "free" });
     }
 
-    // 🔧 NORMALIZA EMAIL
     email = email.toLowerCase().trim();
 
     const url = `${process.env.SHEETS_URL}?email=${encodeURIComponent(email)}`;
 
-    // ⏱️ TIMEOUT PROTECTION
+    // ⏱️ TIMEOUT
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 

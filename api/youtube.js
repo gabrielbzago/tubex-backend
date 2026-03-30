@@ -30,11 +30,27 @@ export default async function handler(req, res) {
     const keyword = body?.keyword;
 
     if (!keyword) {
-      return res.status(400).json({ success: false });
+      return res.status(400).json({
+        success: false,
+        error: "keyword obrigatório",
+        items: []
+      });
     }
 
-    // 🔥 CLUSTER DE KEYS (DO ENV)
-const keys = [process.env.YOUTUBE_API_KEY];
+    // 🔥 VALIDA ENV (CRÍTICO)
+    if (!process.env.YOUTUBE_API_KEY) {
+      console.error("❌ YOUTUBE_API_KEY não definida");
+      return res.status(500).json({
+        success: false,
+        error: "API key do YouTube não configurada",
+        items: []
+      });
+    }
+
+    // 🔥 CLUSTER DE KEYS (PREPARADO PRA ESCALAR)
+    const keys = process.env.YOUTUBE_API_KEY.includes(",")
+      ? process.env.YOUTUBE_API_KEY.split(",")
+      : [process.env.YOUTUBE_API_KEY];
 
     let data = null;
     let lastError = null;
@@ -50,7 +66,11 @@ const keys = [process.env.YOUTUBE_API_KEY];
 
         const json = await response.json();
 
-        if (json.items) {
+        // 🔍 LOG DEBUG (remove depois)
+        console.log("YT STATUS:", response.status);
+        console.log("YT RESPONSE:", json);
+
+        if (response.ok && json.items) {
           data = json;
           break;
         }
@@ -63,8 +83,13 @@ const keys = [process.env.YOUTUBE_API_KEY];
 
     }
 
+    // 🚨 SE TODAS KEYS FALHAREM
     if (!data) {
-      throw new Error("Todas as keys falharam");
+      return res.status(200).json({
+        success: false,
+        error: lastError || "Todas as keys falharam",
+        items: []
+      });
     }
 
     return res.status(200).json({
@@ -78,6 +103,7 @@ const keys = [process.env.YOUTUBE_API_KEY];
 
     return res.status(500).json({
       success: false,
+      error: "Erro interno no servidor",
       items: []
     });
 

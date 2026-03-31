@@ -1,9 +1,9 @@
 export default async function handler(req, res) {
 
-  // 🔐 CORS
+  // 🔐 CORS (CORRIGIDO PRA EXTENSÃO)
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -12,24 +12,42 @@ export default async function handler(req, res) {
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 
-  if (apiKey !== process.env.API_KEY) {
-    return res.status(403).json({ error: "unauthorized" });
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(403).json({
+      success: false,
+      error: "unauthorized",
+      items: []
+    });
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido" });
+    return res.status(405).json({
+      success: false,
+      error: "Método não permitido",
+      items: []
+    });
   }
 
   try {
 
     // 🔥 BODY SAFE
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    let body = req.body;
+
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          error: "JSON inválido",
+          items: []
+        });
+      }
+    }
 
     const keyword = body?.keyword;
 
-    if (!keyword) {
+    if (!keyword || typeof keyword !== "string") {
       return res.status(400).json({
         success: false,
         error: "keyword obrigatório",
@@ -37,7 +55,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔥 VALIDA ENV
+    // 🔥 ENV CHECK
     if (!process.env.YOUTUBE_API_KEY) {
       console.error("❌ YOUTUBE_API_KEY não definida");
       return res.status(500).json({
@@ -47,71 +65,70 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔥 CLUSTER DE KEYS (CORRETO)
+    // 🔥 CLUSTER DE KEYS
     const keys = process.env.YOUTUBE_API_KEY
       .split(",")
       .map(k => k.trim())
       .filter(Boolean);
 
-    let data = null;
+    if (keys.length === 0) {
+      return res.status(500).json({
+        success: false,
+        error: "Nenhuma API key válida",
+        items: []
+      });
+    }
+
+    let finalData = null;
     let lastError = null;
 
     // 🔁 LOOP NAS KEYS
     for (const key of keys) {
       try {
 
-        console.log("🔑 TESTANDO KEY:", key);
-
         const url =
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(keyword)}&maxResults=15&type=video&key=${key}`;
+          `https://www.googleapis.com/youtube/v3/search` +
+          `?part=snippet&type=video&maxResults=15&q=${encodeURIComponent(keyword)}&key=${key}`;
 
         const response = await fetch(url);
         const json = await response.json();
 
-        if (response.ok && json.items) {
-          data = json;
+        if (response.ok && Array.isArray(json.items)) {
+          finalData = json;
           break;
         }
-
-        // 🔴 LOG DETALHADO
-        console.error("❌ KEY FALHOU:", key);
-        console.error("STATUS:", response.status);
-        console.error("ERRO:", json?.error?.message);
 
         lastError = json;
 
       } catch (err) {
-        console.error("❌ ERRO NA KEY:", key, err);
         lastError = err;
       }
     }
 
-    // 🚨 SE TODAS KEYS FALHAREM (AGORA CORRETO FORA DO LOOP)
-    if (!data) {
+    // 🚨 TODAS FALHARAM
+    if (!finalData) {
       return res.status(200).json({
         success: false,
-        error: lastError || "Todas as keys falharam",
+        error: lastError?.error?.message || "Todas as keys falharam",
         items: []
       });
     }
 
-    // ✅ SUCESSO
+    // ✅ SUCESSO GARANTIDO
     return res.status(200).json({
       success: true,
-      items: data.items || [],
-      pageInfo: data.pageInfo || {}
+      items: finalData.items || [],
+      pageInfo: finalData.pageInfo || { totalResults: 0 }
     });
 
-  } catch (e) {
+  } catch (error) {
 
-    console.error("YT backend error:", e);
+    console.error("🔥 ERRO GERAL:", error);
 
     return res.status(500).json({
       success: false,
       error: "Erro interno no servidor",
       items: []
     });
-
   }
-
 }

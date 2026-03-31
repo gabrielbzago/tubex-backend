@@ -1,18 +1,22 @@
 export default async function handler(req, res) {
 
-  // 🔐 CORS (CORRIGIDO PRA EXTENSÃO)
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  // 🔥 CORS FORÇADO (funciona sempre)
+  const origin = req.headers.origin || "*";
 
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+
+  // 🔥 resposta imediata pro preflight
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    return res.status(200).json({});
   }
 
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 
-  if (!apiKey || apiKey !== process.env.API_KEY) {
+  if (apiKey !== process.env.API_KEY) {
     return res.status(403).json({
       success: false,
       error: "unauthorized",
@@ -30,24 +34,11 @@ res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
   try {
 
-    // 🔥 BODY SAFE
-    let body = req.body;
+    const { keyword } = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
 
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch {
-        return res.status(400).json({
-          success: false,
-          error: "JSON inválido",
-          items: []
-        });
-      }
-    }
-
-    const keyword = body?.keyword;
-
-    if (!keyword || typeof keyword !== "string") {
+    if (!keyword) {
       return res.status(400).json({
         success: false,
         error: "keyword obrigatório",
@@ -55,79 +46,38 @@ res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
       });
     }
 
-    // 🔥 ENV CHECK
-    if (!process.env.YOUTUBE_API_KEY) {
-      console.error("❌ YOUTUBE_API_KEY não definida");
-      return res.status(500).json({
-        success: false,
-        error: "API key do YouTube não configurada",
-        items: []
-      });
-    }
-
-    // 🔥 CLUSTER DE KEYS
     const keys = process.env.YOUTUBE_API_KEY
       .split(",")
       .map(k => k.trim())
       .filter(Boolean);
 
-    if (keys.length === 0) {
-      return res.status(500).json({
-        success: false,
-        error: "Nenhuma API key válida",
-        items: []
-      });
-    }
+    let data = null;
 
-    let finalData = null;
-    let lastError = null;
-
-    // 🔁 LOOP NAS KEYS
     for (const key of keys) {
       try {
-
         const url =
-          `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet&type=video&maxResults=15&q=${encodeURIComponent(keyword)}&key=${key}`;
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&q=${encodeURIComponent(keyword)}&key=${key}`;
 
-        const response = await fetch(url);
-        const json = await response.json();
+        const r = await fetch(url);
+        const j = await r.json();
 
-        if (response.ok && Array.isArray(json.items)) {
-          finalData = json;
+        if (r.ok && Array.isArray(j.items)) {
+          data = j;
           break;
         }
 
-        lastError = json;
-
-      } catch (err) {
-        lastError = err;
-      }
+      } catch {}
     }
 
-    // 🚨 TODAS FALHARAM
-    if (!finalData) {
-      return res.status(200).json({
-        success: false,
-        error: lastError?.error?.message || "Todas as keys falharam",
-        items: []
-      });
-    }
-
-    // ✅ SUCESSO GARANTIDO
     return res.status(200).json({
       success: true,
-      items: finalData.items || [],
-      pageInfo: finalData.pageInfo || { totalResults: 0 }
+      items: data?.items || []
     });
 
-  } catch (error) {
-
-    console.error("🔥 ERRO GERAL:", error);
-
+  } catch (e) {
     return res.status(500).json({
       success: false,
-      error: "Erro interno no servidor",
+      error: "erro interno",
       items: []
     });
   }

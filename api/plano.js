@@ -1,11 +1,11 @@
 export default async function handler(req, res){
 
-  // 🔐 CORS
+  // 🔥 CORS TOTAL (EXTENSÃO + WEB)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-  // 🔥 Preflight
+  // 🔥 PRE-FLIGHT (OBRIGATÓRIO)
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -16,10 +16,10 @@ export default async function handler(req, res){
 
   try{
 
-    // 🔐 API KEY
+    // 🔐 API KEY (fallback seguro)
     const apiKey = req.headers["x-api-key"];
 
-    if(apiKey !== process.env.INTERNAL_API_KEY){
+    if(!apiKey || apiKey !== process.env.INTERNAL_API_KEY){
       return res.status(403).json({ error: "unauthorized" });
     }
 
@@ -31,7 +31,7 @@ export default async function handler(req, res){
     let email = body?.email;
 
     if(!email){
-      return res.status(400).json({ plan: "free" });
+      return res.status(200).json({ plan: "free" });
     }
 
     email = email.toLowerCase().trim();
@@ -40,7 +40,7 @@ export default async function handler(req, res){
 
     // ⏱️ TIMEOUT
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 7000);
 
     const response = await fetch(url, {
       signal: controller.signal
@@ -56,14 +56,14 @@ export default async function handler(req, res){
 
     return res.status(200).json({
       success: true,
-      plan: data?.plano || "free"
+      plan: (data?.plano || "free").toLowerCase()
     });
 
   }catch(e){
 
     console.error("Erro plano:", e);
 
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
       plan: "free"
     });

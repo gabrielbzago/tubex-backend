@@ -1,18 +1,22 @@
 export default async function handler(req, res) {
 
   // 🔥 CORS TOTAL (EXTENSÃO PRECISA DISSO)
-  const origin = req.headers.origin || "*";
+const origin = req.headers.origin || "*";
 
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+res.setHeader("Access-Control-Allow-Origin", origin);
+res.setHeader("Access-Control-Allow-Credentials", "true");
+res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+res.setHeader(
+  "Access-Control-Allow-Headers",
+  "Content-Type, x-api-key, authorization"
+);
 
-  // 🔥 PRE-FLIGHT (OBRIGATÓRIO)
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+// 🔥 ESSENCIAL
+res.setHeader("Vary", "Origin");
 
+if (req.method === "OPTIONS") {
+  return res.status(200).end();
+}
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 

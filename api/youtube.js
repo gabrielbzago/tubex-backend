@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
 
-  // 🔥 CORS FORÇADO
+  // 🔥 CORS TOTAL (EXTENSÃO PRECISA DISSO)
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-  // 🔥 preflight
+  // 🔥 PRE-FLIGHT (OBRIGATÓRIO)
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -20,21 +20,22 @@ export default async function handler(req, res) {
     return res.status(403).json({
       success: false,
       error: "unauthorized",
-      data: { items: [] }
+      items: []
     });
   }
 
+  // 🔒 MÉTODO
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
       error: "Método não permitido",
-      data: { items: [] }
+      items: []
     });
   }
 
   try {
 
-    // 🔥 parse seguro
+    // 🔥 PARSE SEGURO
     const body = typeof req.body === "string"
       ? JSON.parse(req.body)
       : req.body;
@@ -45,26 +46,28 @@ export default async function handler(req, res) {
       return res.status(400).json({
         success: false,
         error: "keyword obrigatório",
-        data: { items: [] }
+        items: []
       });
     }
 
-    // 🔑 múltiplas keys
+    // 🔑 MULTI API KEY (FAILOVER)
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
       .map(k => k.trim())
       .filter(Boolean);
 
-    let data = null;
+    let items = [];
 
     for (const key of keys) {
       try {
 
         // =========================
-        // 🔍 1. SEARCH (pega IDs)
+        // 🔍 1. SEARCH
         // =========================
         const searchUrl =
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(keyword)}&key=${key}`;
+          `https://www.googleapis.com/youtube/v3/search` +
+          `?part=snippet&type=video&maxResults=12` +
+          `&q=${encodeURIComponent(keyword)}&key=${key}`;
 
         const searchRes = await fetch(searchUrl);
         const searchJson = await searchRes.json();
@@ -81,16 +84,17 @@ export default async function handler(req, res) {
         if (!ids) continue;
 
         // =========================
-        // 📊 2. VIDEOS (statistics)
+        // 📊 2. VIDEOS (STATS)
         // =========================
         const videosUrl =
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`;
+          `https://www.googleapis.com/youtube/v3/videos` +
+          `?part=snippet,statistics&id=${ids}&key=${key}`;
 
         const videosRes = await fetch(videosUrl);
         const videosJson = await videosRes.json();
 
         if (videosRes.ok && Array.isArray(videosJson.items)) {
-          data = videosJson;
+          items = videosJson.items;
           break;
         }
 
@@ -99,10 +103,8 @@ export default async function handler(req, res) {
       }
     }
 
-    const items = data?.items || [];
-
     // ======================================================
-    // 🔥 MÉTRICAS (agora com dados reais)
+    // 🔥 MÉTRICAS
     // ======================================================
 
     let volume = 50;
@@ -122,20 +124,17 @@ export default async function handler(req, res) {
       else if (avgViews > 300000) competition = 75;
       else if (avgViews > 100000) competition = 60;
       else competition = 40;
-
     }
 
     // ======================================================
-    // ✅ RESPOSTA FINAL
+    // ✅ RESPOSTA CORRETA PRO FRONT (CRÍTICO)
     // ======================================================
 
     return res.status(200).json({
       success: true,
-      data: {
-        items,
-        volume,
-        competition
-      }
+      items,          // 🔥 AGORA CORRETO
+      volume,
+      competition
     });
 
   } catch (e) {
@@ -145,7 +144,7 @@ export default async function handler(req, res) {
     return res.status(500).json({
       success: false,
       error: "erro interno",
-      data: { items: [] }
+      items: []
     });
 
   }

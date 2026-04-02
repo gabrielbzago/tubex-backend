@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
   try {
 
-    // 🔥 parse body seguro
+    // 🔥 parse seguro
     const body = typeof req.body === "string"
       ? JSON.parse(req.body)
       : req.body;
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🔑 múltiplas API keys (failover)
+    // 🔑 múltiplas keys
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
       .map(k => k.trim())
@@ -60,14 +60,37 @@ export default async function handler(req, res) {
     for (const key of keys) {
       try {
 
-        const url =
+        // =========================
+        // 🔍 1. SEARCH (pega IDs)
+        // =========================
+        const searchUrl =
           `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(keyword)}&key=${key}`;
 
-        const r = await fetch(url);
-        const j = await r.json();
+        const searchRes = await fetch(searchUrl);
+        const searchJson = await searchRes.json();
 
-        if (r.ok && Array.isArray(j.items)) {
-          data = j;
+        if (!searchRes.ok || !Array.isArray(searchJson.items)) {
+          continue;
+        }
+
+        const ids = searchJson.items
+          .map(v => v.id?.videoId)
+          .filter(Boolean)
+          .join(",");
+
+        if (!ids) continue;
+
+        // =========================
+        // 📊 2. VIDEOS (statistics)
+        // =========================
+        const videosUrl =
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`;
+
+        const videosRes = await fetch(videosUrl);
+        const videosJson = await videosRes.json();
+
+        if (videosRes.ok && Array.isArray(videosJson.items)) {
+          data = videosJson;
           break;
         }
 
@@ -79,7 +102,7 @@ export default async function handler(req, res) {
     const items = data?.items || [];
 
     // ======================================================
-    // 🔥 MÉTRICAS SIMULADAS (não quebra frontend)
+    // 🔥 MÉTRICAS (agora com dados reais)
     // ======================================================
 
     let volume = 50;
@@ -91,10 +114,8 @@ export default async function handler(req, res) {
         return acc + Number(v?.statistics?.viewCount || 0);
       }, 0);
 
-      // volume baseado em quantidade de resultados
       volume = Math.min(100, items.length * 8);
 
-      // competição baseada em média de views
       const avgViews = totalViews / items.length || 0;
 
       if (avgViews > 1000000) competition = 90;
@@ -105,7 +126,7 @@ export default async function handler(req, res) {
     }
 
     // ======================================================
-    // ✅ RESPOSTA PADRÃO COMPATÍVEL COM FRONT
+    // ✅ RESPOSTA FINAL
     // ======================================================
 
     return res.status(200).json({

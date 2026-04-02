@@ -1,14 +1,17 @@
 export default async function handler(req, res) {
 
   // ===============================
-  // 🔥 CORS TOTAL (CORRIGIDO)
+  // 🔥 CORS TOTAL (ROBUSTO)
   // ===============================
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key, authorization");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, x-api-key, authorization"
+  );
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -19,7 +22,7 @@ export default async function handler(req, res) {
   // ===============================
   const apiKey = req.headers["x-api-key"];
 
-  if (apiKey !== process.env.API_KEY) {
+  if (!apiKey || apiKey !== process.env.API_KEY) {
     return res.status(403).json({
       success: false,
       error: "unauthorized",
@@ -38,11 +41,21 @@ export default async function handler(req, res) {
   try {
 
     // ===============================
-    // 🔥 PARSE BODY
+    // 🔥 PARSE BODY (SEGURO)
     // ===============================
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    let body;
+
+    try {
+      body = typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "JSON inválido",
+        data: { channel: null, videos: [] }
+      });
+    }
 
     const channelId = body?.channelId?.trim();
 
@@ -55,22 +68,33 @@ export default async function handler(req, res) {
     }
 
     // ===============================
-    // 🔑 MULTI API KEY (FAILOVER)
+    // 🔑 MULTI API KEY (FAILOVER REAL)
     // ===============================
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
       .map(k => k.trim())
       .filter(Boolean);
 
+    if (!keys.length) {
+      return res.status(500).json({
+        success: false,
+        error: "YOUTUBE_API_KEY não configurada",
+        data: { channel: null, videos: [] }
+      });
+    }
+
     let channel = null;
     let videos = [];
 
+    // ===============================
+    // 🔁 LOOP DE KEYS (CORRIGIDO)
+    // ===============================
     for (const key of keys) {
       try {
 
-        // ========================================
-        // 📺 1. BUSCAR CANAL
-        // ========================================
+        // ============================
+        // 📺 1. CHANNEL
+        // ============================
         const channelUrl =
           `https://www.googleapis.com/youtube/v3/channels` +
           `?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`;
@@ -79,24 +103,23 @@ export default async function handler(req, res) {
         const channelJson = await channelRes.json();
 
         if (!channelRes.ok || !channelJson.items?.length) {
-          continue;
+          console.warn("Falha ao buscar canal com key");
+          continue; // 🔥 IMPORTANTE (não break)
         }
 
         channel = channelJson.items[0];
 
-        // ========================================
-        // 📦 2. PEGAR PLAYLIST DE UPLOADS
-        // ========================================
         const uploadsPlaylistId =
           channel.contentDetails?.relatedPlaylists?.uploads;
 
         if (!uploadsPlaylistId) {
+          console.warn("Canal sem playlist uploads");
           break;
         }
 
-        // ========================================
-        // 🎥 3. BUSCAR VÍDEOS
-        // ========================================
+        // ============================
+        // 🎥 2. PLAYLIST ITEMS
+        // ============================
         const videosUrl =
           `https://www.googleapis.com/youtube/v3/playlistItems` +
           `?part=snippet,contentDetails` +
@@ -107,22 +130,23 @@ export default async function handler(req, res) {
         const videosJson = await videosRes.json();
 
         if (!videosRes.ok || !Array.isArray(videosJson.items)) {
-          break;
+          console.warn("Erro playlistItems");
+          continue;
         }
 
-        // ========================================
-        // 📊 4. PEGAR IDs
-        // ========================================
         const ids = videosJson.items
           .map(v => v.contentDetails?.videoId)
           .filter(Boolean)
           .join(",");
 
-        if (!ids) break;
+        if (!ids) {
+          console.warn("Nenhum videoId encontrado");
+          continue;
+        }
 
-        // ========================================
-        // 📊 5. BUSCAR STATISTICS
-        // ========================================
+        // ============================
+        // 📊 3. VIDEOS STATS
+        // ============================
         const statsUrl =
           `https://www.googleapis.com/youtube/v3/videos` +
           `?part=snippet,statistics&id=${ids}&key=${key}`;
@@ -132,16 +156,17 @@ export default async function handler(req, res) {
 
         if (statsRes.ok && Array.isArray(statsJson.items)) {
           videos = statsJson.items;
-          break;
+          break; // ✅ sucesso → sai do loop
         }
 
       } catch (e) {
-        console.warn("Erro com key, tentando próxima...");
+        console.warn("Erro com key:", e.message);
+        continue;
       }
     }
 
     // ===============================
-    // 📦 FALLBACK
+    // 🚨 FALLBACK FINAL
     // ===============================
     if (!channel) {
       return res.status(404).json({
@@ -152,7 +177,7 @@ export default async function handler(req, res) {
     }
 
     // ===============================
-    // 🚀 RESPOSTA FINAL
+    // 🚀 RESPOSTA FINAL (PADRÃO FIXO)
     // ===============================
     return res.status(200).json({
       success: true,

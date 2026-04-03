@@ -45,13 +45,13 @@ export default async function handler(req, res) {
 
     const channelId = body?.channelId;
 
-    if (!channelId) {
-      return res.status(400).json({
-        success: false,
-        error: "channelId obrigatório",
-        data: { channel: null, videos: [] }
-      });
-    }
+  // 🔥 NÃO BLOQUEIA MAIS
+if (!channelId) {
+  return res.status(200).json({
+    success: true,
+    data: { channel: null, videos: [] }
+  });
+}
 
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")

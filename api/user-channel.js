@@ -1,37 +1,91 @@
-export default async function handler(req, res) {
+export default async function handler(req, res){
 
-  try {
+  // ===============================
+  // 🔥 CORS
+  // ===============================
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-    const token = req.headers.authorization?.replace("Bearer ", "");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
-    if (!token) {
-      return res.status(401).json({ error: "Token ausente" });
+  // ===============================
+  // 🔐 API KEY
+  // ===============================
+  const apiKey = req.headers["x-api-key"];
+
+  if(apiKey !== process.env.INTERNAL_API_KEY){
+    return res.status(403).json({
+      success:false,
+      error:"unauthorized",
+      channelId:null
+    });
+  }
+
+  if(req.method !== "POST"){
+    return res.status(405).json({
+      success:false,
+      error:"Método não permitido",
+      channelId:null
+    });
+  }
+
+  try{
+
+    // ===============================
+    // 🔥 BODY SAFE
+    // ===============================
+    const body = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
+
+    let email = body?.email;
+
+    if(!email){
+      return res.status(400).json({
+        success:false,
+        error:"email obrigatório",
+        channelId:null
+      });
     }
 
-    // 🔥 YOUTUBE API (CANAL DO USUÁRIO)
-    const r = await fetch(
-      "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
+    email = email.toLowerCase().trim();
 
-    const data = await r.json();
+    // ===============================
+    // 🔥 BUSCAR NA PLANILHA
+    // ===============================
+    const url = `${process.env.SHEETS_URL}?email=${encodeURIComponent(email)}`;
 
-    const channelId = data?.items?.[0]?.id;
+    const response = await fetch(url);
+    const data = await response.json();
 
-    if (!channelId) {
-      return res.status(404).json({ error: "Canal não encontrado" });
+    const channelId = data?.channelId;
+
+    if(!channelId){
+      return res.status(404).json({
+        success:false,
+        error:"Canal não encontrado",
+        channelId:null
+      });
     }
 
-    res.json({ success: true, channelId });
+    return res.status(200).json({
+      success:true,
+      channelId
+    });
 
-  } catch (e) {
+  }catch(e){
 
     console.error("user-channel error:", e);
 
-    res.status(500).json({ error: "Erro interno" });
+    return res.status(500).json({
+      success:false,
+      error:"Erro interno",
+      channelId:null
+    });
+
   }
+
 }

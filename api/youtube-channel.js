@@ -45,11 +45,76 @@ export default async function handler(req, res) {
 
     const channelId = body?.channelId;
 
-  // 🔥 NÃO BLOQUEIA MAIS
+// ======================================================
+// 🔥 FALLBACK AUTOMÁTICO (CRÍTICO)
+// ======================================================
 if (!channelId) {
+
+  const keyword = body?.keyword || "";
+
+  console.warn("⚠️ Sem channelId, usando fallback por keyword:", keyword);
+
+  if(!keyword){
+    return res.status(200).json({
+      success: true,
+      data: { channel: null, videos: [] }
+    });
+  }
+
+  const keys = (process.env.YOUTUBE_API_KEY || "")
+    .split(",")
+    .map(k => k.trim())
+    .filter(Boolean);
+
+  let videos = [];
+
+  for (const key of keys) {
+    try {
+
+      const searchRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(keyword)}&key=${key}`
+      );
+
+      const searchJson = await searchRes.json();
+
+      if (!searchRes.ok || !Array.isArray(searchJson.items)) continue;
+
+      const ids = searchJson.items
+        .map(v => v.id?.videoId)
+        .filter(Boolean)
+        .join(",");
+
+      if (!ids) continue;
+
+      const statsRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
+      );
+
+      const statsJson = await statsRes.json();
+
+      if (statsRes.ok && Array.isArray(statsJson.items)) {
+
+        videos = statsJson.items.map(v => ({
+          ...v,
+          title: v.snippet.title,
+          views: Number(v.statistics.viewCount || 0),
+          publishedAt: v.snippet.publishedAt
+        }));
+
+        break;
+      }
+
+    } catch(e){
+      continue;
+    }
+  }
+
   return res.status(200).json({
     success: true,
-    data: { channel: null, videos: [] }
+    data: {
+      channel: null,
+      videos
+    }
   });
 }
 

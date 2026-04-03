@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     req.headers["X-API-KEY"] ||
     req.headers["authorization"]?.replace("Bearer ","");
 
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
+if (apiKey !== process.env.API_KEY)
     return res.status(403).json({
       success:false,
       error:"unauthorized",

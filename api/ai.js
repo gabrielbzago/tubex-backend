@@ -22,13 +22,13 @@ export default async function handler(req, res) {
     req.headers["X-API-KEY"] ||
     req.headers["authorization"]?.replace("Bearer ","");
 
-if (apiKey !== process.env.API_KEY)
-    return res.status(403).json({
-      success:false,
-      error:"unauthorized",
-      text:""
-    });
-  }
+if (apiKey !== process.env.API_KEY) {
+  return res.status(403).json({
+    success:false,
+    error:"unauthorized",
+    text:""
+  });
+}
 
   if (req.method !== "POST") {
     return res.status(405).json({

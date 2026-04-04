@@ -1,22 +1,18 @@
 export default async function handler(req, res) {
 
   // 🔥 CORS TOTAL (EXTENSÃO PRECISA DISSO)
-const origin = req.headers.origin || "*";
+  const origin = req.headers.origin || "*";
 
-res.setHeader("Access-Control-Allow-Origin", origin);
-res.setHeader("Access-Control-Allow-Credentials", "true");
-res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-res.setHeader(
-  "Access-Control-Allow-Headers",
-  "Content-Type, x-api-key, authorization"
-);
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-// 🔥 ESSENCIAL
-res.setHeader("Vary", "Origin");
+  // 🔥 PRE-FLIGHT
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
-if (req.method === "OPTIONS") {
-  return res.status(200).end();
-}
   // 🔐 API KEY
   const apiKey = req.headers["x-api-key"];
 
@@ -61,46 +57,85 @@ if (req.method === "OPTIONS") {
       .filter(Boolean);
 
     let items = [];
+    let usedKey = null;
 
+    // ======================================================
+    // 🔥 BUSCA COM PAGINAÇÃO REAL (ATÉ 150 VÍDEOS)
+    // ======================================================
     for (const key of keys) {
+
       try {
 
-        // =========================
-        // 🔍 1. SEARCH
-        // =========================
-        const searchUrl =
-          `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet&type=video&maxResults=12` +
-          `&q=${encodeURIComponent(keyword)}&key=${key}`;
+        let allIds = [];
+        let nextPageToken = "";
+        let pageCount = 0;
 
-        const searchRes = await fetch(searchUrl);
-        const searchJson = await searchRes.json();
+        while (pageCount < 3) { // 🔥 3 páginas = até 150 vídeos
 
-        if (!searchRes.ok || !Array.isArray(searchJson.items)) {
-          continue;
+          const searchUrl =
+            `https://www.googleapis.com/youtube/v3/search` +
+            `?part=snippet&type=video&maxResults=50` +
+            `&q=${encodeURIComponent(keyword)}` +
+            `&pageToken=${nextPageToken}` +
+            `&key=${key}`;
+
+          const searchRes = await fetch(searchUrl);
+          const searchJson = await searchRes.json();
+
+          if (!searchRes.ok || !Array.isArray(searchJson.items)) {
+            break;
+          }
+
+          const ids = searchJson.items
+            .map(v => v.id?.videoId)
+            .filter(Boolean);
+
+          allIds.push(...ids);
+
+          nextPageToken = searchJson.nextPageToken || "";
+          pageCount++;
+
+          if (!nextPageToken) break;
         }
 
-        const ids = searchJson.items
-          .map(v => v.id?.videoId)
-          .filter(Boolean)
-          .join(",");
+        // 🔥 REMOVE DUPLICADOS
+        const uniqueIds = [...new Set(allIds)];
 
-        if (!ids) continue;
+        if (!uniqueIds.length) continue;
 
-        // =========================
-        // 📊 2. VIDEOS (STATS)
-        // =========================
-        const videosUrl =
-          `https://www.googleapis.com/youtube/v3/videos` +
-          `?part=snippet,statistics&id=${ids}&key=${key}`;
+        // ======================================================
+        // 📊 BUSCAR STATS EM BLOCOS
+        // ======================================================
+        let allVideos = [];
 
-        const videosRes = await fetch(videosUrl);
-        const videosJson = await videosRes.json();
+        for (let i = 0; i < uniqueIds.length; i += 50) {
 
-        if (videosRes.ok && Array.isArray(videosJson.items)) {
-          items = videosJson.items;
-          break;
+          const chunk = uniqueIds.slice(i, i + 50).join(",");
+
+          const videosUrl =
+            `https://www.googleapis.com/youtube/v3/videos` +
+            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+
+          const videosRes = await fetch(videosUrl);
+          const videosJson = await videosRes.json();
+
+          if (videosRes.ok && Array.isArray(videosJson.items)) {
+            allVideos.push(...videosJson.items);
+          }
+
         }
+
+        // 🔥 FILTRO FINAL (ANTI BUG)
+        items = allVideos.filter(v =>
+          v &&
+          v.snippet &&
+          v.statistics &&
+          v.snippet.publishedAt
+        );
+
+        usedKey = key;
+
+        if (items.length > 0) break;
 
       } catch (e) {
         console.warn("Erro com key, tentando próxima...");
@@ -108,35 +143,52 @@ if (req.method === "OPTIONS") {
     }
 
     // ======================================================
-    // 🔥 MÉTRICAS
+    // 🔥 FALLBACK SEGURO
     // ======================================================
-
-    let volume = 50;
-    let competition = 50;
-
-    if (items.length > 0) {
-
-      const totalViews = items.reduce((acc, v) => {
-        return acc + Number(v?.statistics?.viewCount || 0);
-      }, 0);
-
-      volume = Math.min(100, items.length * 8);
-
-      const avgViews = totalViews / items.length || 0;
-
-      if (avgViews > 1000000) competition = 90;
-      else if (avgViews > 300000) competition = 75;
-      else if (avgViews > 100000) competition = 60;
-      else competition = 40;
+    if (!items.length) {
+      return res.status(200).json({
+        success: true,
+        items: [],
+        volume: 0,
+        competition: 0
+      });
     }
 
     // ======================================================
-    // ✅ RESPOSTA CORRETA PRO FRONT (CRÍTICO)
+    // 🔥 ORDENAÇÃO INTELIGENTE (IMPORTANTE PRA TREND)
     // ======================================================
+    items.sort((a, b) =>
+      Number(b.statistics.viewCount || 0) -
+      Number(a.statistics.viewCount || 0)
+    );
 
+    // ======================================================
+    // 🔥 MÉTRICAS MELHORADAS
+    // ======================================================
+    const totalViews = items.reduce((acc, v) => {
+      return acc + Number(v?.statistics?.viewCount || 0);
+    }, 0);
+
+    const avgViews = totalViews / items.length || 0;
+
+    // 🔥 VOLUME MAIS REALISTA
+    const volume = Math.min(100, Math.round(Math.log10(totalViews + 1) * 15));
+
+    // 🔥 CONCORRÊNCIA MAIS INTELIGENTE
+    let competition = 40;
+
+    if (avgViews > 1000000) competition = 90;
+    else if (avgViews > 500000) competition = 80;
+    else if (avgViews > 200000) competition = 70;
+    else if (avgViews > 100000) competition = 60;
+    else if (avgViews > 50000) competition = 50;
+
+    // ======================================================
+    // ✅ RESPOSTA FINAL (100% COMPATÍVEL)
+    // ======================================================
     return res.status(200).json({
       success: true,
-      items,          // 🔥 AGORA CORRETO
+      items,
       volume,
       competition
     });

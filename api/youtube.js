@@ -172,16 +172,29 @@ export default async function handler(req, res) {
     const avgViews = totalViews / items.length || 0;
 
     // 🔥 VOLUME MAIS REALISTA
-    const volume = Math.min(100, Math.round(Math.log10(totalViews + 1) * 15));
+// 🔥 VOLUME MAIS INTELIGENTE (considera distribuição)
+const top = Number(items[0]?.statistics?.viewCount || 0);
+const median = Number(items[Math.floor(items.length/2)]?.statistics?.viewCount || 0);
 
-    // 🔥 CONCORRÊNCIA MAIS INTELIGENTE
-    let competition = 40;
+const volume = Math.min(100,
+  Math.round(
+    (Math.log10(top + 1) * 10) +
+    (Math.log10(median + 1) * 5)
+  )
+);
+   // 🔥 COMPETITION BASEADO EM DOMINÂNCIA REAL
+const topViews = Number(items[0]?.statistics?.viewCount || 0);
+const medianViews = Number(items[Math.floor(items.length/2)]?.statistics?.viewCount || 1);
 
-    if (avgViews > 1000000) competition = 90;
-    else if (avgViews > 500000) competition = 80;
-    else if (avgViews > 200000) competition = 70;
-    else if (avgViews > 100000) competition = 60;
-    else if (avgViews > 50000) competition = 50;
+const dominance = topViews / medianViews;
+
+let competition = 50;
+
+if(dominance > 20) competition = 90;
+else if(dominance > 10) competition = 80;
+else if(dominance > 5) competition = 70;
+else if(dominance > 2) competition = 60;
+else competition = 40;
 
     // ======================================================
     // ✅ RESPOSTA FINAL (100% COMPATÍVEL)

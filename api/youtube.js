@@ -182,19 +182,21 @@ const volume = Math.min(100,
     (Math.log10(median + 1) * 5)
   )
 );
-   // 🔥 COMPETITION BASEADO EM DOMINÂNCIA REAL
+// 🔥 COMPETITION CONTÍNUO (NÃO TRAVA MAIS)
 const topViews = Number(items[0]?.statistics?.viewCount || 0);
 const medianViews = Number(items[Math.floor(items.length/2)]?.statistics?.viewCount || 1);
 
+// dominância real
 const dominance = topViews / medianViews;
 
-let competition = 50;
+// normalização logarítmica (igual ferramenta profissional)
+const normalized = Math.log10(dominance + 1);
 
-if(dominance > 20) competition = 90;
-else if(dominance > 10) competition = 80;
-else if(dominance > 5) competition = 70;
-else if(dominance > 2) competition = 60;
-else competition = 40;
+// escala 0–100
+let competition = Math.min(100, normalized * 40);
+
+// ajuste fino (evita ficar baixo demais)
+competition = Math.max(20, competition);
 
     // ======================================================
     // ✅ RESPOSTA FINAL (100% COMPATÍVEL)

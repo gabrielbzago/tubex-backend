@@ -5,5 +5,10 @@
   "private": true,
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.43.1",
+    "stripe": "^14.0.0",
+    "micro": "^10.0.1"
   }
 }

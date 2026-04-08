@@ -41,14 +41,35 @@ export default async function handler(req, res) {
       : req.body;
 
     const keyword = body?.keyword?.trim();
+const videoId = body?.videoId;
 
-    if (!keyword) {
-      return res.status(400).json({
-        success: false,
-        error: "keyword obrigatório",
-        items: []
-      });
-    }
+// 🔥 PRIORIDADE: VIDEO ID
+if (videoId) {
+
+const key = (process.env.YOUTUBE_API_KEY || "").split(",")[0];
+
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${key}`;
+
+  const resYT = await fetch(url);
+  const json = await resYT.json();
+
+const video = json.items?.[0];
+
+return res.status(200).json({
+  success: true,
+  data: video || { snippet: { tags: [] } }
+});
+
+}
+
+// 🔥 SÓ EXIGE KEYWORD SE NÃO FOR VIDEO
+if (!keyword) {
+  return res.status(400).json({
+    success: false,
+    error: "keyword obrigatório",
+    items: []
+  });
+}
 
     // 🔑 MULTI API KEY (FAILOVER)
     const keys = (process.env.YOUTUBE_API_KEY || "")

@@ -133,9 +133,9 @@ if (!keyword) {
 
           const chunk = uniqueIds.slice(i, i + 50).join(",");
 
-          const videosUrl =
-            `https://www.googleapis.com/youtube/v3/videos` +
-            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+         const videosUrl =
+  `https://www.googleapis.com/youtube/v3/videos` +
+  `?part=snippet,statistics,contentDetails&id=${chunk}&key=${key}`;
 
           const videosRes = await fetch(videosUrl);
           const videosJson = await videosRes.json();
@@ -169,7 +169,7 @@ if (!keyword) {
     if (!items.length) {
       return res.status(200).json({
         success: true,
-        items: [],
+        items:items,
         volume: 0,
         competition: 0
       });

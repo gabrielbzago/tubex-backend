@@ -54,12 +54,12 @@ if (!channelId) {
 
   console.warn("⚠️ Sem channelId, usando fallback por keyword:", keyword);
 
-  if(!keyword){
-    return res.status(200).json({
-      success: true,
-      data: { channel: null, videos: [] }
-    });
-  }
+if(!keyword){
+  return res.status(200).json({
+    success: false,
+    data: { channel: null, videos: [] }
+  });
+}
 
   const keys = (process.env.YOUTUBE_API_KEY || "")
     .split(",")
@@ -72,7 +72,7 @@ if (!channelId) {
     try {
 
       const searchRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(keyword)}&key=${key}`
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(keyword)}&key=${key}`
       );
 
       const searchJson = await searchRes.json();

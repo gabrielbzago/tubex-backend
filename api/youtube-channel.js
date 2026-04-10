@@ -94,7 +94,7 @@ if(!keyword){
 
       if (statsRes.ok && Array.isArray(statsJson.items)) {
 
-        videos = statsJson.items.map(v => ({
+        videos = (statsJson.items || []).map(v => ({
           ...v,
           title: v.snippet.title,
           views: Number(v.statistics.viewCount || 0),
@@ -110,12 +110,13 @@ if(!keyword){
   }
 
   return res.status(200).json({
-    success: true,
-    data: {
-      channel: null,
-      videos
-    }
-  });
+  success: true,
+  items: videos,
+  data: {
+    channel: null,
+    videos
+  }
+});
 }
 
     const keys = (process.env.YOUTUBE_API_KEY || "")
@@ -145,6 +146,8 @@ if(!keyword){
         const uploads =
           channel.contentDetails?.relatedPlaylists?.uploads;
 
+if (!uploads) continue;
+
         // ===============================
         // 🎥 PEGAR MAIS VÍDEOS (ATÉ 50)
         // ===============================
@@ -154,12 +157,12 @@ if(!keyword){
 
         const vidsJson = await vidsRes.json();
 
-        const ids = vidsJson.items
-          .map(v => v.contentDetails?.videoId)
+        const ids = (vidsJson.items || [])
+  .map(v => v.contentDetails?.videoId)
           .filter(Boolean)
           .join(",");
 
-        if (!ids) continue;
+if (!ids || ids.length < 5) continue;
 
         // ===============================
         // 📊 STATS
@@ -170,7 +173,7 @@ if(!keyword){
 
         const statsJson = await statsRes.json();
 
-        videos = statsJson.items.map(v => ({
+        videos = (statsJson.items || []).map(v => ({
           ...v,
           title: v.snippet.title,
           views: Number(v.statistics.viewCount || 0),
@@ -214,21 +217,20 @@ if(!keyword){
     // 🚀 RESPONSE FINAL (UPGRADE)
     // ===============================
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        channel,
-        videos,
-
-        // 🔥 NOVO (NÃO QUEBRA NADA)
-        metrics: {
-          totalViews,
-          avgViews,
-          views7,
-          uploads7
-        }
-      }
-    });
+ return res.status(200).json({
+  success: true,
+  items: videos, // 🔥 PADRÃO GLOBAL
+  data: {
+    channel,
+    videos,
+    metrics: {
+      totalViews,
+      avgViews,
+      views7,
+      uploads7
+    }
+  }
+});
 
   } catch (e) {
 

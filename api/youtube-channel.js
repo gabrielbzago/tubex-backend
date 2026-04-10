@@ -55,10 +55,11 @@ if (!channelId) {
   console.warn("⚠️ Sem channelId, usando fallback por keyword:", keyword);
 
 if(!keyword){
-  return res.status(200).json({
-    success: false,
+  return {
+    success:true,
+    items: [],
     data: { channel: null, videos: [] }
-  });
+  };
 }
 
   const keys = (process.env.YOUTUBE_API_KEY || "")

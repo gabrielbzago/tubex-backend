@@ -56,7 +56,8 @@ if (!channelId) {
 
 if(!keyword){
   return res.status(200).json({
-    success: false,
+    success: true,
+    items: [],
     data: { channel: null, videos: [] }
   });
 }
@@ -162,7 +163,7 @@ if (!uploads) continue;
           .filter(Boolean)
           .join(",");
 
-if (!ids || ids.length < 5) continue;
+if (!ids) continue;
 
         // ===============================
         // 📊 STATS
@@ -187,13 +188,13 @@ if (!ids || ids.length < 5) continue;
       }
     }
 
-    if (!channel) {
-      return res.status(404).json({
-        success: false,
-        error: "Canal não encontrado",
-        data: { channel: null, videos: [] }
-      });
-    }
+if (!channel) {
+  return res.status(200).json({
+    success: true,
+    items: videos,
+    data: { channel: null, videos }
+  });
+}
 
     // ===============================
     // 🧠 MÉTRICAS INTELIGENTES

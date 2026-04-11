@@ -67,8 +67,12 @@ export default async function handler(req, res) {
 
     // fallback seguro
     if (!videos.length) {
-      console.warn("⚠️ IA sem dados de vídeos → modo genérico");
-    }
+  return res.status(200).json({
+    success: false,
+    error: "no_videos",
+    text: ""
+  });
+}
 
     // ===============================
     // 📊 NORMALIZAÇÃO DE DADOS

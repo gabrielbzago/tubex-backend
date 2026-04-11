@@ -66,10 +66,10 @@ export default async function handler(req, res) {
     const videos = Array.isArray(context.videos) ? context.videos : [];
 
     // fallback seguro
-    if (!videos.length) {
+if (!videos || videos.length < 3) {
   return res.status(200).json({
-    success: false,
-    error: "no_videos",
+    success: true,
+    empty: true,
     text: ""
   });
 }
@@ -89,12 +89,14 @@ export default async function handler(req, res) {
     // 📈 MÉTRICAS INTELIGENTES
     // ===============================
     const totalViews = parsedVideos.reduce((acc, v) => acc + v.views, 0);
-    const avgViews = Math.round(totalViews / Math.max(1, parsedVideos.length));
+const avgViews = parsedVideos.length
+  ? Math.round(totalViews / parsedVideos.length)
+  : 0;
 
     const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
 
-    const topVideo = sorted[0];
-    const worstVideo = sorted[sorted.length - 1];
+   const topVideo = sorted[0] || {};
+const worstVideo = sorted[sorted.length - 1] || {};
 
     // frequência últimos 7 dias
     const now = Date.now();
@@ -151,6 +153,27 @@ Inclua:
 Seja direto, estratégico e profissional.
 `;
 
+
+// ===============================
+// ⚡ CACHE (EVITA REQUISIÇÕES REPETIDAS)
+// ===============================
+const cacheKey = parsedVideos
+  .slice(0,5)
+  .map(v => v.title)
+  .join("|")
+  .toLowerCase();
+
+global.__tubexCache = global.__tubexCache || {};
+
+const cache = global.__tubexCache[cacheKey];
+
+if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){ // 30 min
+  console.log("⚡ usando cache IA");
+  return res.status(200).json({
+    success: true,
+    text: cache.text
+  });
+}
     // ===============================
     // 🤖 OPENAI
     // ===============================
@@ -201,6 +224,12 @@ Seja direto, estratégico e profissional.
     }
 
     const text = String(data.choices?.[0]?.message?.content || "").trim();
+
+// 💾 salva no cache
+global.__tubexCache[cacheKey] = {
+  text,
+  timestamp: Date.now()
+};
 
     return res.status(200).json({
       success: true,

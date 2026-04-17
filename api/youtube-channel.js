@@ -1,8 +1,8 @@
 export default async function handler(req, res) {
 
-  // ===============================
+  // ======================================================
   // 🔥 CORS
-  // ===============================
+  // ======================================================
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -12,27 +12,28 @@ export default async function handler(req, res) {
     "Access-Control-Allow-Headers",
     "Content-Type, x-api-key, authorization"
   );
-  res.setHeader("Vary", "Origin");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // ===============================
+  // ======================================================
   // 🔐 API KEY
-  // ===============================
+  // ======================================================
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
-    return res.status(403).json({
+    return res.status(200).json({
       success: false,
       error: "unauthorized",
+      items: [],
       data: { channel: null, videos: [] }
     });
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({
+    return res.status(200).json({
       success: false,
-      error: "Método não permitido",
+      error: "invalid_method",
+      items: [],
       data: { channel: null, videos: [] }
     });
   }
@@ -44,81 +45,7 @@ export default async function handler(req, res) {
       : req.body;
 
     const channelId = body?.channelId;
-
-// ======================================================
-// 🔥 FALLBACK AUTOMÁTICO (CRÍTICO)
-// ======================================================
-if (!channelId) {
-
-  const keyword = body?.keyword || "";
-
-  console.warn("⚠️ Sem channelId, usando fallback por keyword:", keyword);
-
-if(!keyword){
-  return res.status(200).json({
-    success: true,
-    items: [],
-    data: { channel: null, videos: [] }
-  });
-}
-
-  const keys = (process.env.YOUTUBE_API_KEY || "")
-    .split(",")
-    .map(k => k.trim())
-    .filter(Boolean);
-
-  let videos = [];
-
-  for (const key of keys) {
-    try {
-
-      const searchRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(keyword)}&key=${key}`
-      );
-
-      const searchJson = await searchRes.json();
-
-      if (!searchRes.ok || !Array.isArray(searchJson.items)) continue;
-
-      const ids = searchJson.items
-        .map(v => v.id?.videoId)
-        .filter(Boolean)
-        .join(",");
-
-      if (!ids) continue;
-
-      const statsRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
-      );
-
-      const statsJson = await statsRes.json();
-
-      if (statsRes.ok && Array.isArray(statsJson.items)) {
-
-        videos = (statsJson.items || []).map(v => ({
-          ...v,
-          title: v.snippet.title,
-          views: Number(v.statistics.viewCount || 0),
-          publishedAt: v.snippet.publishedAt
-        }));
-
-        break;
-      }
-
-    } catch(e){
-      continue;
-    }
-  }
-
-  return res.status(200).json({
-  success: true,
-  items: videos,
-  data: {
-    channel: null,
-    videos
-  }
-});
-}
+    const keyword = body?.keyword || "";
 
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
@@ -128,90 +55,103 @@ if(!keyword){
     let channel = null;
     let videos = [];
 
-    for (const key of keys) {
-      try {
+    // ======================================================
+    // 🔥 FUNÇÃO UNIVERSAL DE FETCH
+    // ======================================================
+    const fetchVideosFromIds = async (ids, key) => {
+      if (!ids) return [];
 
-        // ===============================
-        // 📺 CHANNEL
-        // ===============================
-        const chRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
-        );
+      const statsRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
+      );
 
-        const chJson = await chRes.json();
+      const statsJson = await statsRes.json();
 
-        if (!chJson.items?.length) continue;
+      if (!statsRes.ok || !Array.isArray(statsJson.items)) return [];
 
-        channel = chJson.items[0];
+      return statsJson.items.map(v => ({
+        ...v,
+        title: v.snippet?.title || "",
+        views: Number(v.statistics?.viewCount || 0),
+        publishedAt: v.snippet?.publishedAt || ""
+      }));
+    };
 
-        const uploads =
-          channel.contentDetails?.relatedPlaylists?.uploads;
+    // ======================================================
+    // 🎯 PRIORIDADE 1: CHANNEL
+    // ======================================================
+    if (channelId) {
 
-if (!uploads) continue;
+      for (const key of keys) {
+        try {
 
-        // ===============================
-        // 🎥 PEGAR MAIS VÍDEOS (ATÉ 50)
-        // ===============================
-        const vidsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
-        );
+          const chRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
+          );
 
-const vidsJson = await vidsRes.json();
+          const chJson = await chRes.json();
 
-if (!vidsRes.ok || !Array.isArray(vidsJson.items)) {
-  console.warn("⚠️ playlistItems falhou:", vidsJson);
-  continue;
-}
+          if (!chJson.items?.length) continue;
 
-        const ids = (vidsJson.items || [])
-  .map(v => v.contentDetails?.videoId)
-          .filter(Boolean)
-          .join(",");
+          channel = chJson.items[0];
 
-if (!ids) continue;
+          const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
+          if (!uploads) continue;
 
-        // ===============================
-        // 📊 STATS
-        // ===============================
-        const statsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
-        );
+          const vidsRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
+          );
 
-const statsJson = await statsRes.json();
+          const vidsJson = await vidsRes.json();
 
-if (!statsRes.ok || !Array.isArray(statsJson.items)) {
-  console.warn("⚠️ videos stats falhou:", statsJson);
-  continue;
-}
+          const ids = (vidsJson.items || [])
+            .map(v => v.contentDetails?.videoId)
+            .filter(Boolean)
+            .join(",");
 
-        videos = (statsJson.items || []).map(v => ({
-          ...v,
-          title: v.snippet.title,
-          views: Number(v.statistics.viewCount || 0),
-          publishedAt: v.snippet.publishedAt
-        }));
+          videos = await fetchVideosFromIds(ids, key);
 
-        break;
+          if (videos.length) break;
 
-      } catch (e) {
-        continue;
+        } catch {}
       }
     }
 
-if (!channel || !videos.length) {
-  console.warn("🚨 nenhum vídeo encontrado no canal");
+    // ======================================================
+    // 🔁 FALLBACK: KEYWORD (SE NÃO TEM VÍDEOS)
+    // ======================================================
+    if (videos.length < 3 && keyword) {
 
-  return res.status(200).json({
-    success: true, // 🔥 CORRIGIDO
-    items: [],
-    data: { channel: null, videos: [] }
-  });
-}
+      console.warn("⚠️ fallback por keyword:", keyword);
 
-    // ===============================
-    // 🧠 MÉTRICAS INTELIGENTES
-    // ===============================
+      for (const key of keys) {
+        try {
 
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(keyword)}&key=${key}`
+          );
+
+          const searchJson = await searchRes.json();
+
+          const ids = (searchJson.items || [])
+            .map(v => v.id?.videoId)
+            .filter(Boolean)
+            .join(",");
+
+          const fallbackVideos = await fetchVideosFromIds(ids, key);
+
+          if (fallbackVideos.length) {
+            videos = fallbackVideos;
+            break;
+          }
+
+        } catch {}
+      }
+    }
+
+    // ======================================================
+    // 🧠 MÉTRICAS
+    // ======================================================
     const totalViews = videos.reduce((acc,v)=>acc+v.views,0);
     const avgViews = Math.round(totalViews / Math.max(1,videos.length));
 
@@ -223,33 +163,34 @@ if (!channel || !videos.length) {
     });
 
     const views7 = last7.reduce((acc,v)=>acc+v.views,0);
-
     const uploads7 = last7.length;
 
-    // ===============================
-    // 🚀 RESPONSE FINAL (UPGRADE)
-    // ===============================
-
- return res.status(200).json({
-  success: true,
-  items: videos, // 🔥 PADRÃO GLOBAL
-  data: {
-    channel,
-    videos,
-    metrics: {
-      totalViews,
-      avgViews,
-      views7,
-      uploads7
-    }
-  }
-});
+    // ======================================================
+    // 🚀 RESPONSE FINAL (PADRÃO PERFEITO)
+    // ======================================================
+    return res.status(200).json({
+      success: true,
+      items: videos, // 🔥 SEMPRE PADRÃO
+      data: {
+        channel,
+        videos,
+        metrics: {
+          totalViews,
+          avgViews,
+          views7,
+          uploads7
+        }
+      }
+    });
 
   } catch (e) {
 
-    return res.status(500).json({
+    console.error("💥 BACKEND ERROR:", e);
+
+    return res.status(200).json({
       success: false,
-      error: "erro interno",
+      error: "internal_error",
+      items: [],
       data: { channel: null, videos: [] }
     });
 

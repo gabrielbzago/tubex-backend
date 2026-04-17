@@ -56,7 +56,8 @@ if (!channelId) {
 
 if(!keyword){
   return res.status(200).json({
-    success: false,
+    success: true,
+    items: [],
     data: { channel: null, videos: [] }
   });
 }
@@ -155,14 +156,19 @@ if (!uploads) continue;
           `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
         );
 
-        const vidsJson = await vidsRes.json();
+const vidsJson = await vidsRes.json();
+
+if (!vidsRes.ok || !Array.isArray(vidsJson.items)) {
+  console.warn("⚠️ playlistItems falhou:", vidsJson);
+  continue;
+}
 
         const ids = (vidsJson.items || [])
   .map(v => v.contentDetails?.videoId)
           .filter(Boolean)
           .join(",");
 
-if (!ids || ids.length < 5) continue;
+if (!ids) continue;
 
         // ===============================
         // 📊 STATS
@@ -171,7 +177,12 @@ if (!ids || ids.length < 5) continue;
           `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
         );
 
-        const statsJson = await statsRes.json();
+const statsJson = await statsRes.json();
+
+if (!statsRes.ok || !Array.isArray(statsJson.items)) {
+  console.warn("⚠️ videos stats falhou:", statsJson);
+  continue;
+}
 
         videos = (statsJson.items || []).map(v => ({
           ...v,
@@ -187,13 +198,15 @@ if (!ids || ids.length < 5) continue;
       }
     }
 
-    if (!channel) {
-      return res.status(404).json({
-        success: false,
-        error: "Canal não encontrado",
-        data: { channel: null, videos: [] }
-      });
-    }
+if (!channel || !videos.length) {
+  console.warn("🚨 nenhum vídeo encontrado no canal");
+
+  return res.status(200).json({
+    success: false,
+    items: [],
+    data: { channel: null, videos: [] }
+  });
+}
 
     // ===============================
     // 🧠 MÉTRICAS INTELIGENTES

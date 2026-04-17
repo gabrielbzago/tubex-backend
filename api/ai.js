@@ -67,6 +67,7 @@ export default async function handler(req, res) {
 
     // fallback seguro
 if (!videos || videos.length < 3) {
+ console.warn("⚠️ sem vídeos → IA sem contexto");
   return res.status(200).json({
     success: true,
     empty: true,

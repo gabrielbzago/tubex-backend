@@ -202,7 +202,7 @@ if (!channel || !videos.length) {
   console.warn("🚨 nenhum vídeo encontrado no canal");
 
   return res.status(200).json({
-    success: false,
+    success: true, // 🔥 CORRIGIDO
     items: [],
     data: { channel: null, videos: [] }
   });

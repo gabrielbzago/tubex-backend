@@ -110,69 +110,10 @@ const worstVideo = sorted[sorted.length - 1] || {};
       return `- ${v.title} (${v.views} views)`;
     }).join("\n");
 
-// ===============================
-// 🧠 DETECÇÃO DE TIPO (CORRIGIDA E SEGURA)
-// ===============================
-const tipo = body?.tipo || "";
-
-const lower = String(prompt || "").toLowerCase();
-
-// 🔥 prioridade total para tipo (mais confiável)
-const isTitulo =
-  tipo === "tituloSEO" ||
-  tipo === "tituloImpactante" ||
-  tipo === "tituloEmocional";
-
-const isDescricao =
-  tipo === "descricao";
-
-// 🔥 fallback (caso tipo não venha)
-const fallbackTitulo =
-  lower.includes("título") || lower.includes("titulo");
-
-const fallbackDescricao =
-  lower.includes("descrição") || lower.includes("descricao");
-
-// ===============================
-// 🧠 PROMPT FINAL (CORRIGIDO)
-// ===============================
-let finalPrompt = prompt;
-
-// 🔥 TÍTULOS (SEM CONTEXTO DE CANAL)
-if (isTitulo || (!tipo && fallbackTitulo)) {
-
-  finalPrompt = `
-Crie 4 títulos curtos, altamente clicáveis e com SEO forte para YouTube.
-Máximo 70 caracteres.
-
-Base:
-"${prompt}"
-`;
-
-}
-
-// 🔥 DESCRIÇÃO (SEM CONTEXTO DE CANAL)
-else if (isDescricao || (!tipo && fallbackDescricao)) {
-
-  finalPrompt = `
-Crie uma descrição otimizada para SEO no YouTube.
-
-Inclua:
-- introdução forte
-- palavras-chave naturais
-- CTA leve
-- até 2 hashtags
-
-Base:
-"${prompt}"
-`;
-
-}
-
-// 🔥 MANTÉM SEU COMPORTAMENTO ORIGINAL (ANÁLISE)
-else {
-
-  finalPrompt = `
+    // ===============================
+    // 🧠 PROMPT PROFISSIONAL
+    // ===============================
+    const finalPrompt = `
 ${prompt}
 
 ========================
@@ -207,30 +148,28 @@ Inclua:
 
 Seja direto, estratégico e profissional.
 `;
-}
 
-// 🔥 AGORA FORA DO IF (PARA TODOS OS CASOS)
 
 // ===============================
-// ⚡ CACHE
+// ⚡ CACHE (EVITA REQUISIÇÕES REPETIDAS)
 // ===============================
-const cacheKey = (
-  parsedVideos.length >= 3
-    ? parsedVideos.slice(0,5).map(v => v.title).join("|")
-    : tipo + "_" + prompt
-).toLowerCase();
+const cacheKey = parsedVideos
+  .slice(0,5)
+  .map(v => v.title)
+  .join("|")
+  .toLowerCase();
 
 global.__tubexCache = global.__tubexCache || {};
 
 const cache = global.__tubexCache[cacheKey];
 
-if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){
+if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){ // 30 min
+  console.log("⚡ usando cache IA");
   return res.status(200).json({
     success: true,
     text: cache.text
   });
 }
-
     // ===============================
     // 🤖 OPENAI
     // ===============================

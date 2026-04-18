@@ -1,8 +1,5 @@
 export default async function handler(req, res) {
 
-  // ===============================
-  // 🔐 CORS
-  // ===============================
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -18,9 +15,6 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // ===============================
-  // 🔐 API KEY
-  // ===============================
   const apiKey =
     req.headers["x-api-key"] ||
     req.headers["authorization"]?.replace("Bearer ", "");
@@ -49,6 +43,7 @@ export default async function handler(req, res) {
 
     let prompt = body?.prompt;
     const context = body?.context || {};
+    const tipo = body?.tipo || "";
 
     if (!prompt) {
       return res.status(400).json({
@@ -60,19 +55,12 @@ export default async function handler(req, res) {
 
     prompt = String(prompt).slice(0, 2000);
 
-    // ======================================================
-    // 🔥 DADOS REAIS DO CANAL
-    // ======================================================
     const videos = Array.isArray(context.videos) ? context.videos : [];
 
-    // fallback seguro
-if (!videos || videos.length < 3) {
-  console.warn("⚠️ sem vídeos → IA sem contexto");
-}
+    if (!videos || videos.length < 3) {
+      console.warn("⚠️ sem vídeos → IA sem contexto");
+    }
 
-    // ===============================
-    // 📊 NORMALIZAÇÃO DE DADOS
-    // ===============================
     const parsedVideos = videos.slice(0, 20).map(v => ({
       title: v.title || v.snippet?.title || "",
       views: Number(v.views || v.statistics?.viewCount || 0),
@@ -81,20 +69,16 @@ if (!videos || videos.length < 3) {
       publishedAt: v.publishedAt || v.snippet?.publishedAt || ""
     }));
 
-    // ===============================
-    // 📈 MÉTRICAS INTELIGENTES
-    // ===============================
     const totalViews = parsedVideos.reduce((acc, v) => acc + v.views, 0);
-const avgViews = parsedVideos.length
-  ? Math.round(totalViews / parsedVideos.length)
-  : 0;
+    const avgViews = parsedVideos.length
+      ? Math.round(totalViews / parsedVideos.length)
+      : 0;
 
     const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
 
-   const topVideo = sorted[0] || {};
-const worstVideo = sorted[sorted.length - 1] || {};
+    const topVideo = sorted[0] || {};
+    const worstVideo = sorted[sorted.length - 1] || {};
 
-    // frequência últimos 7 dias
     const now = Date.now();
     const last7 = parsedVideos.filter(v => {
       const t = new Date(v.publishedAt).getTime();
@@ -103,17 +87,47 @@ const worstVideo = sorted[sorted.length - 1] || {};
 
     const uploads7 = last7.length;
 
-    // ===============================
-    // 🧠 RESUMO DOS VÍDEOS
-    // ===============================
     const videoSummary = parsedVideos.slice(0, 10).map(v => {
       return `- ${v.title} (${v.views} views)`;
     }).join("\n");
 
-    // ===============================
-    // 🧠 PROMPT PROFISSIONAL
-    // ===============================
-    const finalPrompt = `
+    // =========================================
+    // 🧠 PROMPT CONTROLADO (CORREÇÃO REAL)
+    // =========================================
+    let finalPrompt = "";
+
+    if(tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional"){
+
+      finalPrompt = `
+Crie 4 títulos curtos, altamente clicáveis para YouTube.
+Máx 70 caracteres.
+
+Base:
+"${prompt}"
+`;
+
+    }
+
+    else if(tipo === "descricao"){
+
+      finalPrompt = `
+Crie uma descrição otimizada para YouTube.
+
+Inclua:
+- introdução forte
+- palavras-chave naturais
+- CTA leve
+
+Base:
+"${prompt}"
+`;
+
+    }
+
+    // 🔥 SE NÃO FOR TÍTULO/DESCRIÇÃO → USA INTELLIGENCE NORMAL
+    if(!finalPrompt){
+
+      finalPrompt = `
 ${prompt}
 
 ========================
@@ -149,30 +163,27 @@ Inclua:
 Seja direto, estratégico e profissional.
 `;
 
+    }
 
-// ===============================
-// ⚡ CACHE (EVITA REQUISIÇÕES REPETIDAS)
-// ===============================
-const cacheKey = parsedVideos
-  .slice(0,5)
-  .map(v => v.title)
-  .join("|")
-  .toLowerCase();
-
-global.__tubexCache = global.__tubexCache || {};
-
-const cache = global.__tubexCache[cacheKey];
-
-if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){ // 30 min
-  console.log("⚡ usando cache IA");
-  return res.status(200).json({
-    success: true,
-    text: cache.text
-  });
-}
     // ===============================
-    // 🤖 OPENAI
+    // ⚡ CACHE
     // ===============================
+    const cacheKey = parsedVideos.length >= 3
+      ? parsedVideos.slice(0,5).map(v => v.title).join("|")
+      : (tipo + "_" + prompt);
+
+    global.__tubexCache = global.__tubexCache || {};
+
+    const cache = global.__tubexCache[cacheKey];
+
+    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){
+      console.log("⚡ usando cache IA");
+      return res.status(200).json({
+        success: true,
+        text: cache.text
+      });
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -195,37 +206,14 @@ if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){ // 30 min
       })
     });
 
-    const raw = await response.text();
-
-    let data;
-
-    try{
-      data = JSON.parse(raw);
-    }catch{
-      console.error("JSON inválido:", raw);
-      return res.status(500).json({
-        success:false,
-        error:"invalid json",
-        text:""
-      });
-    }
-
-    if (!response.ok) {
-      console.error("OpenAI error:", data);
-      return res.status(500).json({
-        success:false,
-        error:data?.error?.message || "Erro IA",
-        text:""
-      });
-    }
+    const data = await response.json();
 
     const text = String(data.choices?.[0]?.message?.content || "").trim();
 
-// 💾 salva no cache
-global.__tubexCache[cacheKey] = {
-  text,
-  timestamp: Date.now()
-};
+    global.__tubexCache[cacheKey] = {
+      text,
+      timestamp: Date.now()
+    };
 
     return res.status(200).json({
       success: true,

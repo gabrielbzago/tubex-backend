@@ -24,7 +24,9 @@ export default async function handler(req, res) {
     // =========================
     // 🎯 TÍTULOS
     // =========================
-    if (tipo === "tituloSEO") {
+const tipoNormalized = String(tipo).toLowerCase();
+
+if (tipoNormalized === "titulo" || tipoNormalized === "tituloseo") {
 
       finalPrompt = `
 Crie 4 títulos curtos, altamente clicáveis para YouTube.

@@ -41,12 +41,18 @@ export default async function handler(req, res) {
       : req.body;
 
     const keyword = body?.keyword?.trim();
+// =====================================
+// 🔥 CACHE GLOBAL (COLE AQUI)
+// =====================================
+global.tubexCache = global.tubexCache || {};
+
 const videoId = body?.videoId;
 
 // 🔥 PRIORIDADE: VIDEO ID
 if (videoId) {
 
-const key = (process.env.YOUTUBE_API_KEY || "").split(",")[0];
+const keys = (process.env.YOUTUBE_API_KEY || "").split(",");
+const key = keys[Math.floor(Math.random() * keys.length)];
 
   const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${key}`;
 
@@ -71,6 +77,18 @@ if (!keyword) {
   });
 }
 
+// 🔥 AGORA SIM
+const cacheKey = `seo_${keyword}`;
+const cached = global.tubexCache[cacheKey];
+
+if(cached){
+  if(cached.expires > Date.now()){
+    console.log("⚡ CACHE HIT:", keyword);
+    return res.status(200).json(cached.data);
+  }
+  delete global.tubexCache[cacheKey];
+}
+
     // 🔑 MULTI API KEY (FAILOVER)
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
@@ -83,7 +101,9 @@ if (!keyword) {
     // ======================================================
     // 🔥 BUSCA COM PAGINAÇÃO REAL (ATÉ 150 VÍDEOS)
     // ======================================================
-    for (const key of keys) {
+const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
+  
+  for (const key of shuffledKeys) {
 
       try {
 
@@ -222,12 +242,21 @@ competition = Math.max(20, competition);
     // ======================================================
     // ✅ RESPOSTA FINAL (100% COMPATÍVEL)
     // ======================================================
-    return res.status(200).json({
-      success: true,
-      items,
-      volume,
-      competition
-    });
+ const finalData = {
+  success: true,
+  items,
+  volume,
+  competition
+};
+
+// 💾 SALVA CACHE
+global.tubexCache[cacheKey] = {
+  data: finalData,
+  expires: Date.now() + (5 * 60 * 1000) // 5 minutos
+};
+
+return res.status(200).json(finalData);
+
 
   } catch (e) {
 

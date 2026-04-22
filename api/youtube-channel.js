@@ -22,9 +22,28 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const channelId = body?.channelId;
 
+// =====================================
+// 🔥 CACHE GLOBAL CHANNEL
+// =====================================
+
+
     if (!channelId) {
       return res.status(200).json({ success:false, error:"channelId_required", items:[], data:{channel:null,videos:[]} });
     }
+
+global.tubexChannelCache = global.tubexChannelCache || {};
+
+const cacheKey = `channel_${channelId}`;
+
+const cached = global.tubexChannelCache[cacheKey];
+
+if(cached){
+  if(cached.expires > Date.now()){
+    console.log("⚡ CACHE HIT CHANNEL:", channelId);
+    return res.status(200).json(cached.data);
+  }
+  delete global.tubexChannelCache[cacheKey];
+}
 
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
@@ -72,7 +91,9 @@ export default async function handler(req, res) {
     // ======================================================
     // 🔁 LOOP COM RETRY REAL + MULTI KEY
     // ======================================================
-    for (const key of keys) {
+    const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
+
+for (const key of shuffledKeys) {
 
       try {
 
@@ -81,7 +102,10 @@ export default async function handler(req, res) {
           `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
         );
 
-        if (!chRes.ok) continue;
+if (chRes.status === 403 || chRes.status === 429) {
+  console.warn("🚫 quota estourada");
+  continue;
+}
 
         const chJson = await chRes.json();
 
@@ -153,20 +177,28 @@ export default async function handler(req, res) {
     const views7 = last7.reduce((acc,v)=>acc+v.views,0);
     const uploads7 = last7.length;
 
-    return res.status(200).json({
-      success:true,
-      items:videos,
-      data:{
-        channel,
-        videos,
-        metrics:{
-          totalViews,
-          avgViews,
-          views7,
-          uploads7
-        }
-      }
-    });
+const finalData = {
+  success:true,
+  items:videos,
+  data:{
+    channel,
+    videos,
+    metrics:{
+      totalViews,
+      avgViews,
+      views7,
+      uploads7
+    }
+  }
+};
+
+// 💾 SALVA CACHE
+global.tubexChannelCache[cacheKey] = {
+  data: finalData,
+  expires: Date.now() + (5 * 60 * 1000) // 5 min
+};
+
+return res.status(200).json(finalData);
 
   } catch (e) {
 

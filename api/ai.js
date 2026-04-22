@@ -168,15 +168,13 @@ Seja direto, estratégico e profissional.
     // ===============================
     // ⚡ CACHE
     // ===============================
-    const cacheKey = parsedVideos.length >= 3
-      ? parsedVideos.slice(0,5).map(v => v.title).join("|")
-      : (tipo + "_" + prompt);
+    const cacheKey = `${tipo}_${prompt.slice(0,100)}_${parsedVideos.slice(0,3).map(v=>v.title).join("|")}`;
 
     global.__tubexCache = global.__tubexCache || {};
 
     const cache = global.__tubexCache[cacheKey];
 
-    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 30)){
+    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 10)){
       console.log("⚡ usando cache IA");
       return res.status(200).json({
         success: true,
@@ -184,41 +182,57 @@ Seja direto, estratégico e profissional.
       });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type":"application/json",
-        "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model:"gpt-4o-mini",
-        messages:[
-          {
-            role:"system",
-            content:"Você é um especialista em crescimento no YouTube, focado em SEO, retenção e viralização."
-          },
-          {
-            role:"user",
-            content: finalPrompt
-          }
-        ],
-        temperature: 0.5
-      })
-    });
+ const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  method:"POST",
+  headers:{
+    "Content-Type":"application/json",
+    "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
+  },
+  body: JSON.stringify({
+    model:"gpt-4o-mini",
+    messages:[
+      { role:"system", content:"Você é especialista em YouTube e SEO." },
+      { role:"user", content: finalPrompt }
+    ],
+    temperature:0.6
+  })
+});
 
-    const data = await response.json();
+// 🚨 TRATAMENTO REAL
+if (!response.ok) {
+  const errorText = await response.text();
+  console.error("💥 OPENAI ERROR:", errorText);
 
-    const text = String(data.choices?.[0]?.message?.content || "").trim();
+  return res.status(500).json({
+    success:false,
+    error:"openai_error",
+    message:errorText
+  });
+}
 
-    global.__tubexCache[cacheKey] = {
-      text,
-      timestamp: Date.now()
-    };
+const data = await response.json();
 
-    return res.status(200).json({
-      success: true,
-      text: text || "📊 Continue melhorando consistência e títulos."
-    });
+console.log("🧠 OPENAI RAW:", data);
+
+// 🔥 EXTRAÇÃO SEGURA
+const text = data?.choices?.[0]?.message?.content?.trim();
+
+if (!text) {
+  return res.status(500).json({
+    success:false,
+    error:"empty_ai_response"
+  });
+}
+
+global.__tubexCache[cacheKey] = {
+  text,
+  timestamp: Date.now()
+};
+
+return res.status(200).json({
+  success:true,
+  text
+});
 
   } catch (e) {
 

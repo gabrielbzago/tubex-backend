@@ -16,31 +16,13 @@ export default async function handler(req, res) {
 
     const { tipo, prompt } = body;
 
-  if (!prompt) {
+    if (!prompt) {
       return res.status(400).json({
         success:false,
         error:"prompt obrigatório"
       });
     }
 
-// ===============================
-// ⚡ CACHE IA EDITOR
-// ===============================
-global.__tubexEditorCache = global.__tubexEditorCache || {};
-
-const cacheKey = `${tipo}_${prompt.slice(0,100)}`;
-
-const cache = global.__tubexEditorCache[cacheKey];
-
-if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 60 * 6 )){
-  console.log("⚡ CACHE HIT IA EDITOR");
-  return res.status(200).json({
-    success: true,
-    text: cache.text
-  });
-}
-
-    
     let finalPrompt = "";
 
     // =========================
@@ -63,7 +45,7 @@ Base:
     // =========================
     // 📝 DESCRIÇÃO
     // =========================
-    else if (tipoNormalized === "descricao") {
+    else if (tipo === "descricao") {
 
       finalPrompt = `
 Crie uma descrição otimizada para YouTube.
@@ -109,10 +91,7 @@ Base:
 // 🚨 erro OpenAI
 if (!response.ok) {
   const errorText = await response.text();
-  console.error("💥 OPENAI ERROR FULL:", {
-  status: response.status,
-  body: errorText
-});
+  console.error("💥 OPENAI ERROR:", errorText);
 
   return res.status(500).json({
     success:false,
@@ -155,23 +134,19 @@ if (!text) {
 }
 
 // ✅ sucesso
-global.__tubexEditorCache[cacheKey] = {
-  text,
-  timestamp: Date.now()
-};
-
 return res.status(200).json({
   success:true,
   text
 });
 
-} catch (e) {
+  } catch (e) {
 
-  console.error(e);
+    console.error(e);
 
-  return res.status(500).json({
-    success:false,
-    error:"erro interno"
-  });
+    return res.status(500).json({
+      success:false,
+      error:"erro interno"
+    });
 
+  }
 }

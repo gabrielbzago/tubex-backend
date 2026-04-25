@@ -201,7 +201,7 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
       { role:"user", content: finalPrompt }
     ],
     temperature:0.6,
-max_tokens: 400
+max_tokens: 1200
   })
 });
 

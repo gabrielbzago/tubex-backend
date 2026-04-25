@@ -63,7 +63,7 @@ Base:
     // =========================
     // 📝 DESCRIÇÃO
     // =========================
-    else if (tipo === "descricao") {
+    else if (tipoNormalized === "descricao") {
 
       finalPrompt = `
 Crie uma descrição otimizada para YouTube.
@@ -109,7 +109,10 @@ Base:
 // 🚨 erro OpenAI
 if (!response.ok) {
   const errorText = await response.text();
-  console.error("💥 OPENAI ERROR:", errorText);
+  console.error("💥 OPENAI ERROR FULL:", {
+  status: response.status,
+  body: errorText
+});
 
   return res.status(500).json({
     success:false,

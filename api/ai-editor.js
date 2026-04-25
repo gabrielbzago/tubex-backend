@@ -32,7 +32,7 @@ const cacheKey = `${tipo}_${prompt.slice(0,100)}`;
 
 const cache = global.__tubexEditorCache[cacheKey];
 
-if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 10)){
+if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 60 * 6 )){
   console.log("⚡ CACHE HIT IA EDITOR");
   return res.status(200).json({
     success: true,

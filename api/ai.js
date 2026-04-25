@@ -87,7 +87,7 @@ export default async function handler(req, res) {
 
     const uploads7 = last7.length;
 
-    const videoSummary = parsedVideos.slice(0, 10).map(v => {
+    const videoSummary = parsedVideos.slice(0, 3).map(v => {
       return `- ${v.title} (${v.views} views)`;
     }).join("\n");
 
@@ -168,13 +168,19 @@ Seja direto, estratégico e profissional.
     // ===============================
     // ⚡ CACHE
     // ===============================
-    const cacheKey = `${tipo}_${prompt.slice(0,100)}_${parsedVideos.slice(0,3).map(v=>v.title).join("|")}`;
+const stableKey = parsedVideos
+  .slice(0,5)
+  .map(v => (v.title || "").slice(0,30).toLowerCase().trim())
+  .sort() // 🔥 ESSENCIAL
+  .join("|");
+
+const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
 
     global.__tubexCache = global.__tubexCache || {};
 
     const cache = global.__tubexCache[cacheKey];
 
-    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 10)){
+    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 60 * 6)){
       console.log("⚡ usando cache IA");
       return res.status(200).json({
         success: true,
@@ -194,7 +200,8 @@ Seja direto, estratégico e profissional.
       { role:"system", content:"Você é especialista em YouTube e SEO." },
       { role:"user", content: finalPrompt }
     ],
-    temperature:0.6
+    temperature:0.6,
+max_tokens: 400
   })
 });
 

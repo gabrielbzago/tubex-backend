@@ -116,18 +116,60 @@ Base:
 `;
         break;
 
-      case "roteiro":
-        finalPrompt = `
-Crie um roteiro de vídeo para YouTube.
+    case "roteiro":
+  finalPrompt = `
+Crie um roteiro profissional para vídeo do YouTube com foco em ALTA RETENÇÃO, SEO e RECOMENDAÇÃO do algoritmo.
 
-- abertura forte
-- desenvolvimento
-- CTA final
+OBJETIVO:
+Gerar um roteiro que maximize:
+- Tempo de exibição
+- CTR (clique)
+- Engajamento (comentários, likes, retenção)
 
-Base:
+ESTRUTURA OBRIGATÓRIA:
+
+1. HOOK (0–10 segundos)
+- Comece com uma frase extremamente forte e curiosa
+- Promessa clara de valor
+- Pode usar quebra de padrão ou dor do público
+- NÃO cumprimente (sem "oi pessoal")
+
+2. INTRO RÁPIDA (10–20s)
+- Explique rapidamente o que o vídeo vai entregar
+- Reforce o benefício principal
+- Inclua palavra-chave principal naturalmente
+
+3. DESENVOLVIMENTO (em blocos)
+- Divida em etapas ou tópicos claros
+- Use linguagem simples e direta
+- Inclua micro ganchos entre partes (ex: "e o próximo passo é o mais importante...")
+- Foque em retenção contínua
+
+4. MOMENTO DE REENGAJAMENTO
+- Inserir uma pergunta estratégica para gerar comentários
+- Ex: "você já tentou isso antes?"
+
+5. CTA INTELIGENTE
+- Incentivar like, comentário ou inscrição de forma natural
+- Não forçar, integrar ao conteúdo
+
+6. FINALIZAÇÃO
+- Encerrar com reforço do valor entregue
+- Criar sensação de continuidade (ex: próximo vídeo ou tema relacionado)
+
+REGRAS:
+- Linguagem natural e envolvente (estilo YouTuber profissional)
+- Sem listas numeradas no texto final
+- Não explique a estrutura, apenas escreva o roteiro pronto
+- Use a palavra-chave principal de forma natural ao longo do roteiro
+- Evite texto genérico ou robótico
+
+BASE DO VÍDEO:
 "${prompt}"
+
+Retorne apenas o roteiro final completo.
 `;
-        break;
+break;
 
       default:
         return res.status(400).json({

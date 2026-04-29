@@ -133,7 +133,10 @@ if (chRes.status === 403 || chRes.status === 429) {
           .map(v => v.contentDetails?.videoId)
           .filter(Boolean);
 
-        if (!idsArr.length) continue;
+if (!idsArr.length){
+  console.warn("⚠️ sem ids de vídeo");
+  continue;
+}
 
         const ids = idsArr.join(",");
 
@@ -152,14 +155,16 @@ if (chRes.status === 403 || chRes.status === 429) {
     // ======================================================
     // ❌ SEM DADOS
     // ======================================================
-    if (!Array.isArray(videos) || videos.length < 3) {
-      return res.status(200).json({
-        success:false,
-        error:"no_channel_videos",
-        items:[],
-        data:{channel,videos:[]}
-      });
-    }
+   if (!Array.isArray(videos) || videos.length === 0) {
+
+  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
+
+  return res.status(200).json({
+    success:true, // 🔥 NÃO BLOQUEIA MAIS
+    items:[],
+    data:{channel,videos:[]}
+  });
+}
 
     // ======================================================
     // 🧠 MÉTRICAS

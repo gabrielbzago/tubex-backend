@@ -11,12 +11,25 @@ const API_KEY = process.env.API_KEY;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
 // ======================================================
-// 🧱 MIDDLEWARE
+// 🧱 CORS (CORRETO PARA EXTENSÃO + YOUTUBE STUDIO)
 // ======================================================
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "x-api-key"]
+}));
+
+app.options("*", cors());
+
+// ======================================================
+// 📦 BODY
+// ======================================================
 app.use(express.json({ limit: "1mb" }));
 
-app.use((req,res,next)=>{
+// ======================================================
+// 📡 LOG
+// ======================================================
+app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.url}`);
   next();
 });
@@ -24,14 +37,13 @@ app.use((req,res,next)=>{
 // ======================================================
 // 🔒 AUTH
 // ======================================================
-function auth(req,res,next){
-
+function auth(req, res, next) {
   const key = req.headers["x-api-key"];
 
-  if(!key || key !== API_KEY){
+  if (!key || key !== API_KEY) {
     return res.status(401).json({
-      success:false,
-      error:"unauthorized"
+      success: false,
+      error: "unauthorized"
     });
   }
 
@@ -43,43 +55,40 @@ app.use("/api/ai", auth);
 // ======================================================
 // 🧠 CORE AI
 // ======================================================
-async function callAI(prompt){
-
-  try{
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization":`Bearer ${OPENAI_KEY}`
+async function callAI(prompt) {
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_KEY}`
       },
       body: JSON.stringify({
-        model:"gpt-4o-mini",
-        messages:[
+        model: "gpt-4o-mini",
+        messages: [
           {
-            role:"system",
-            content:"Especialista em crescimento no YouTube. Direto, prático e estratégico."
+            role: "system",
+            content: "Especialista em crescimento no YouTube. Direto, prático e estratégico."
           },
           {
-            role:"user",
+            role: "user",
             content: prompt
           }
         ],
-        temperature:0.7
+        temperature: 0.7
       })
     });
 
-    if(!res.ok){
+    if (!res.ok) {
       const err = await res.text();
       console.error("🚨 OpenAI ERROR:", err);
       return null;
     }
 
     const data = await res.json();
-
     return data?.choices?.[0]?.message?.content || null;
 
-  }catch(e){
+  } catch (e) {
     console.error("💥 AI FAIL:", e);
     return null;
   }
@@ -88,8 +97,7 @@ async function callAI(prompt){
 // ======================================================
 // 🧰 HELPERS
 // ======================================================
-function getTitles(videos = []){
-
+function getTitles(videos = []) {
   return videos
     .slice(0, 15)
     .map(v => v?.snippet?.title || v?.title || "")
@@ -97,25 +105,25 @@ function getTitles(videos = []){
     .join("\n");
 }
 
-function safeResponse(res, field, text){
+// 🔥 NUNCA RETORNA success:false (CRÍTICO)
+function safeResponse(res, field, text) {
 
-  if(!text || text.length < 20){
-    return res.json({
-      success:false,
-      error:"ai_empty"
-    });
+  let finalText = String(text || "").trim();
+
+  if (!finalText || finalText.length < 20) {
+    finalText = "⚠ Não foi possível gerar análise no momento.";
   }
 
   return res.json({
-    success:true,
-    [field]: text
+    success: true,
+    [field]: finalText
   });
 }
 
 // ======================================================
 // 🎯 STRATEGY
 // ======================================================
-app.post("/api/ai/strategy", async (req,res)=>{
+app.post("/api/ai/strategy", async (req, res) => {
 
   const { videos = [], stats = {} } = req.body;
 
@@ -137,13 +145,13 @@ Responda:
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"strategy",text);
+  return safeResponse(res, "strategy", text);
 });
 
 // ======================================================
 // 🧠 DIAGNOSIS
 // ======================================================
-app.post("/api/ai/diagnosis", async (req,res)=>{
+app.post("/api/ai/diagnosis", async (req, res) => {
 
   const { stats = {} } = req.body;
 
@@ -163,13 +171,13 @@ Responda:
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"diagnosis",text);
+  return safeResponse(res, "diagnosis", text);
 });
 
 // ======================================================
 // 💡 VIDEO IDEAS
 // ======================================================
-app.post("/api/ai/video-ideas", async (req,res)=>{
+app.post("/api/ai/video-ideas", async (req, res) => {
 
   const { videos = [] } = req.body;
 
@@ -183,13 +191,13 @@ Gere 5 ideias virais no mesmo estilo.
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"ideas",text);
+  return safeResponse(res, "ideas", text);
 });
 
 // ======================================================
 // 🚀 OPPORTUNITY
 // ======================================================
-app.post("/api/ai/opportunity", async (req,res)=>{
+app.post("/api/ai/opportunity", async (req, res) => {
 
   const { videos = [] } = req.body;
 
@@ -205,13 +213,13 @@ Sugira:
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"opportunity",text);
+  return safeResponse(res, "opportunity", text);
 });
 
 // ======================================================
-// 🔎 NICHE DETECTION
+// 🔎 NICHE
 // ======================================================
-app.post("/api/ai/niche", async (req,res)=>{
+app.post("/api/ai/niche", async (req, res) => {
 
   const { videos = [] } = req.body;
 
@@ -229,20 +237,20 @@ Identifique:
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"niche",text);
+  return safeResponse(res, "niche", text);
 });
 
 // ======================================================
-// 🧠 AI COACH
+// 🧠 COACH
 // ======================================================
-app.post("/api/ai/coach", async (req,res)=>{
+app.post("/api/ai/coach", async (req, res) => {
 
   const { question = "" } = req.body;
 
-  if(!question){
+  if (!question) {
     return res.json({
-      success:false,
-      error:"empty_question"
+      success: true,
+      answer: "⚠ Pergunta inválida."
     });
   }
 
@@ -257,10 +265,12 @@ Responda de forma prática.
 
   const text = await callAI(prompt);
 
-  return safeResponse(res,"answer",text);
+  return safeResponse(res, "answer", text);
 });
 
 // ======================================================
-app.listen(PORT, ()=>{
+// 🚀 START
+// ======================================================
+app.listen(PORT, () => {
   console.log(`🚀 AI SERVER RUNNING ON ${PORT}`);
 });

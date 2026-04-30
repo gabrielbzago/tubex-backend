@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
 
   // =========================
-  // 🔥 CORS (EXTENSÃO)
+  // 🔥 CORS
   // =========================
   const origin = req.headers.origin || "*";
 
@@ -55,79 +55,50 @@ export default async function handler(req, res) {
     const key = keys[Math.floor(Math.random() * keys.length)];
 
     // =========================
-    // 🔎 SEARCH (50 vídeos)
+    // 🔎 1. BUSCAR CANAL
     // =========================
     const searchRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=50&q=${encodeURIComponent(keyword)}&key=${key}`
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(keyword)}&key=${key}`
     );
 
     const searchJson = await searchRes.json();
 
-    const ids = searchJson.items
-      ?.map(v => v.id.videoId)
-      .filter(Boolean) || [];
+    const channelId = searchJson.items?.[0]?.id?.channelId;
 
-    if (!ids.length) {
+    if (!channelId) {
       return res.status(200).json({
-        success: true,
-        totalViews: 0,
-        totalVideos: 0,
-        avgViews: 0,
-        topTags: []
+        success: false,
+        error: "channel_not_found"
       });
     }
 
     // =========================
-    // 📊 DETAILS
+    // 📊 2. DADOS DO CANAL (REAL)
     // =========================
-    const videosRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(",")}&key=${key}`
+    const channelRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${key}`
     );
 
-    const videosJson = await videosRes.json();
+    const channelJson = await channelRes.json();
 
-    const items = videosJson.items || [];
+    const stats = channelJson.items?.[0]?.statistics;
 
-    // =========================
-    // 📈 MÉTRICAS
-    // =========================
-    let totalViews = 0;
-    let tagsMap = {};
-
-    items.forEach(v => {
-
-      const views = Number(v.statistics?.viewCount || 0);
-      totalViews += views;
-
-      const tags = v.snippet?.tags || [];
-
-      tags.forEach(tag => {
-        tagsMap[tag] = (tagsMap[tag] || 0) + 1;
+    if (!stats) {
+      return res.status(200).json({
+        success: false,
+        error: "no_channel_stats"
       });
-
-    });
-
-    const totalVideos = items.length;
-    const avgViews = totalVideos ? Math.round(totalViews / totalVideos) : 0;
+    }
 
     // =========================
-    // 🏷 TOP TAGS
-    // =========================
-    const topTags = Object.entries(tagsMap)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([tag]) => tag);
-
-    // =========================
-    // ✅ RESPOSTA FINAL
+    // ✅ RESPOSTA FINAL (SÓ O QUE IMPORTA)
     // =========================
     return res.status(200).json({
       success: true,
-      totalViews,
-      totalVideos,
-      avgViews,
-      topTags,
-      items // opcional (mantém compatível com seu sistema atual)
+      channelId,
+      totalViews: Number(stats.viewCount || 0),
+      totalVideos: Number(stats.videoCount || 0),
+      subscribers: Number(stats.subscriberCount || 0)
     });
 
   } catch (e) {

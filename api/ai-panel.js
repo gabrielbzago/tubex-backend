@@ -115,62 +115,101 @@ Base:
 "${prompt}"
 `;
         break;
-
-    case "roteiro":
+case "roteiro":
   finalPrompt = `
-Crie um roteiro profissional para vídeo do YouTube com foco em ALTA RETENÇÃO, SEO e RECOMENDAÇÃO do algoritmo.
+Você é um roteirista profissional de YouTube especializado em vídeos virais, retenção e SEO.
 
-OBJETIVO:
-Gerar um roteiro que maximize:
-- Tempo de exibição
+Crie um roteiro completo com estrutura altamente envolvente e formatado para leitura clara na tela.
+
+---
+
+🎯 OBJETIVO:
+Maximizar:
+- Retenção (assistir até o final)
 - CTR (clique)
-- Engajamento (comentários, likes, retenção)
+- Engajamento (comentários, likes, inscrição)
 
-ESTRUTURA OBRIGATÓRIA:
+---
 
-1. HOOK (0–10 segundos)
-- Comece com uma frase extremamente forte e curiosa
-- Promessa clara de valor
-- Pode usar quebra de padrão ou dor do público
-- NÃO cumprimente (sem "oi pessoal")
-
-2. INTRO RÁPIDA (10–20s)
-- Explique rapidamente o que o vídeo vai entregar
-- Reforce o benefício principal
-- Inclua palavra-chave principal naturalmente
-
-3. DESENVOLVIMENTO (em blocos)
-- Divida em etapas ou tópicos claros
-- Use linguagem simples e direta
-- Inclua micro ganchos entre partes (ex: "e o próximo passo é o mais importante...")
-- Foque em retenção contínua
-
-4. MOMENTO DE REENGAJAMENTO
-- Inserir uma pergunta estratégica para gerar comentários
-- Ex: "você já tentou isso antes?"
-
-5. CTA INTELIGENTE
-- Incentivar like, comentário ou inscrição de forma natural
-- Não forçar, integrar ao conteúdo
-
-6. FINALIZAÇÃO
-- Encerrar com reforço do valor entregue
-- Criar sensação de continuidade (ex: próximo vídeo ou tema relacionado)
-
-REGRAS:
-- Linguagem natural e envolvente (estilo YouTuber profissional)
-- Sem listas numeradas no texto final
-- Não explique a estrutura, apenas escreva o roteiro pronto
-- Use a palavra-chave principal de forma natural ao longo do roteiro
-- Evite texto genérico ou robótico
-
-BASE DO VÍDEO:
+📺 TEMA DO VÍDEO:
 "${prompt}"
 
-Retorne apenas o roteiro final completo.
+---
+
+📌 REGRAS DE OURO:
+- Linguagem natural (como um YouTuber experiente)
+- Sem enrolação
+- Sem frases genéricas
+- Direto, envolvente e estratégico
+- Nada de "olá pessoal"
+- Evitar tom robótico
+
+---
+
+🧠 ESTRUTURA (NÃO EXPLICAR, APENAS EXECUTAR):
+
+## 🚀 HOOK (ABERTURA IMPACTANTE)
+- Frase extremamente forte ou curiosa
+- Pode usar dor, polêmica ou promessa
+- Criar necessidade imediata de continuar assistindo
+
+## ⚡ INTRO RÁPIDA
+- O que a pessoa vai aprender
+- Por que isso importa
+- Inserir palavra-chave principal naturalmente
+
+## 📚 DESENVOLVIMENTO (BLOCOS CLAROS)
+Dividir o conteúdo em partes com subtítulos naturais:
+
+### 🔹 Bloco 1
+Conteúdo direto + valor imediato  
++ micro gancho no final
+
+### 🔹 Bloco 2
+Aprofundamento  
++ quebra de padrão ou insight
+
+### 🔹 Bloco 3
+Parte mais importante ou revelação  
++ manter tensão narrativa
+
+(Use quantos blocos forem necessários, mantendo fluidez)
+
+## 💬 REENGAJAMENTO
+- Inserir pergunta estratégica para comentários
+- Deve parecer natural dentro do roteiro
+
+## 🔥 CTA INTELIGENTE
+- Incentivar like/inscrição de forma orgânica
+- Integrado ao valor entregue (não forçado)
+
+## 🎯 FINALIZAÇÃO FORTE
+- Reforçar o valor principal
+- Criar sensação de continuidade (próximo vídeo, próximo passo, etc)
+
+---
+
+📌 FORMATAÇÃO (OBRIGATÓRIA):
+- Use Markdown
+- Títulos com ## e ###
+- Espaçamento entre blocos
+- Texto limpo e escaneável
+- Nada de bloco gigante de texto
+
+---
+
+⚠ IMPORTANTE:
+- NÃO explique a estrutura
+- NÃO fale "hook", "introdução", etc
+- Apenas entregue o roteiro pronto e profissional
+- Deve parecer um roteiro real pronto para gravação
+
+---
+
+Retorne apenas o roteiro final.
 `;
 break;
-
+    
       default:
         return res.status(400).json({
           success: false,

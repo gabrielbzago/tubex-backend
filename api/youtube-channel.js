@@ -159,11 +159,12 @@ if (!idsArr.length){
 
   console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
 
-  return res.status(200).json({
-    success:true, // 🔥 NÃO BLOQUEIA MAIS
-    items:[],
-    data:{channel,videos:[]}
-  });
+return res.status(200).json({
+  success:false,
+  error:"no_videos_found",
+  items:[],
+  data:{channel,videos:[]}
+});
 }
 
     // ======================================================

@@ -1,6 +1,5 @@
 import Stripe from "stripe";
 import { buffer } from "micro";
-import { supabase } from "../lib/supabase.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -8,7 +7,6 @@ export const config = {
   api: { bodyParser: false },
 };
 
-// 🔥 MAPEAMENTO DE PLANOS
 const PLAN_MAP = {
   "price_start_123": "start",
   "price_pro_456": "pro",
@@ -39,40 +37,23 @@ export default async function handler(req, res) {
 
   try {
 
-    // =========================
-    // 💰 PAGAMENTO / ASSINATURA
-    // =========================
     if (event.type === "checkout.session.completed") {
 
       const session = event.data.object;
 
-      const email = session.customer_email;
-      const customerId = session.customer;
+      const email =
+        session.customer_details?.email ||
+        session.customer_email ||
+        "sem-email";
 
-      // 🔥 pega o price_id correto
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
       const priceId = lineItems.data[0]?.price?.id;
 
       const plan = PLAN_MAP[priceId] || "free";
 
       console.log("💰 Pagamento aprovado:", email, plan);
-
-      await supabase
-        .from("users")
-        .upsert([
-          {
-            email: email.toLowerCase(),
-            plan: plan,
-            stripe_customer_id: customerId,
-            status: "active"
-          }
-        ]);
-
     }
 
-    // =========================
-    // 🔁 UPGRADE / DOWNGRADE
-    // =========================
     if (event.type === "customer.subscription.updated") {
 
       const subscription = event.data.object;
@@ -83,57 +64,25 @@ export default async function handler(req, res) {
       const plan = PLAN_MAP[priceId] || "free";
 
       console.log("🔄 Plano atualizado:", customerId, plan);
-
-      await supabase
-        .from("users")
-        .update({
-          plan: plan,
-          status: "active"
-        })
-        .eq("stripe_customer_id", customerId);
-
     }
 
-    // =========================
-    // ❌ CANCELAMENTO
-    // =========================
     if (event.type === "customer.subscription.deleted") {
 
       const subscription = event.data.object;
-      const customerId = subscription.customer;
 
-      console.log("❌ Assinatura cancelada:", customerId);
-
-      await supabase
-        .from("users")
-        .update({
-          plan: "free",
-          status: "cancelled"
-        })
-        .eq("stripe_customer_id", customerId);
+      console.log("❌ Assinatura cancelada:", subscription.customer);
     }
 
-    // =========================
-    // ⚠️ PAGAMENTO FALHOU
-    // =========================
     if (event.type === "invoice.payment_failed") {
 
       const invoice = event.data.object;
-      const customerId = invoice.customer;
 
-      console.log("⚠️ Pagamento falhou:", customerId);
-
-      await supabase
-        .from("users")
-        .update({
-          status: "past_due"
-        })
-        .eq("stripe_customer_id", customerId);
+      console.log("⚠️ Pagamento falhou:", invoice.customer);
     }
 
   } catch (err) {
-    console.error("Erro geral webhook:", err);
+    console.error("💥 erro geral webhook:", err);
   }
 
-  res.json({ received: true });
+  return res.json({ received: true });
 }

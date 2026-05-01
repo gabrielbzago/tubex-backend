@@ -217,6 +217,25 @@ break;
         });
     }
 
+// =====================================
+// ⚡ CACHE (ANTES DA IA)
+// =====================================
+const cacheKey = tipo + "_" + prompt;
+
+globalThis.__tubexCache = globalThis.__tubexCache || {};
+
+const cached = globalThis.__tubexCache[cacheKey];
+
+if (cached) {
+  console.log("⚡ CACHE HIT");
+
+  return res.status(200).json({
+    success: true,
+    text: cached,
+    cached: true
+  });
+}
+
     // =====================================
     // ⏱ TIMEOUT CONTROLLER
     // =====================================
@@ -244,12 +263,12 @@ break;
             content: `
 Você é um especialista em crescimento no YouTube.
 
-Regras obrigatórias:
-- Gere apenas UMA resposta final
-- Nunca gere listas ou múltiplas opções
-- Nunca numere
-- Resposta direta, limpa e pronta
-            `.trim()
+Regras:
+- Gere uma resposta direta e completa
+- Siga exatamente o formato solicitado no prompt
+- Se for roteiro, use estrutura com seções
+- Não corte conteúdo
+`.trim()
           },
           {
             role: "user",
@@ -258,7 +277,7 @@ Regras obrigatórias:
         ],
 
         temperature: 0.7,
-        max_tokens: 300,
+        max_tokens: 1200,
         top_p: 1,
         frequency_penalty: 0.3,
         presence_penalty: 0.2
@@ -283,21 +302,31 @@ Regras obrigatórias:
 
     const data = await response.json();
 
-    let text = String(
-      data?.choices?.[0]?.message?.content || ""
-    ).trim();
+ let text = String(
+  data?.choices?.[0]?.message?.content || ""
+).trim();
 
-    // =====================================
-    // 🧹 LIMPEZA DE RESPOSTA
-    // =====================================
-    text = text
-      .split("\n")[0]
-      .replace(/^[\d\.\-\)\s]+/, "")
-      .trim();
+// =====================================
+// 🧹 LIMPEZA FINAL
+// =====================================
+if (
+  tipo === "titulo-impactante" ||
+  tipo === "titulo-seo" ||
+  tipo === "titulo-emocional"
+) {
+  text = text.split("\n")[0].trim();
+} else {
+  text = text.trim();
+}
 
-    if (!text) {
-      text = "⚠ Não foi possível gerar conteúdo no momento.";
-    }
+if (!text) {
+  text = "⚠ Não foi possível gerar conteúdo no momento.";
+}
+
+// =====================================
+// 💾 SAVE CACHE (AGORA CORRETO)
+// =====================================
+globalThis.__tubexCache[cacheKey] = text;
 
     // =====================================
     // ✅ RESPONSE FINAL

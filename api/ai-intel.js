@@ -3,274 +3,268 @@ import cors from "cors";
 
 const app = express();
 
-// ======================================================
-// ⚙️ CONFIG
-// ======================================================
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
-// ======================================================
-// 🧱 CORS (CORRETO PARA EXTENSÃO + YOUTUBE STUDIO)
-// ======================================================
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "x-api-key"]
-}));
-
-app.options("*", cors());
-
-// ======================================================
-// 📦 BODY
-// ======================================================
+app.use(cors({ origin: "*", methods: ["GET","POST"], allowedHeaders: ["Content-Type","x-api-key"] }));
 app.use(express.json({ limit: "1mb" }));
-
-// ======================================================
-// 📡 LOG
-// ======================================================
-app.use((req, res, next) => {
-  console.log(`📡 ${req.method} ${req.url}`);
-  next();
-});
 
 // ======================================================
 // 🔒 AUTH
 // ======================================================
-function auth(req, res, next) {
-  const key = req.headers["x-api-key"];
-
-  if (!key || key !== API_KEY) {
-    return res.status(401).json({
-      success: false,
-      error: "unauthorized"
-    });
+function auth(req,res,next){
+  if(req.headers["x-api-key"] !== API_KEY){
+    return res.status(401).json({ success:false });
   }
-
   next();
 }
 
 app.use("/api/ai", auth);
 
 // ======================================================
-// 🧠 CORE AI
+// 🧠 IA CORE
 // ======================================================
-async function callAI(prompt) {
-  try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_KEY}`
+async function callAI(prompt){
+  try{
+    const res = await fetch("https://api.openai.com/v1/chat/completions",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":`Bearer ${OPENAI_KEY}`
       },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Especialista em crescimento no YouTube. Direto, prático e estratégico."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.7
+      body:JSON.stringify({
+        model:"gpt-4o-mini",
+        temperature:0.6,
+        messages:[
+          { role:"system", content:"Especialista em crescimento no YouTube, direto e estratégico." },
+          { role:"user", content: prompt }
+        ]
       })
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("🚨 OpenAI ERROR:", err);
-      return null;
-    }
+    if(!res.ok) return null;
 
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || null;
 
-  } catch (e) {
-    console.error("💥 AI FAIL:", e);
+  }catch(e){
+    console.error("AI FAIL", e);
     return null;
   }
 }
 
 // ======================================================
-// 🧰 HELPERS
+// 📊 ENGINE (SEM IA)
 // ======================================================
-function getTitles(videos = []) {
-  return videos
-    .slice(0, 15)
-    .map(v => v?.snippet?.title || v?.title || "")
-    .filter(Boolean)
-    .join("\n");
+function analyzeChannel(stats, videos){
+
+  const subs = Number(stats.subscribers || 0);
+  const avg = Number(stats.avg || 0);
+  const uploads7 = Number(stats.uploads7 || 0);
+  const views7 = Number(stats.views7 || 0);
+
+  // consistência
+  const consistency = Math.min(10, uploads7 * 2);
+
+  // performance
+  const performance = subs > 0 ? Math.min(10, (avg / subs) * 10) : 0;
+
+  // crescimento
+  const growth = subs > 0 ? (views7 / subs) : 0;
+
+  const potential = Math.min(10, growth * 5);
+
+  const positioning = avg > 0 ? 6 : 2;
+
+  const score = Math.round(
+    (consistency + performance + potential + positioning) * 2.5
+  );
+
+  return {
+    score,
+    consistency: Math.round(consistency),
+    performance: Math.round(performance),
+    potential: Math.round(potential),
+    positioning: Math.round(positioning)
+  };
 }
 
-// 🔥 NUNCA RETORNA success:false (CRÍTICO)
-function safeResponse(res, field, text) {
-
-  let finalText = String(text || "").trim();
-
-  if (!finalText || finalText.length < 20) {
-    finalText = "⚠ Não foi possível gerar análise no momento.";
-  }
-
-  return res.json({
-    success: true,
-    [field]: finalText
-  });
-}
-
 // ======================================================
-// 🎯 STRATEGY
+// 🧠 DIAGNOSIS (HYBRID)
 // ======================================================
-app.post("/api/ai/strategy", async (req, res) => {
+app.post("/api/ai/diagnosis", async (req,res)=>{
 
-  const { videos = [], stats = {} } = req.body;
+  try{
 
-  const prompt = `
-Analise este canal:
+    const { stats={}, videos=[] } = req.body;
 
-Inscritos: ${stats.subscribers || 0}
-Views: ${stats.views || 0}
+    if(videos.length < 3){
+      return res.json({
+        success:true,
+        data:{
+          score:0,
+          message:"Dados insuficientes"
+        }
+      });
+    }
+
+    const base = analyzeChannel(stats, videos);
+
+    // ======================================================
+    // 🧠 IA COMPLEMENTAR
+    // ======================================================
+    const titles = videos
+      .slice(0,10)
+      .map(v=>v?.snippet?.title || v?.title || "")
+      .join("\n");
+
+    const prompt = `
+Baseado nesses dados:
+
+Score: ${base.score}
+Consistência: ${base.consistency}
+Performance: ${base.performance}
 
 Títulos:
-${getTitles(videos)}
+${titles}
 
-Responda:
+Gere:
 
-### ✔ O que funciona
-### ⚠ Problemas
-### 🎯 Estratégia de crescimento
+- 3 problemas principais
+- 3 oportunidades
+
+Resposta curta
 `;
 
-  const text = await callAI(prompt);
+    const ai = await callAI(prompt);
 
-  return safeResponse(res, "strategy", text);
-});
-
-// ======================================================
-// 🧠 DIAGNOSIS
-// ======================================================
-app.post("/api/ai/diagnosis", async (req, res) => {
-
-  const { stats = {} } = req.body;
-
-  const prompt = `
-Diagnostique este canal:
-
-Inscritos: ${stats.subscribers || 0}
-Views: ${stats.views || 0}
-Uploads: ${stats.uploads7 || 0}
-
-Responda:
-
-### ✔ Pontos fortes
-### ⚠ Problemas
-### 🎯 Ações práticas
-`;
-
-  const text = await callAI(prompt);
-
-  return safeResponse(res, "diagnosis", text);
-});
-
-// ======================================================
-// 💡 VIDEO IDEAS
-// ======================================================
-app.post("/api/ai/video-ideas", async (req, res) => {
-
-  const { videos = [] } = req.body;
-
-  const prompt = `
-Baseado nesses vídeos:
-
-${getTitles(videos)}
-
-Gere 5 ideias virais no mesmo estilo.
-`;
-
-  const text = await callAI(prompt);
-
-  return safeResponse(res, "ideas", text);
-});
-
-// ======================================================
-// 🚀 OPPORTUNITY
-// ======================================================
-app.post("/api/ai/opportunity", async (req, res) => {
-
-  const { videos = [] } = req.body;
-
-  const prompt = `
-Com base nesses vídeos:
-
-${getTitles(videos)}
-
-Sugira:
-
-1 ideia com alto potencial viral + explicação.
-`;
-
-  const text = await callAI(prompt);
-
-  return safeResponse(res, "opportunity", text);
-});
-
-// ======================================================
-// 🔎 NICHE
-// ======================================================
-app.post("/api/ai/niche", async (req, res) => {
-
-  const { videos = [] } = req.body;
-
-  const prompt = `
-Analise:
-
-${getTitles(videos)}
-
-Identifique:
-
-✔ Nicho principal
-✔ Subnicho
-✔ Público
-`;
-
-  const text = await callAI(prompt);
-
-  return safeResponse(res, "niche", text);
-});
-
-// ======================================================
-// 🧠 COACH
-// ======================================================
-app.post("/api/ai/coach", async (req, res) => {
-
-  const { question = "" } = req.body;
-
-  if (!question) {
     return res.json({
-      success: true,
-      answer: "⚠ Pergunta inválida."
+      success:true,
+      data:{
+        ...base,
+        insights: ai || "Sem insights disponíveis"
+      }
+    });
+
+  }catch(e){
+
+    console.error(e);
+
+    return res.json({
+      success:true,
+      data:{
+        score:0,
+        error:true
+      }
+    });
+  }
+});
+
+// ======================================================
+// 💡 VIDEO IDEAS (INTELIGENTE)
+// ======================================================
+app.post("/api/ai/video-ideas", async (req,res)=>{
+
+  try{
+
+    const { videos=[] } = req.body;
+
+    if(videos.length < 3){
+      return res.json({
+        success:true,
+        ideas:[
+          "Como crescer no YouTube do zero",
+          "Erros que matam seu canal",
+          "Como viralizar vídeos pequenos"
+        ]
+      });
+    }
+
+    const top = videos
+      .sort((a,b)=> (b.views||0)-(a.views||0))
+      .slice(0,10);
+
+    const titles = top.map(v=>v.title).join("\n");
+
+    const prompt = `
+Baseado nesses vídeos virais:
+
+${titles}
+
+Crie 5 títulos altamente clicáveis
+
+Sem explicação
+`;
+
+    const text = await callAI(prompt);
+
+    const ideas = text
+      ?.split("\n")
+      .map(i=>i.trim())
+      .filter(i=>i.length>5)
+      .slice(0,5);
+
+    return res.json({
+      success:true,
+      ideas: ideas?.length ? ideas : top.map(v=>v.title)
+    });
+
+  }catch(e){
+
+    return res.json({
+      success:true,
+      ideas:["Erro ao gerar ideias"]
+    });
+  }
+});
+
+// ======================================================
+// 🧠 NICHE (SEM IA - RÁPIDO)
+// ======================================================
+app.post("/api/ai/niche", async (req,res)=>{
+
+  const { videos=[] } = req.body;
+
+  if(videos.length < 3){
+    return res.json({
+      success:true,
+      niche:"Geral",
+      confidence:0
     });
   }
 
-  const prompt = `
-Você é um coach de YouTube.
+  const text = videos.map(v=>v.title).join(" ").toLowerCase();
 
-Pergunta:
-${question}
+  const map = {
+    youtube:["youtube","canal","views"],
+    games:["game","minecraft","fps"],
+    anime:["naruto","anime","episodio"],
+    dinheiro:["dinheiro","renda","lucro"]
+  };
 
-Responda de forma prática.
-`;
+  let best = "Geral";
+  let score = 0;
 
-  const text = await callAI(prompt);
+  for(const k in map){
+    let s = 0;
+    map[k].forEach(w=>{
+      if(text.includes(w)) s++;
+    });
+    if(s > score){
+      score = s;
+      best = k;
+    }
+  }
 
-  return safeResponse(res, "answer", text);
+  return res.json({
+    success:true,
+    niche:best,
+    confidence: Math.min(100, score*20)
+  });
 });
 
 // ======================================================
-// 🚀 START
-// ======================================================
-app.listen(PORT, () => {
-  console.log(`🚀 AI SERVER RUNNING ON ${PORT}`);
+app.listen(PORT, ()=>{
+  console.log("🚀 ENTERPRISE AI RUNNING");
 });

@@ -1,107 +1,20 @@
-// ======================================================
-// 🚀 TubeX YouTube Channel API (PRODUCTION)
-// ======================================================
-
-const CACHE_TTL = 1000 * 60 * 5; // 5 min
-const REQUEST_TIMEOUT = 8000;
-
-// 🔒 CORS WHITELIST
-const ALLOWED_ORIGINS = [
-  "https://www.youtube.com",
-  "https://studio.youtube.com"
-];
-
-// 🧠 CACHE GLOBAL (fallback serverless)
-global.tubexCache = global.tubexCache || {};
-
-function getCache(key) {
-  const item = global.tubexCache[key];
-  if (!item) return null;
-  if (item.exp < Date.now()) {
-    delete global.tubexCache[key];
-    return null;
-  }
-  return item.data;
-}
-
-function setCache(key, data) {
-  global.tubexCache[key] = {
-    data,
-    exp: Date.now() + CACHE_TTL
-  };
-}
-
-// ======================================================
-// ⏱ FETCH COM TIMEOUT
-// ======================================================
-async function fetchWithTimeout(url) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    return res;
-  } catch (e) {
-    clearTimeout(timeout);
-    throw e;
-  }
-}
-
-// ======================================================
-// 🎥 FETCH VIDEOS
-// ======================================================
-async function fetchVideos(ids, key) {
-  if (!ids.length) return [];
-
-  try {
-    const res = await fetchWithTimeout(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(",")}&key=${key}`
-    );
-
-    if (!res.ok) return [];
-
-    const json = await res.json();
-
-    return (json.items || []).map(v => ({
-      title: v.snippet?.title || "",
-      views: Number(v.statistics?.viewCount || 0),
-      publishedAt: v.snippet?.publishedAt || ""
-    }));
-
-  } catch {
-    return [];
-  }
-}
-
-// ======================================================
-// 🚀 HANDLER
-// ======================================================
 export default async function handler(req, res) {
 
-  // ======================================================
-  // 🔒 CORS
-  // ======================================================
-  const origin = req.headers.origin;
+  const origin = req.headers.origin || "*";
 
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key, authorization");
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // ======================================================
-  // 🔑 AUTH
-  // ======================================================
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
-    return res.status(200).json({ success: false, error: "unauthorized" });
+    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
   }
 
   if (req.method !== "POST") {
-    return res.status(200).json({ success: false, error: "invalid_method" });
+    return res.status(200).json({ success:false, error:"invalid_method", items:[], data:{channel:null,videos:[]} });
   }
 
   try {
@@ -109,163 +22,199 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const channelId = body?.channelId;
 
+// =====================================
+// 🔥 CACHE GLOBAL CHANNEL
+// =====================================
+
+
     if (!channelId) {
-      return res.status(200).json({ success: false, error: "missing_channelId" });
+      return res.status(200).json({ success:false, error:"channelId_required", items:[], data:{channel:null,videos:[]} });
     }
 
-    // ======================================================
-    // ⚡ CACHE
-    // ======================================================
-    const cacheKey = `channel_${channelId}`;
-    const cached = getCache(cacheKey);
+global.tubexChannelCache = global.tubexChannelCache || {};
 
-    if (cached) {
-      console.log("⚡ CACHE HIT");
-      return res.status(200).json(cached);
-    }
+const cacheKey = `channel_${channelId}`;
 
-    // ======================================================
-    // 🔑 MULTI KEY
-    // ======================================================
+const cached = global.tubexChannelCache[cacheKey];
+
+if(cached){
+  if(cached.expires > Date.now()){
+    console.log("⚡ CACHE HIT CHANNEL:", channelId);
+    return res.status(200).json(cached.data);
+  }
+  delete global.tubexChannelCache[cacheKey];
+}
+
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
       .map(k => k.trim())
-      .filter(Boolean)
-      .sort(() => 0.5 - Math.random());
+      .filter(Boolean);
 
     let channel = null;
     let videos = [];
 
     // ======================================================
-    // 🔁 LOOP KEYS
+    // 🔥 FETCH VIDEOS COM PROTEÇÃO REAL
     // ======================================================
-    for (const key of keys) {
+    const fetchVideosFromIds = async (ids, key) => {
+
+      if (!ids) return [];
+
+      try{
+
+        const res = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
+        );
+
+        if (!res.ok) {
+          console.warn("⚠️ erro videos API:", res.status);
+          return [];
+        }
+
+        const json = await res.json();
+
+        if (!Array.isArray(json.items)) return [];
+
+        return json.items.map(v => ({
+          ...v,
+          title: v.snippet?.title || "",
+          views: Number(v.statistics?.viewCount || 0),
+          publishedAt: v.snippet?.publishedAt || ""
+        }));
+
+      }catch(e){
+        console.warn("⚠️ erro fetch videos:", e);
+        return [];
+      }
+    };
+
+    // ======================================================
+    // 🔁 LOOP COM RETRY REAL + MULTI KEY
+    // ======================================================
+    const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
+
+for (const key of shuffledKeys) {
 
       try {
 
-        // 📊 CHANNEL
-        const chRes = await fetchWithTimeout(
+        // 🔹 1. CHANNEL
+        const chRes = await fetch(
           `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
         );
 
-        if (!chRes.ok) continue;
+if (chRes.status === 403 || chRes.status === 429) {
+  console.warn("🚫 quota estourada");
+  continue;
+}
 
         const chJson = await chRes.json();
+
         if (!chJson.items?.length) continue;
 
         channel = chJson.items[0];
 
         const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
+
         if (!uploads) continue;
 
-        // 📺 PLAYLIST
-        const listRes = await fetchWithTimeout(
+        // 🔹 2. PLAYLIST
+        const vidsRes = await fetch(
           `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
         );
 
-        if (!listRes.ok) continue;
+        if (!vidsRes.ok) {
+          console.warn("⚠️ erro playlistItems:", vidsRes.status);
+          continue;
+        }
 
-        const listJson = await listRes.json();
+        const vidsJson = await vidsRes.json();
 
-        const ids = (listJson.items || [])
+        const idsArr = (vidsJson.items || [])
           .map(v => v.contentDetails?.videoId)
           .filter(Boolean);
 
-        if (!ids.length) continue;
+if (!idsArr.length){
+  console.warn("⚠️ sem ids de vídeo");
+  continue;
+}
 
-        const fetched = await fetchVideos(ids, key);
+        const ids = idsArr.join(",");
 
-        if (fetched.length >= 3) {
-          videos = fetched;
-          break;
-        }
+        const fetched = await fetchVideosFromIds(ids, key);
+
+        if (!Array.isArray(fetched) || fetched.length < 3) continue;
+
+        videos = fetched;
+        break;
 
       } catch (e) {
-        console.warn("⚠️ key falhou");
+        console.warn("⚠️ erro geral key:", e);
       }
     }
 
     // ======================================================
-    // ❌ FALLBACK (NUNCA QUEBRA FRONT)
+    // ❌ SEM DADOS
     // ======================================================
-    if (!channel) {
-      return res.status(200).json({
-        success: true,
-        warning: "no_channel_data",
-        data: {
-          channel: null,
-          videos: [],
-          metrics: {
-            subscribers: 0,
-            totalViews: 0,
-            avgViews: 0,
-            views7: 0,
-            uploads7: 0
-          }
-        }
-      });
-    }
+   if (!Array.isArray(videos) || videos.length === 0) {
+
+  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
+
+return res.status(200).json({
+  success:false,
+  error:"no_videos_found",
+  items:[],
+  data:{channel,videos:[]}
+});
+}
 
     // ======================================================
-    // 📊 MÉTRICAS REAIS
+    // 🧠 MÉTRICAS
     // ======================================================
-    const subscribers = Number(channel.statistics?.subscriberCount || 0);
-    const totalViews = Number(channel.statistics?.viewCount || 0);
-
-    const totalVideoViews = videos.reduce((a, v) => a + v.views, 0);
-    const avgViews = videos.length ? Math.round(totalVideoViews / videos.length) : 0;
+    const totalViews = videos.reduce((acc,v)=>acc+v.views,0);
+    const avgViews = Math.round(totalViews / videos.length);
 
     const now = Date.now();
 
-    const last7 = videos.filter(v => {
+    const last7 = videos.filter(v=>{
       const t = new Date(v.publishedAt).getTime();
-      return (now - t) <= (7 * 24 * 60 * 60 * 1000);
+      return (now - t) <= (7*24*60*60*1000);
     });
 
-    const views7 = last7.reduce((a, v) => a + v.views, 0);
+    const views7 = last7.reduce((acc,v)=>acc+v.views,0);
     const uploads7 = last7.length;
 
-    // ======================================================
-    // ✅ RESULT FINAL
-    // ======================================================
-    const result = {
-      success: true,
-      data: {
-        channel,
-        videos,
-        metrics: {
-          subscribers,
-          totalViews,
-          avgViews,
-          views7,
-          uploads7
-        }
-      }
-    };
+const finalData = {
+  success:true,
+  items:videos,
+  data:{
+    channel,
+    videos,
+    metrics:{
+      totalViews,
+      avgViews,
+      views7,
+      uploads7
+    }
+  }
+};
 
-    // 💾 CACHE
-    setCache(cacheKey, result);
+// 💾 SALVA CACHE
+global.tubexChannelCache[cacheKey] = {
+  data: finalData,
+  expires: Date.now() + (5 * 60 * 1000) // 5 min
+};
 
-    return res.status(200).json(result);
+return res.status(200).json(finalData);
 
   } catch (e) {
 
-    console.error("💥 BACKEND CRASH:", e);
+    console.error("💥 BACKEND ERROR:", e);
 
     return res.status(200).json({
-      success: true,
-      warning: "internal_error",
-      data: {
-        channel: null,
-        videos: [],
-        metrics: {
-          subscribers: 0,
-          totalViews: 0,
-          avgViews: 0,
-          views7: 0,
-          uploads7: 0
-        }
-      }
+      success:false,
+      error:"internal_error",
+      items:[],
+      data:{channel:null,videos:[]}
     });
   }
 }

@@ -152,6 +152,51 @@ Responda apenas com as ideias.
 
 }
 
+else if(tipo === "strategy"){
+
+  finalPrompt = `
+Você é um consultor especialista em crescimento no YouTube.
+
+📊 DADOS REAIS:
+- Média de views: ${avgViews}
+- Uploads últimos 7 dias: ${uploads7}
+
+🔥 Melhor vídeo:
+${topVideo?.title || "N/A"} (${topVideo?.views || 0} views)
+
+⚠️ Pior vídeo:
+${worstVideo?.title || "N/A"} (${worstVideo?.views || 0} views)
+
+📺 Vídeos:
+${videoSummary}
+
+---
+
+Gere uma estratégia PROFISSIONAL:
+
+1. 📈 PADRÃO DO CANAL
+- O que está funcionando de verdade
+
+2. ❌ ERRO CRÍTICO
+- O que está travando crescimento (sem genérico)
+
+3. 🚀 ESTRATÉGIA DE ESCALA
+- O que repetir
+- O que parar
+- O que testar
+
+4. 🎯 3 TÍTULOS PRONTOS
+- Baseados no padrão que funciona
+
+---
+
+⚠️ Regras:
+- Proibido resposta genérica
+- Seja direto
+- Baseado apenas nos dados
+`;
+}
+
 
     // 🔥 SE NÃO FOR TÍTULO/DESCRIÇÃO → USA INTELLIGENCE NORMAL
     if(!finalPrompt){
@@ -217,6 +262,13 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
       });
     }
 
+
+let temp = 0.6;
+
+if (tipo === "ideas") temp = 0.8;
+if (tipo === "descricao") temp = 0.5;
+if (tipo === "strategy") temp = 0.7;
+
  const response = await fetch("https://api.openai.com/v1/chat/completions", {
   method:"POST",
   headers:{
@@ -229,7 +281,7 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
       { role:"system", content:"Você é especialista em YouTube e SEO." },
       { role:"user", content: finalPrompt }
     ],
-    temperature:0.8,
+temperature: temp,
 max_tokens: 1200
   })
 });

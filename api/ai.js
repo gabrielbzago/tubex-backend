@@ -124,6 +124,35 @@ Base:
 
     }
 
+
+// =========================
+// 💡 IDEIAS DE VÍDEO (FIX)
+// =========================
+else if(tipo === "ideas"){
+
+  finalPrompt = `
+Você é um especialista em crescimento no YouTube.
+
+Baseado nos vídeos abaixo:
+
+${videoSummary}
+
+Crie 5 ideias de vídeos NOVOS para este canal.
+
+Regras:
+- Baseadas no estilo do canal
+- Não repetir títulos existentes
+- 1 linha por ideia
+- Máx 12 palavras
+- Foco em CTR e viralização
+- Não explique
+
+Responda apenas com as ideias.
+`;
+
+}
+
+
     // 🔥 SE NÃO FOR TÍTULO/DESCRIÇÃO → USA INTELLIGENCE NORMAL
     if(!finalPrompt){
 
@@ -200,7 +229,7 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
       { role:"system", content:"Você é especialista em YouTube e SEO." },
       { role:"user", content: finalPrompt }
     ],
-    temperature:0.6,
+    temperature:0.8,
 max_tokens: 1200
   })
 });

@@ -1,28 +1,30 @@
 // ======================================================
-// 🚀 TubeX YouTube Channel API (VIDIQ LEVEL PRODUCTION)
+// 🚀 TubeX YouTube Channel API (PRODUCTION)
 // ======================================================
 
-const CACHE_TTL = 1000 * 60 * 5;
+const CACHE_TTL = 1000 * 60 * 5; // 5 min
 const REQUEST_TIMEOUT = 8000;
 
+// 🔒 CORS WHITELIST
 const ALLOWED_ORIGINS = [
   "https://www.youtube.com",
   "https://studio.youtube.com"
 ];
 
+// 🧠 CACHE GLOBAL (fallback serverless)
 global.tubexCache = global.tubexCache || {};
 
-function getCache(key){
+function getCache(key) {
   const item = global.tubexCache[key];
-  if(!item) return null;
-  if(item.exp < Date.now()){
+  if (!item) return null;
+  if (item.exp < Date.now()) {
     delete global.tubexCache[key];
     return null;
   }
   return item.data;
 }
 
-function setCache(key,data){
+function setCache(key, data) {
   global.tubexCache[key] = {
     data,
     exp: Date.now() + CACHE_TTL
@@ -32,53 +34,42 @@ function setCache(key,data){
 // ======================================================
 // ⏱ FETCH COM TIMEOUT
 // ======================================================
-async function fetchWithTimeout(url){
+async function fetchWithTimeout(url) {
   const controller = new AbortController();
-  const timeout = setTimeout(()=>controller.abort(), REQUEST_TIMEOUT);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  try{
-    const res = await fetch(url,{ signal:controller.signal });
+  try {
+    const res = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
     return res;
-  }catch(e){
+  } catch (e) {
     clearTimeout(timeout);
     throw e;
   }
 }
 
 // ======================================================
-// 🎥 FETCH VIDEOS (ROBUSTO)
+// 🎥 FETCH VIDEOS
 // ======================================================
-async function fetchVideos(ids,key){
+async function fetchVideos(ids, key) {
+  if (!ids.length) return [];
 
-  if(!ids.length) return [];
-
-  try{
-
+  try {
     const res = await fetchWithTimeout(
       `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(",")}&key=${key}`
     );
 
-    if(!res.ok) return [];
+    if (!res.ok) return [];
 
     const json = await res.json();
 
     return (json.items || []).map(v => ({
-      id: v.id,
       title: v.snippet?.title || "",
-      publishedAt: v.snippet?.publishedAt || "",
-      thumbnail:
-        v.snippet?.thumbnails?.high?.url ||
-        v.snippet?.thumbnails?.default?.url ||
-        "",
-      statistics: {
-        viewCount: Number(v.statistics?.viewCount || 0),
-        likeCount: Number(v.statistics?.likeCount || 0)
-      },
-      snippet: v.snippet || {}
+      views: Number(v.statistics?.viewCount || 0),
+      publishedAt: v.snippet?.publishedAt || ""
     }));
 
-  }catch(e){
+  } catch {
     return [];
   }
 }
@@ -86,195 +77,216 @@ async function fetchVideos(ids,key){
 // ======================================================
 // 🚀 HANDLER
 // ======================================================
-export default async function handler(req,res){
+export default async function handler(req, res) {
 
+  // ======================================================
+  // 🔒 CORS
+  // ======================================================
   const origin = req.headers.origin;
 
-  if(ALLOWED_ORIGINS.includes(origin)){
-    res.setHeader("Access-Control-Allow-Origin",origin);
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
-  res.setHeader("Access-Control-Allow-Methods","POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-  if(req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") return res.status(200).end();
 
-  if(req.headers["x-api-key"] !== process.env.API_KEY){
-    return res.status(200).json({ success:false });
+  // ======================================================
+  // 🔑 AUTH
+  // ======================================================
+  if (req.headers["x-api-key"] !== process.env.API_KEY) {
+    return res.status(200).json({ success: false, error: "unauthorized" });
   }
 
-  try{
+  if (req.method !== "POST") {
+    return res.status(200).json({ success: false, error: "invalid_method" });
+  }
+
+  try {
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const channelId = body?.channelId;
 
-    if(!channelId){
-      return res.status(200).json({ success:false });
+    if (!channelId) {
+      return res.status(200).json({ success: false, error: "missing_channelId" });
     }
 
+    // ======================================================
+    // ⚡ CACHE
+    // ======================================================
     const cacheKey = `channel_${channelId}`;
     const cached = getCache(cacheKey);
 
-    if(cached){
+    if (cached) {
       console.log("⚡ CACHE HIT");
       return res.status(200).json(cached);
     }
 
+    // ======================================================
+    // 🔑 MULTI KEY
+    // ======================================================
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
-      .map(k=>k.trim())
-      .filter(Boolean);
+      .map(k => k.trim())
+      .filter(Boolean)
+      .sort(() => 0.5 - Math.random());
 
-   let channel = null;
-let videos = [];
-let fallbackVideos = [];
+    let channel = null;
+    let videos = [];
 
     // ======================================================
-    // 🔁 LOOP KEYS (ANTI QUOTA FAIL)
+    // 🔁 LOOP KEYS
     // ======================================================
-    for(const key of keys){
+    for (const key of keys) {
 
-      try{
+      try {
 
-        // 🔥 CHANNEL
+        // 📊 CHANNEL
         const chRes = await fetchWithTimeout(
           `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
         );
 
-        if(!chRes.ok) continue;
+        if (!chRes.ok) continue;
 
         const chJson = await chRes.json();
-        if(!chJson.items?.length) continue;
+        if (!chJson.items?.length) continue;
 
         channel = chJson.items[0];
 
         const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
-if(!uploads){
-  console.warn("⚠️ canal sem uploads playlist");
-  continue;
+        if (!uploads) continue;
+
+        // 📺 PLAYLIST
+        const listRes = await fetchWithTimeout(
+          `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
+        );
+
+        if (!listRes.ok) continue;
+
+        const listJson = await listRes.json();
+
+        const ids = (listJson.items || [])
+          .map(v => v.contentDetails?.videoId)
+          .filter(Boolean);
+
+        if (!ids.length) continue;
+
+        const fetched = await fetchVideos(ids, key);
+
+       if (fetched.length > 0) {
+  videos = fetched;
+  break;
 }
 
-        // 🔥 PEGAR ATÉ 100 VIDEOS (2 páginas)
-        let allIds = [];
-        let nextPage = null;
-
-        for(let i=0;i<3;i++){
-
-          const listRes = await fetchWithTimeout(
-            `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
-          );
-if(!listRes.ok){
-  console.warn("⚠️ playlist falhou");
-  break; // 🔥 não continue
-}
-          const listJson = await listRes.json();
-
-          const ids = (listJson.items || [])
-            .map(v => v.contentDetails?.videoId)
-            .filter(Boolean);
-
-          allIds.push(...ids);
-
-          nextPage = listJson.nextPageToken;
-          if(!nextPage) break;
-        }
-
-      const fetchedVideos = await fetchVideos(allIds.slice(0, Math.min(allIds.length, 100)),key);
-
-// 🔥 SEMPRE tenta aproveitar dados
-if(fetchedVideos.length > 0){
-
-  // se ainda não tem vídeos → usa direto
-  if(videos.length === 0){
-    videos = fetchedVideos;
-  }
-
-  // se vier mais dados → melhora resultado
-  if(fetchedVideos.length > videos.length){
-    videos = fetchedVideos;
-  }
-
-  // 🔥 já temos algo → pode parar
-  if(videos.length >= 10){
-    break;
-  }
+// 🔥 se nenhum key trouxe dados, ainda usa o último
+if (!videos.length && fetched.length === 0) {
+  videos = [];
 }
 
-// 🔁 continua tentando melhorar com outras keys
-console.warn("⚠️ tentativa parcial, buscando mais dados...");
-continue;
-
-      }catch(e){
-  console.warn("⚠️ key falhou:", e.message);
-  continue;
-}
+      } catch (e) {
+        console.warn("⚠️ key falhou");
+      }
     }
 
-// 🔥 fallback final (se nenhuma key trouxe vídeo mas tentou)
-if(!videos.length && fallbackVideos.length){
-  console.warn("⚠️ usando fallbackVideos");
-  videos = fallbackVideos;
-}
-
     // ======================================================
-    // 🚨 GARANTE NUNCA QUEBRA
+    // ❌ FALLBACK (NUNCA QUEBRA FRONT)
     // ======================================================
-    if(!channel){
+    if (!channel) {
       return res.status(200).json({
-        success:true,
-        channel:null,
-        videos:[],
-        metrics:{}
+        success: true,
+        warning: "no_channel_data",
+        data: {
+          channel: null,
+          videos: [],
+          metrics: {
+            subscribers: 0,
+            totalViews: 0,
+            avgViews: 0,
+            views7: 0,
+            uploads7: 0
+          }
+        }
       });
     }
 
+// 🔥 canal existe mas sem vídeos ainda
+if (channel && videos.length === 0) {
+
+  return res.status(200).json({
+    success: true,
+    channel,
+    videos: [],
+    metrics: {
+      subscribers: Number(channel.statistics?.subscriberCount || 0),
+      totalViews: Number(channel.statistics?.viewCount || 0),
+      avgViews: 0,
+      views7: 0,
+      uploads7: 0
+    }
+  });
+}
     // ======================================================
-    // 📊 MÉTRICAS
+    // 📊 MÉTRICAS REAIS
     // ======================================================
     const subscribers = Number(channel.statistics?.subscriberCount || 0);
     const totalViews = Number(channel.statistics?.viewCount || 0);
 
-    const avgViews = videos.length
-      ? Math.round(videos.reduce((a,v)=>a+v.statistics.viewCount,0)/videos.length)
-      : 0;
+    const totalVideoViews = videos.reduce((a, v) => a + v.views, 0);
+    const avgViews = videos.length ? Math.round(totalVideoViews / videos.length) : 0;
 
     const now = Date.now();
 
-    const last7 = videos.filter(v=>{
+    const last7 = videos.filter(v => {
       const t = new Date(v.publishedAt).getTime();
-      return (now - t) <= (7 * 86400000);
+      return (now - t) <= (7 * 24 * 60 * 60 * 1000);
     });
 
-    const views7 = last7.reduce((a,v)=>a+v.statistics.viewCount,0);
+    const views7 = last7.reduce((a, v) => a + v.views, 0);
+    const uploads7 = last7.length;
 
+    // ======================================================
+    // ✅ RESULT FINAL
+    // ======================================================
     const result = {
-      success:true,
-      channel,
-      videos, // 🔥 DIRETO (SEM data.videos)
-      metrics:{
-        subscribers,
-        totalViews,
-        avgViews,
-        views7,
-        uploads7:last7.length
+      success: true,
+      data: {
+        channel,
+        videos,
+        metrics: {
+          subscribers,
+          totalViews,
+          avgViews,
+          views7,
+          uploads7
+        }
       }
     };
 
-// 🔥 só cacheia se tem dados reais OU canal válido
-if(channel){
-  setCache(cacheKey,result);
-}
+    // 💾 CACHE
+    setCache(cacheKey, result);
+
     return res.status(200).json(result);
 
-  }catch(e){
+  } catch (e) {
 
-    console.error("💥 BACKEND CRASH:",e);
+    console.error("💥 BACKEND CRASH:", e);
 
     return res.status(200).json({
-      success:true,
-      channel:null,
-      videos:[],
-      metrics:{}
+      success: true,
+      warning: "internal_error",
+      data: {
+        channel: null,
+        videos: [],
+        metrics: {
+          subscribers: 0,
+          totalViews: 0,
+          avgViews: 0,
+          views7: 0,
+          uploads7: 0
+        }
+      }
     });
   }
 }

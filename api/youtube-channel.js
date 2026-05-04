@@ -173,15 +173,11 @@ for (const chunk of chunks) {
   }
 }
 
-    const fetched = await fetchVideosFromIds(ids, key);
-
     if (!Array.isArray(fetched)) continue;
 
     // ======================================================
     // 🔥 LÓGICA VIDIQ (ACEITA PARCIAL E MELHORA)
     // ======================================================
-    if (fetched.length > 0) {
-
       // guarda melhor resultado
    if (fetched.length > 0) {
   videos = fetched;

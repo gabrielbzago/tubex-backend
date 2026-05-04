@@ -9,9 +9,9 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  if (req.headers["x-api-key"] !== process.env.API_KEY) {
-    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
-  }
+//  if (req.headers["x-api-key"] !== process.env.API_KEY) {
+//    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
+//  }
 
   if (req.method !== "POST") {
     return res.status(200).json({ success:false, error:"invalid_method", items:[], data:{channel:null,videos:[]} });
@@ -178,26 +178,28 @@ for (const chunk of chunks) {
 if (!Array.isArray(fetched)) continue;
 
 // ======================================================
-// ✅ TEM VÍDEOS → USA E PARA
+// ✅ TEM VÍDEOS → USA E MELHORA
 // ======================================================
 if (fetched.length > 0) {
 
   console.log("📦 vídeos obtidos:", fetched.length);
 
+  // 🔥 sempre mantém o melhor resultado
   if (fetched.length > bestVideos.length) {
     bestVideos = fetched;
   }
 
+  // 🔥 define imediatamente (importante!)
+  videos = fetched;
+
   // 🔥 se já for BOM, para
   if (fetched.length >= 50) {
-    videos = fetched;
     break;
   }
 
   // 🔥 senão continua tentando melhorar
   continue;
 }
-
 // ======================================================
 // ❌ NÃO TEM → TENTA PRÓXIMA KEY
 // ======================================================

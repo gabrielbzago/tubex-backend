@@ -89,89 +89,127 @@ if(cached){
     };
 
     // ======================================================
-    // 🔁 LOOP COM RETRY REAL + MULTI KEY
-    // ======================================================
-    const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
+// 🔁 LOOP COM RETRY REAL + MULTI KEY (VIDIQ LEVEL)
+// ======================================================
+const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
 
 for (const key of shuffledKeys) {
 
-      try {
+  try {
 
-        // 🔹 1. CHANNEL
-        const chRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
-        );
+    // ======================================================
+    // 🔹 1. CHANNEL
+    // ======================================================
+    const chRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
+    );
 
-if (chRes.status === 403 || chRes.status === 429) {
-  console.warn("🚫 quota estourada");
-  continue;
-}
-
-        const chJson = await chRes.json();
-
-        if (!chJson.items?.length) continue;
-
-        channel = chJson.items[0];
-
-        const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
-
-        if (!uploads) continue;
-
-        // 🔹 2. PLAYLIST
-        const vidsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
-        );
-
-        if (!vidsRes.ok) {
-          console.warn("⚠️ erro playlistItems:", vidsRes.status);
-          continue;
-        }
-
-        const vidsJson = await vidsRes.json();
-
-        const idsArr = (vidsJson.items || [])
-          .map(v => v.contentDetails?.videoId)
-          .filter(Boolean);
-
-if (!idsArr.length){
-  console.warn("⚠️ sem ids de vídeo");
-  continue;
-}
-
-        const ids = idsArr.join(",");
-
-        const fetched = await fetchVideosFromIds(ids, key);
-
-        if (!Array.isArray(fetched) || fetched.length < 3) continue;
-
-        videos = fetched;
-        break;
-
-      } catch (e) {
-        console.warn("⚠️ erro geral key:", e);
-      }
+    if (chRes.status === 403 || chRes.status === 429) {
+      console.warn("🚫 quota estourada");
+      continue;
     }
+
+    if (!chRes.ok) continue;
+
+    const chJson = await chRes.json();
+
+    if (!chJson.items?.length) continue;
+
+    channel = chJson.items[0];
+
+    const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
+    if (!uploads) continue;
+
+    // ======================================================
+    // 🔹 2. PLAYLIST (PAGINAÇÃO REAL)
+    // ======================================================
+    let allIds = [];
+    let nextPage = null;
+
+    for (let i = 0; i < 3; i++) { // 🔥 até 150 vídeos
+
+      const vidsRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
+      );
+
+      if (!vidsRes.ok) {
+        console.warn("⚠️ erro playlistItems:", vidsRes.status);
+        break;
+      }
+
+      const vidsJson = await vidsRes.json();
+
+      const idsArr = (vidsJson.items || [])
+        .map(v => v.contentDetails?.videoId)
+        .filter(Boolean);
+
+      if (!idsArr.length) break;
+
+      allIds.push(...idsArr);
+
+      nextPage = vidsJson.nextPageToken;
+      if (!nextPage) break;
+    }
+
+    if (!allIds.length) {
+      console.warn("⚠️ nenhum ID encontrado");
+      continue;
+    }
+
+    // ======================================================
+    // 🔹 3. FETCH VIDEOS
+    // ======================================================
+const ids = allIds.slice(0, Math.min(allIds.length, 150)).join(",");
+
+    const fetched = await fetchVideosFromIds(ids, key);
+
+    if (!Array.isArray(fetched)) continue;
+
+    // ======================================================
+    // 🔥 LÓGICA VIDIQ (ACEITA PARCIAL E MELHORA)
+    // ======================================================
+    if (fetched.length > 0) {
+
+      // guarda melhor resultado
+      if (fetched.length > videos.length) {
+        videos = fetched;
+      }
+
+      // se já temos dados bons → pode parar
+     if (videos.length >= Math.min(allIds.length, 40)) {
+  break;
+}
+    }
+if(videos.length < 20){
+  console.warn("⚠️ dados parciais, tentando próxima key...");
+}
+  } catch (e) {
+    console.warn("⚠️ erro geral key:", e);
+    continue;
+  }
+}
+
 
     // ======================================================
     // ❌ SEM DADOS
     // ======================================================
-   if (!Array.isArray(videos) || videos.length === 0) {
 
-  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
-
-return res.status(200).json({
-  success:false,
-  error:"no_videos_found",
-  items:[],
-  data:{channel,videos:[]}
-});
+if (!Array.isArray(videos)) {
+  videos = [];
 }
+
+if(videos.length === 0){
+  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
+}
+
 
     // ======================================================
     // 🧠 MÉTRICAS
     // ======================================================
     const totalViews = videos.reduce((acc,v)=>acc+v.views,0);
-    const avgViews = Math.round(totalViews / videos.length);
+const avgViews = videos.length
+  ? Math.round(totalViews / videos.length)
+  : 0;
 
     const now = Date.now();
 
@@ -201,7 +239,7 @@ const finalData = {
 // 💾 SALVA CACHE
 global.tubexChannelCache[cacheKey] = {
   data: finalData,
-  expires: Date.now() + (5 * 60 * 1000) // 5 min
+  expires: Date.now() + (5 * 60 * 1000)
 };
 
 return res.status(200).json(finalData);

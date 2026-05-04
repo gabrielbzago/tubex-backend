@@ -181,18 +181,27 @@ if(!listRes.ok){
 
       const fetchedVideos = await fetchVideos(allIds.slice(0, Math.min(allIds.length, 100)),key);
 
-// 🔥 SÓ ACEITA SE VEIO DADO REAL
+// 🔥 SEMPRE tenta aproveitar dados
 if(fetchedVideos.length > 0){
-  videos = fetchedVideos;
-  break;
-}
-// guarda tentativa mesmo vazia (fallback futuro)
-if(fetchedVideos.length > fallbackVideos.length){
-  fallbackVideos = fetchedVideos;
+
+  // se ainda não tem vídeos → usa direto
+  if(videos.length === 0){
+    videos = fetchedVideos;
+  }
+
+  // se vier mais dados → melhora resultado
+  if(fetchedVideos.length > videos.length){
+    videos = fetchedVideos;
+  }
+
+  // 🔥 já temos algo → pode parar
+  if(videos.length >= 10){
+    break;
+  }
 }
 
-// 🔁 tenta próxima key se falhou
-console.warn("⚠️ vídeos vazios, tentando próxima key...");
+// 🔁 continua tentando melhorar com outras keys
+console.warn("⚠️ tentativa parcial, buscando mais dados...");
 continue;
 
       }catch(e){

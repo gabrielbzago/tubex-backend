@@ -204,7 +204,7 @@ if (Array.isArray(fetched) && fetched.length > 0) {
 
 }
 
-
+} 
 
 // ======================================================
 // 🔥 GARANTE MELHOR RESULTADO FINAL (FORA DO LOOP)

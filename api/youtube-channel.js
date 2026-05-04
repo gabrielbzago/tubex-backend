@@ -198,6 +198,13 @@ if (fetched.length > 0) {
 console.warn("⚠️ nenhum vídeo com essa key, tentando próxima...");
 continue;
 
+} catch (e) {
+  console.warn("⚠️ erro geral key:", e);
+  continue;
+}
+
+} // 🔥 FECHA O FOR AQUI (ESSENCIAL)
+
 // ======================================================
 // 🔥 GARANTE MELHOR RESULTADO FINAL (FORA DO LOOP)
 // ======================================================

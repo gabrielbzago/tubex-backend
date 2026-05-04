@@ -162,12 +162,10 @@ if(!uploads){
           const listRes = await fetchWithTimeout(
             `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
           );
-
 if(!listRes.ok){
   console.warn("⚠️ playlist falhou");
-  continue;
+  break; // 🔥 não continue
 }
-
           const listJson = await listRes.json();
 
           const ids = (listJson.items || [])
@@ -187,6 +185,8 @@ if(fetchedVideos.length > 0){
   videos = fetchedVideos;
   break;
 }
+// guarda tentativa mesmo vazia (fallback futuro)
+fallbackVideos = fetchedVideos;
 
 // 🔁 tenta próxima key se falhou
 console.warn("⚠️ vídeos vazios, tentando próxima key...");
@@ -242,8 +242,10 @@ continue;
       }
     };
 
-    setCache(cacheKey,result);
-
+// 🔥 só cacheia se tem dados reais OU canal válido
+if(videos.length > 0 || channel){
+  setCache(cacheKey,result);
+}
     return res.status(200).json(result);
 
   }catch(e){

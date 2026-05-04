@@ -188,8 +188,14 @@ if (fetched.length > 0) {
     bestVideos = fetched;
   }
 
-  videos = fetched;
-  break; // 🔥 sai do loop de keys
+  // 🔥 se já for BOM, para
+  if (fetched.length >= 50) {
+    videos = fetched;
+    break;
+  }
+
+  // 🔥 senão continua tentando melhorar
+  continue;
 }
 
 // ======================================================

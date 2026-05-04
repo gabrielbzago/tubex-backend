@@ -148,7 +148,10 @@ export default async function handler(req,res){
         channel = chJson.items[0];
 
         const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
-        if(!uploads) break;
+if(!uploads){
+  console.warn("⚠️ canal sem uploads playlist");
+  continue;
+}
 
         // 🔥 PEGAR ATÉ 100 VIDEOS (2 páginas)
         let allIds = [];
@@ -160,7 +163,10 @@ export default async function handler(req,res){
             `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
           );
 
-          if(!listRes.ok) break;
+if(!listRes.ok){
+  console.warn("⚠️ playlist falhou");
+  continue;
+}
 
           const listJson = await listRes.json();
 
@@ -187,8 +193,9 @@ console.warn("⚠️ vídeos vazios, tentando próxima key...");
 continue;
 
       }catch(e){
-        console.warn("⚠️ key falhou");
-      }
+  console.warn("⚠️ key falhou:", e.message);
+  continue;
+}
     }
 
     // ======================================================

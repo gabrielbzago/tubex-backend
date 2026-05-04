@@ -125,8 +125,9 @@ export default async function handler(req,res){
       .map(k=>k.trim())
       .filter(Boolean);
 
-    let channel = null;
-    let videos = [];
+   let channel = null;
+let videos = [];
+let fallbackVideos = [];
 
     // ======================================================
     // 🔁 LOOP KEYS (ANTI QUOTA FAIL)
@@ -178,7 +179,7 @@ if(!listRes.ok){
           if(!nextPage) break;
         }
 
-      const fetchedVideos = await fetchVideos(allIds.slice(0,50),key);
+      const fetchedVideos = await fetchVideos(allIds.slice(0, Math.min(allIds.length, 100)),key);
 
 // 🔥 SÓ ACEITA SE VEIO DADO REAL
 if(fetchedVideos.length > 0){
@@ -197,6 +198,12 @@ continue;
   continue;
 }
     }
+
+// 🔥 fallback final (se nenhuma key trouxe vídeo mas tentou)
+if(!videos.length && fallbackVideos.length){
+  console.warn("⚠️ usando fallbackVideos");
+  videos = fallbackVideos;
+}
 
     // ======================================================
     // 🚨 GARANTE NUNCA QUEBRA
@@ -243,7 +250,7 @@ continue;
     };
 
 // 🔥 só cacheia se tem dados reais OU canal válido
-if(videos.length > 0 || channel){
+if(channel){
   setCache(cacheKey,result);
 }
     return res.status(200).json(result);

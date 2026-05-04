@@ -159,7 +159,19 @@ for (const key of shuffledKeys) {
     // ======================================================
     // 🔹 3. FETCH VIDEOS
     // ======================================================
-const ids = allIds.slice(0, Math.min(allIds.length, 150)).join(",");
+const chunks = [];
+for (let i = 0; i < allIds.length; i += 50) {
+  chunks.push(allIds.slice(i, i + 50));
+}
+
+let fetched = [];
+
+for (const chunk of chunks) {
+  const res = await fetchVideosFromIds(chunk.join(","), key);
+  if (Array.isArray(res)) {
+    fetched.push(...res);
+  }
+}
 
     const fetched = await fetchVideosFromIds(ids, key);
 
@@ -171,9 +183,10 @@ const ids = allIds.slice(0, Math.min(allIds.length, 150)).join(",");
     if (fetched.length > 0) {
 
       // guarda melhor resultado
-      if (fetched.length > videos.length) {
-        videos = fetched;
-      }
+   if (fetched.length > 0) {
+  videos = fetched;
+  break; // 🔥 para na melhor resposta válida
+}
 
       }
 if(videos.length > 0 && videos.length < 20){
@@ -200,7 +213,7 @@ if(videos.length === 0){
 
 
   // ======================================================
-// 🧠 MÉTRICAS (VIDIQ LEVEL - ROBUSTO)
+// 🧠 MÉTRICAS (ROBUSTO)
 // ======================================================
 
 // 🔢 total views
@@ -252,6 +265,26 @@ if (uploads7 === 0 && videos.length > 0) {
 // ======================================================
 if (!Number.isFinite(views7)) views7 = 0;
 if (!Number.isFinite(avgViews)) avgViews = 0;
+
+// ======================================================
+// 🛡️ FALLBACK DE SEGURANÇA DO CHANNEL (CRÍTICO)
+// ======================================================
+if (!channel) {
+
+  console.warn("⚠️ fallback channel vazio");
+
+  channel = {
+    snippet: {
+      title: "Canal",
+      thumbnails: {}
+    },
+    statistics: {
+      subscriberCount: 0,
+      videoCount: videos.length || 0,
+      viewCount: totalViews || 0
+    }
+  };
+}
 
 // ======================================================
 // 📦 RESULTADO FINAL

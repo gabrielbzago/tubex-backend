@@ -109,6 +109,13 @@ if (chRes.status === 403 || chRes.status === 429) {
 
         const chJson = await chRes.json();
 
+if (!chJson.items?.length) {
+  console.warn("⚠️ canal não encontrado nessa key");
+  continue;
+}
+
+channel = chJson.items[0] || null;
+
         if (!chJson.items?.length) continue;
 
         channel = chJson.items[0];
@@ -134,10 +141,11 @@ if (chRes.status === 403 || chRes.status === 429) {
           .filter(Boolean);
 
 if (!idsArr.length){
-  console.warn("⚠️ sem ids de vídeo");
-  continue;
+  console.warn("⚠️ canal sem vídeos ainda");
+  
+  videos = []; // 🔥 força fluxo válido
+  break;       // 🔥 sai do loop corretamente
 }
-
         const ids = idsArr.join(",");
 
         const fetched = await fetchVideosFromIds(ids, key);

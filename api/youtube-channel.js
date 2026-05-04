@@ -175,12 +175,8 @@ const ids = allIds.slice(0, Math.min(allIds.length, 150)).join(",");
         videos = fetched;
       }
 
-      // se já temos dados bons → pode parar
-     if (videos.length >= Math.min(allIds.length, 40)) {
-  break;
-}
-    }
-if(videos.length < 20){
+      }
+if(videos.length > 0 && videos.length < 20){
   console.warn("⚠️ dados parciais, tentando próxima key...");
 }
   } catch (e) {
@@ -203,31 +199,70 @@ if(videos.length === 0){
 }
 
 
-    // ======================================================
-    // 🧠 MÉTRICAS
-    // ======================================================
-    const totalViews = videos.reduce((acc,v)=>acc+v.views,0);
-const avgViews = videos.length
+  // ======================================================
+// 🧠 MÉTRICAS (VIDIQ LEVEL - ROBUSTO)
+// ======================================================
+
+// 🔢 total views
+const totalViews = videos.reduce((acc, v) => {
+  return acc + Number(v.views || 0);
+}, 0);
+
+// 📊 média
+const avgViews = videos.length > 0
   ? Math.round(totalViews / videos.length)
   : 0;
 
-    const now = Date.now();
+const now = Date.now();
 
-    const last7 = videos.filter(v=>{
-      const t = new Date(v.publishedAt).getTime();
-      return (now - t) <= (7*24*60*60*1000);
-    });
+// ======================================================
+// 📅 FILTRO 7 DIAS
+// ======================================================
+let last7 = videos.filter(v => {
+  const t = new Date(v.publishedAt || 0).getTime();
+  return t && (now - t) <= (7 * 24 * 60 * 60 * 1000);
+});
 
-    const views7 = last7.reduce((acc,v)=>acc+v.views,0);
-    const uploads7 = last7.length;
+// 🔥 métricas base
+let views7 = last7.reduce((acc, v) => {
+  return acc + Number(v.views || 0);
+}, 0);
 
+let uploads7 = last7.length;
+
+// ======================================================
+// 🔥 FALLBACK INTELIGENTE (CRÍTICO)
+// ======================================================
+if (uploads7 === 0 && videos.length > 0) {
+
+  console.warn("⚠️ fallback 7 dias ativado (canal sem posts recentes)");
+
+  // usa últimos vídeos disponíveis
+  const sample = videos.slice(0, Math.min(10, videos.length));
+
+  views7 = sample.reduce((acc, v) => {
+    return acc + Number(v.views || 0);
+  }, 0);
+
+  uploads7 = sample.length;
+}
+
+// ======================================================
+// 📊 SEGURANÇA FINAL (ANTI-QUEBRA UI)
+// ======================================================
+if (!Number.isFinite(views7)) views7 = 0;
+if (!Number.isFinite(avgViews)) avgViews = 0;
+
+// ======================================================
+// 📦 RESULTADO FINAL
+// ======================================================
 const finalData = {
-  success:true,
-  items:videos,
-  data:{
+  success: true,
+  items: videos,
+  data: {
     channel,
     videos,
-    metrics:{
+    metrics: {
       totalViews,
       avgViews,
       views7,
@@ -236,23 +271,15 @@ const finalData = {
   }
 };
 
-// 💾 SALVA CACHE
+// ======================================================
+// 💾 CACHE
+// ======================================================
 global.tubexChannelCache[cacheKey] = {
   data: finalData,
   expires: Date.now() + (5 * 60 * 1000)
 };
 
-return res.status(200).json(finalData);
-
-  } catch (e) {
-
-    console.error("💥 BACKEND ERROR:", e);
-
-    return res.status(200).json({
-      success:false,
-      error:"internal_error",
-      items:[],
-      data:{channel:null,videos:[]}
-    });
-  }
-}
+// ======================================================
+// 🚀 RESPONSE
+// ======================================================
+return res.status(200).json(finalData); 

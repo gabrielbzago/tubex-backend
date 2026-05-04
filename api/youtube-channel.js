@@ -52,6 +52,7 @@ if(cached){
 
     let channel = null;
     let videos = [];
+    let bestVideos = [];
 
     // ======================================================
     // 🔥 FETCH VIDEOS COM PROTEÇÃO REAL
@@ -173,45 +174,28 @@ for (const chunk of chunks) {
   }
 }
 
-    if (!Array.isArray(fetched)) continue;
-
-// ======================================================
-// 🔥 LÓGICA VIDIQ (SELECIONA O MELHOR RESULTADO)
-// ======================================================
-
-let bestVideos = videos; // mantém melhor resultado global
+if (!Array.isArray(fetched)) continue;
 
 if (Array.isArray(fetched) && fetched.length > 0) {
 
   console.log("📦 vídeos obtidos:", fetched.length);
 
-  // 🔥 sempre guarda o melhor conjunto encontrado
-  if (!bestVideos || fetched.length > bestVideos.length) {
+  if (fetched.length > bestVideos.length) {
     bestVideos = fetched;
   }
 
-  // ======================================================
-  // 🎯 CRITÉRIO DE QUALIDADE (PARADA INTELIGENTE)
-  // ======================================================
   if (fetched.length >= 20) {
-
     console.log("🚀 dados suficientes → finalizando");
-
     videos = fetched;
     break;
-
-  } else {
-
-    console.warn("⚠️ poucos vídeos, tentando melhorar com próxima key...");
-    continue;
-
   }
-}
 
+  console.warn("⚠️ poucos vídeos, tentando próxima key...");
+  continue;
+}
 // ======================================================
 // ⚠️ fallback: usa melhor resultado encontrado
 // ======================================================
-videos = bestVideos || [];
 
 } catch (e) {
 
@@ -220,18 +204,26 @@ videos = bestVideos || [];
 
 }
 
-    // ======================================================
-    // ❌ SEM DADOS
-    // ======================================================
 
+
+// ======================================================
+// 🔥 GARANTE MELHOR RESULTADO FINAL (FORA DO LOOP)
+// ======================================================
+if (!videos.length && bestVideos.length) {
+  console.log("📦 usando melhor resultado parcial");
+  videos = bestVideos;
+}
+
+// ======================================================
+// ❌ SEM DADOS
+// ======================================================
 if (!Array.isArray(videos)) {
   videos = [];
 }
 
-if(videos.length === 0){
+if (videos.length === 0) {
   console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
 }
-
 
   // ======================================================
 // 🧠 MÉTRICAS (ROBUSTO)

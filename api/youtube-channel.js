@@ -174,9 +174,17 @@ export default async function handler(req,res){
           if(!nextPage) break;
         }
 
-        videos = await fetchVideos(allIds.slice(0,50),key);
+      const fetchedVideos = await fetchVideos(allIds.slice(0,50),key);
 
-        break;
+// 🔥 SÓ ACEITA SE VEIO DADO REAL
+if(fetchedVideos.length > 0){
+  videos = fetchedVideos;
+  break;
+}
+
+// 🔁 tenta próxima key se falhou
+console.warn("⚠️ vídeos vazios, tentando próxima key...");
+continue;
 
       }catch(e){
         console.warn("⚠️ key falhou");

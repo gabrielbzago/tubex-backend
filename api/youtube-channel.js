@@ -175,25 +175,50 @@ for (const chunk of chunks) {
 
     if (!Array.isArray(fetched)) continue;
 
-    // ======================================================
-    // 🔥 LÓGICA VIDIQ (ACEITA PARCIAL E MELHORA)
-    // ======================================================
-      // guarda melhor resultado
-   if (fetched.length > 0) {
-  videos = fetched;
-  break; // 🔥 para na melhor resposta válida
-}
+// ======================================================
+// 🔥 LÓGICA VIDIQ (SELECIONA O MELHOR RESULTADO)
+// ======================================================
 
-      }
-if(videos.length > 0 && videos.length < 20){
-  console.warn("⚠️ dados parciais, tentando próxima key...");
-}
-  } catch (e) {
-    console.warn("⚠️ erro geral key:", e);
+let bestVideos = videos; // mantém melhor resultado global
+
+if (Array.isArray(fetched) && fetched.length > 0) {
+
+  console.log("📦 vídeos obtidos:", fetched.length);
+
+  // 🔥 sempre guarda o melhor conjunto encontrado
+  if (!bestVideos || fetched.length > bestVideos.length) {
+    bestVideos = fetched;
+  }
+
+  // ======================================================
+  // 🎯 CRITÉRIO DE QUALIDADE (PARADA INTELIGENTE)
+  // ======================================================
+  if (fetched.length >= 20) {
+
+    console.log("🚀 dados suficientes → finalizando");
+
+    videos = fetched;
+    break;
+
+  } else {
+
+    console.warn("⚠️ poucos vídeos, tentando melhorar com próxima key...");
     continue;
+
   }
 }
 
+// ======================================================
+// ⚠️ fallback: usa melhor resultado encontrado
+// ======================================================
+videos = bestVideos || [];
+
+} catch (e) {
+
+  console.warn("⚠️ erro geral key:", e);
+  continue;
+
+}
 
     // ======================================================
     // ❌ SEM DADOS

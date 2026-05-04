@@ -1,220 +1,245 @@
-export default async function handler(req, res) {
+// ======================================================
+// 🚀 TubeX YouTube Channel API (VIDIQ LEVEL PRODUCTION)
+// ======================================================
 
-  const origin = req.headers.origin || "*";
+const CACHE_TTL = 1000 * 60 * 5;
+const REQUEST_TIMEOUT = 8000;
 
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key, authorization");
+const ALLOWED_ORIGINS = [
+  "https://www.youtube.com",
+  "https://studio.youtube.com"
+];
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+global.tubexCache = global.tubexCache || {};
 
-  if (req.headers["x-api-key"] !== process.env.API_KEY) {
-    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
+function getCache(key){
+  const item = global.tubexCache[key];
+  if(!item) return null;
+  if(item.exp < Date.now()){
+    delete global.tubexCache[key];
+    return null;
+  }
+  return item.data;
+}
+
+function setCache(key,data){
+  global.tubexCache[key] = {
+    data,
+    exp: Date.now() + CACHE_TTL
+  };
+}
+
+// ======================================================
+// ⏱ FETCH COM TIMEOUT
+// ======================================================
+async function fetchWithTimeout(url){
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), REQUEST_TIMEOUT);
+
+  try{
+    const res = await fetch(url,{ signal:controller.signal });
+    clearTimeout(timeout);
+    return res;
+  }catch(e){
+    clearTimeout(timeout);
+    throw e;
+  }
+}
+
+// ======================================================
+// 🎥 FETCH VIDEOS (ROBUSTO)
+// ======================================================
+async function fetchVideos(ids,key){
+
+  if(!ids.length) return [];
+
+  try{
+
+    const res = await fetchWithTimeout(
+      `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(",")}&key=${key}`
+    );
+
+    if(!res.ok) return [];
+
+    const json = await res.json();
+
+    return (json.items || []).map(v => ({
+      id: v.id,
+      title: v.snippet?.title || "",
+      publishedAt: v.snippet?.publishedAt || "",
+      thumbnail:
+        v.snippet?.thumbnails?.high?.url ||
+        v.snippet?.thumbnails?.default?.url ||
+        "",
+      statistics: {
+        viewCount: Number(v.statistics?.viewCount || 0),
+        likeCount: Number(v.statistics?.likeCount || 0)
+      },
+      snippet: v.snippet || {}
+    }));
+
+  }catch(e){
+    return [];
+  }
+}
+
+// ======================================================
+// 🚀 HANDLER
+// ======================================================
+export default async function handler(req,res){
+
+  const origin = req.headers.origin;
+
+  if(ALLOWED_ORIGINS.includes(origin)){
+    res.setHeader("Access-Control-Allow-Origin",origin);
   }
 
-  if (req.method !== "POST") {
-    return res.status(200).json({ success:false, error:"invalid_method", items:[], data:{channel:null,videos:[]} });
+  res.setHeader("Access-Control-Allow-Methods","POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key");
+
+  if(req.method === "OPTIONS") return res.status(200).end();
+
+  if(req.headers["x-api-key"] !== process.env.API_KEY){
+    return res.status(200).json({ success:false });
   }
 
-  try {
+  try{
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const channelId = body?.channelId;
 
-// =====================================
-// 🔥 CACHE GLOBAL CHANNEL
-// =====================================
-
-
-    if (!channelId) {
-      return res.status(200).json({ success:false, error:"channelId_required", items:[], data:{channel:null,videos:[]} });
+    if(!channelId){
+      return res.status(200).json({ success:false });
     }
 
-global.tubexChannelCache = global.tubexChannelCache || {};
+    const cacheKey = `channel_${channelId}`;
+    const cached = getCache(cacheKey);
 
-const cacheKey = `channel_${channelId}`;
-
-const cached = global.tubexChannelCache[cacheKey];
-
-if(cached){
-  if(cached.expires > Date.now()){
-    console.log("⚡ CACHE HIT CHANNEL:", channelId);
-    return res.status(200).json(cached.data);
-  }
-  delete global.tubexChannelCache[cacheKey];
-}
+    if(cached){
+      console.log("⚡ CACHE HIT");
+      return res.status(200).json(cached);
+    }
 
     const keys = (process.env.YOUTUBE_API_KEY || "")
       .split(",")
-      .map(k => k.trim())
+      .map(k=>k.trim())
       .filter(Boolean);
 
     let channel = null;
     let videos = [];
 
     // ======================================================
-    // 🔥 FETCH VIDEOS COM PROTEÇÃO REAL
+    // 🔁 LOOP KEYS (ANTI QUOTA FAIL)
     // ======================================================
-    const fetchVideosFromIds = async (ids, key) => {
-
-      if (!ids) return [];
+    for(const key of keys){
 
       try{
 
-        const res = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${key}`
-        );
-
-        if (!res.ok) {
-          console.warn("⚠️ erro videos API:", res.status);
-          return [];
-        }
-
-        const json = await res.json();
-
-        if (!Array.isArray(json.items)) return [];
-
-        return json.items.map(v => ({
-          ...v,
-          title: v.snippet?.title || "",
-          views: Number(v.statistics?.viewCount || 0),
-          publishedAt: v.snippet?.publishedAt || ""
-        }));
-
-      }catch(e){
-        console.warn("⚠️ erro fetch videos:", e);
-        return [];
-      }
-    };
-
-    // ======================================================
-    // 🔁 LOOP COM RETRY REAL + MULTI KEY
-    // ======================================================
-    const shuffledKeys = [...keys].sort(() => 0.5 - Math.random());
-
-for (const key of shuffledKeys) {
-
-      try {
-
-        // 🔹 1. CHANNEL
-        const chRes = await fetch(
+        // 🔥 CHANNEL
+        const chRes = await fetchWithTimeout(
           `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
         );
 
-if (chRes.status === 403 || chRes.status === 429) {
-  console.warn("🚫 quota estourada");
-  continue;
-}
+        if(!chRes.ok) continue;
 
         const chJson = await chRes.json();
-
-        if (!chJson.items?.length) continue;
+        if(!chJson.items?.length) continue;
 
         channel = chJson.items[0];
 
         const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
+        if(!uploads) break;
 
-        if (!uploads) continue;
+        // 🔥 PEGAR ATÉ 100 VIDEOS (2 páginas)
+        let allIds = [];
+        let nextPage = null;
 
-        // 🔹 2. PLAYLIST
-        const vidsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
-        );
+        for(let i=0;i<2;i++){
 
-        if (!vidsRes.ok) {
-          console.warn("⚠️ erro playlistItems:", vidsRes.status);
-          continue;
+          const listRes = await fetchWithTimeout(
+            `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
+          );
+
+          if(!listRes.ok) break;
+
+          const listJson = await listRes.json();
+
+          const ids = (listJson.items || [])
+            .map(v => v.contentDetails?.videoId)
+            .filter(Boolean);
+
+          allIds.push(...ids);
+
+          nextPage = listJson.nextPageToken;
+          if(!nextPage) break;
         }
 
-        const vidsJson = await vidsRes.json();
+        videos = await fetchVideos(allIds.slice(0,50),key);
 
-        const idsArr = (vidsJson.items || [])
-          .map(v => v.contentDetails?.videoId)
-          .filter(Boolean);
-
-if (!idsArr.length){
-  console.warn("⚠️ sem ids de vídeo");
-  continue;
-}
-
-        const ids = idsArr.join(",");
-
-        const fetched = await fetchVideosFromIds(ids, key);
-
-        if (!Array.isArray(fetched) || fetched.length < 3) continue;
-
-        videos = fetched;
         break;
 
-      } catch (e) {
-        console.warn("⚠️ erro geral key:", e);
+      }catch(e){
+        console.warn("⚠️ key falhou");
       }
     }
 
     // ======================================================
-    // ❌ SEM DADOS
+    // 🚨 GARANTE NUNCA QUEBRA
     // ======================================================
-   if (!Array.isArray(videos) || videos.length === 0) {
-
-  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
-
-return res.status(200).json({
-  success:false,
-  error:"no_videos_found",
-  items:[],
-  data:{channel,videos:[]}
-});
-}
+    if(!channel){
+      return res.status(200).json({
+        success:true,
+        channel:null,
+        videos:[],
+        metrics:{}
+      });
+    }
 
     // ======================================================
-    // 🧠 MÉTRICAS
+    // 📊 MÉTRICAS
     // ======================================================
-    const totalViews = videos.reduce((acc,v)=>acc+v.views,0);
-    const avgViews = Math.round(totalViews / videos.length);
+    const subscribers = Number(channel.statistics?.subscriberCount || 0);
+    const totalViews = Number(channel.statistics?.viewCount || 0);
+
+    const avgViews = videos.length
+      ? Math.round(videos.reduce((a,v)=>a+v.statistics.viewCount,0)/videos.length)
+      : 0;
 
     const now = Date.now();
 
     const last7 = videos.filter(v=>{
       const t = new Date(v.publishedAt).getTime();
-      return (now - t) <= (7*24*60*60*1000);
+      return (now - t) <= (7 * 86400000);
     });
 
-    const views7 = last7.reduce((acc,v)=>acc+v.views,0);
-    const uploads7 = last7.length;
+    const views7 = last7.reduce((a,v)=>a+v.statistics.viewCount,0);
 
-const finalData = {
-  success:true,
-  items:videos,
-  data:{
-    channel,
-    videos,
-    metrics:{
-      totalViews,
-      avgViews,
-      views7,
-      uploads7
-    }
-  }
-};
+    const result = {
+      success:true,
+      channel,
+      videos, // 🔥 DIRETO (SEM data.videos)
+      metrics:{
+        subscribers,
+        totalViews,
+        avgViews,
+        views7,
+        uploads7:last7.length
+      }
+    };
 
-// 💾 SALVA CACHE
-global.tubexChannelCache[cacheKey] = {
-  data: finalData,
-  expires: Date.now() + (5 * 60 * 1000) // 5 min
-};
+    setCache(cacheKey,result);
 
-return res.status(200).json(finalData);
+    return res.status(200).json(result);
 
-  } catch (e) {
+  }catch(e){
 
-    console.error("💥 BACKEND ERROR:", e);
+    console.error("💥 BACKEND CRASH:",e);
 
     return res.status(200).json({
-      success:false,
-      error:"internal_error",
-      items:[],
-      data:{channel:null,videos:[]}
+      success:true,
+      channel:null,
+      videos:[],
+      metrics:{}
     });
   }
 }

@@ -180,11 +180,6 @@ export default async function handler(req, res) {
   break;
 }
 
-// 🔥 se nenhum key trouxe dados, ainda usa o último
-if (!videos.length && fetched.length === 0) {
-  videos = [];
-}
-
       } catch (e) {
         console.warn("⚠️ key falhou");
       }

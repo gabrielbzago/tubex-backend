@@ -157,10 +157,11 @@ for (const key of shuffledKeys) {
       continue;
     }
 
-    // ======================================================
-    // 🔹 3. FETCH VIDEOS
-    // ======================================================
+// ======================================================
+// 🔹 3. FETCH VIDEOS
+// ======================================================
 const chunks = [];
+
 for (let i = 0; i < allIds.length; i += 50) {
   chunks.push(allIds.slice(i, i + 50));
 }
@@ -176,7 +177,10 @@ for (const chunk of chunks) {
 
 if (!Array.isArray(fetched)) continue;
 
-if (Array.isArray(fetched) && fetched.length > 0) {
+// ======================================================
+// ✅ TEM VÍDEOS → USA E PARA
+// ======================================================
+if (fetched.length > 0) {
 
   console.log("📦 vídeos obtidos:", fetched.length);
 
@@ -184,27 +188,15 @@ if (Array.isArray(fetched) && fetched.length > 0) {
     bestVideos = fetched;
   }
 
-  if (fetched.length >= 20) {
-    console.log("🚀 dados suficientes → finalizando");
-    videos = fetched;
-    break;
-  }
-
-  console.warn("⚠️ poucos vídeos, tentando próxima key...");
-  continue;
-}
-// ======================================================
-// ⚠️ fallback: usa melhor resultado encontrado
-// ======================================================
-
-} catch (e) {
-
-  console.warn("⚠️ erro geral key:", e);
-  continue;
-
+  videos = fetched;
+  break; // 🔥 sai do loop de keys
 }
 
-} 
+// ======================================================
+// ❌ NÃO TEM → TENTA PRÓXIMA KEY
+// ======================================================
+console.warn("⚠️ nenhum vídeo com essa key, tentando próxima...");
+continue;
 
 // ======================================================
 // 🔥 GARANTE MELHOR RESULTADO FINAL (FORA DO LOOP)

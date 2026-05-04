@@ -158,7 +158,7 @@ if(!uploads){
         let allIds = [];
         let nextPage = null;
 
-        for(let i=0;i<2;i++){
+        for(let i=0;i<3;i++){
 
           const listRes = await fetchWithTimeout(
             `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
@@ -187,7 +187,9 @@ if(fetchedVideos.length > 0){
   break;
 }
 // guarda tentativa mesmo vazia (fallback futuro)
-fallbackVideos = fetchedVideos;
+if(fetchedVideos.length > fallbackVideos.length){
+  fallbackVideos = fetchedVideos;
+}
 
 // 🔁 tenta próxima key se falhou
 console.warn("⚠️ vídeos vazios, tentando próxima key...");

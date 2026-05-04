@@ -161,16 +161,26 @@ continue;
     // ======================================================
     // ❌ SEM DADOS
     // ======================================================
-   if (!Array.isArray(videos) || videos.length === 0) {
+if (!Array.isArray(videos) || videos.length === 0) {
 
-  console.warn("⚠️ nenhum vídeo encontrado, retornando vazio");
+  console.warn("⚠️ canal sem vídeos — retornando vazio controlado");
 
-return res.status(200).json({
-  success:false,
-  error:"no_videos_found",
-  items:[],
-  data:{channel,videos:[]}
-});
+  const finalData = {
+    success: true, // 🔥 MUITO IMPORTANTE
+    items: [],
+    data: {
+      channel,
+      videos: [],
+      metrics: {
+        totalViews: 0,
+        avgViews: 0,
+        views7: 0,
+        uploads7: 0
+      }
+    }
+  };
+
+  return res.status(200).json(finalData);
 }
 
     // ======================================================

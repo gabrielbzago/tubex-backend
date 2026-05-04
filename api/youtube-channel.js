@@ -175,10 +175,10 @@ export default async function handler(req, res) {
 
         const fetched = await fetchVideos(ids, key);
 
-       if (fetched.length > 0) {
-  videos = fetched;
-  break;
-}
+        if (fetched.length >= 3) {
+          videos = fetched;
+          break;
+        }
 
       } catch (e) {
         console.warn("⚠️ key falhou");
@@ -206,22 +206,6 @@ export default async function handler(req, res) {
       });
     }
 
-// 🔥 canal existe mas sem vídeos ainda
-if (channel && videos.length === 0) {
-
-  return res.status(200).json({
-    success: true,
-    channel,
-    videos: [],
-    metrics: {
-      subscribers: Number(channel.statistics?.subscriberCount || 0),
-      totalViews: Number(channel.statistics?.viewCount || 0),
-      avgViews: 0,
-      views7: 0,
-      uploads7: 0
-    }
-  });
-}
     // ======================================================
     // 📊 MÉTRICAS REAIS
     // ======================================================

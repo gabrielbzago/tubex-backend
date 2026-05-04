@@ -9,9 +9,9 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
-//  if (req.headers["x-api-key"] !== process.env.API_KEY) {
-//    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
-//  }
+  if (req.headers["x-api-key"] !== process.env.API_KEY) {
+    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
+  }
 
   if (req.method !== "POST") {
     return res.status(200).json({ success:false, error:"invalid_method", items:[], data:{channel:null,videos:[]} });
@@ -130,8 +130,8 @@ for (const key of shuffledKeys) {
     for (let i = 0; i < 3; i++) { // 🔥 até 150 vídeos
 
       const vidsRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&pageToken=${nextPage || ""}&key=${key}`
-      );
+  `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50${nextPage ? `&pageToken=${nextPage}` : ""}&key=${key}`
+);
 
       if (!vidsRes.ok) {
         console.warn("⚠️ erro playlistItems:", vidsRes.status);
@@ -152,10 +152,22 @@ for (const key of shuffledKeys) {
       if (!nextPage) break;
     }
 
-    if (!allIds.length) {
-      console.warn("⚠️ nenhum ID encontrado");
-      continue;
-    }
+  if (!allIds.length) {
+  console.warn("⚠️ fallback simples playlist");
+  
+  // 🔥 fallback estilo original (NÃO QUEBRA)
+  const vidsRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
+  );
+
+  const vidsJson = await vidsRes.json();
+
+  allIds = (vidsJson.items || [])
+    .map(v => v.contentDetails?.videoId)
+    .filter(Boolean);
+
+  if (!allIds.length) continue;
+}
 
 // ======================================================
 // 🔹 3. FETCH VIDEOS

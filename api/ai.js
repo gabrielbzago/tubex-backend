@@ -1,9 +1,12 @@
 // ======================================================
-// 🧠 TubeX AI ENGINE (PRO LEVEL)
+// 🧠 TubeX AI (SAFE PRODUCTION VERSION)
 // ======================================================
 
 export default async function handler(req, res) {
 
+  // ======================================================
+  // 🌐 CORS (controlado)
+  // ======================================================
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
@@ -15,24 +18,48 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // ======================================================
+  // 🚫 METHOD
+  // ======================================================
   if (req.method !== "POST") {
-    return res.status(405).json({ success:false, error:"method_not_allowed" });
+    return res.status(405).json({
+      success: false,
+      error: "method_not_allowed"
+    });
   }
 
   try {
 
-    let body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    // ======================================================
+    // 📦 BODY PARSE
+    // ======================================================
+    let body;
+
+    try {
+      body = typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "invalid_json"
+      });
+    }
 
     const email = body?.email;
 
-    if (!email) {
-      return res.status(401).json({ success:false, error:"unauthorized" });
+    // ======================================================
+    // 🔒 USER REQUIRED
+    // ======================================================
+    if (!email || typeof email !== "string") {
+      return res.status(401).json({
+        success: false,
+        error: "unauthorized"
+      });
     }
 
     // ======================================================
-    // 🔥 RATE LIMIT
+    // 🔥 RATE LIMIT (ANTI ABUSE)
     // ======================================================
     global.__tubexRate = global.__tubexRate || {};
     const now = Date.now();
@@ -44,23 +71,44 @@ export default async function handler(req, res) {
     global.__tubexRate[email] =
       global.__tubexRate[email].filter(t => now - t < 60000);
 
-    if (global.__tubexRate[email].length >= 6) {
-      return res.status(429).json({ success:false, error:"rate_limit" });
+    if (global.__tubexRate[email].length >= 5) {
+      return res.status(429).json({
+        success: false,
+        error: "rate_limit"
+      });
     }
 
     global.__tubexRate[email].push(now);
+
+    // ======================================================
+    // 🔒 OPENAI KEY
+    // ======================================================
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: "missing_openai_key"
+      });
+    }
 
     // ======================================================
     // 🧠 INPUT
     // ======================================================
     let { prompt, context, tipo } = body;
 
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "invalid_prompt"
+      });
+    }
+
+    prompt = prompt.slice(0, 500);
+
     const videos = Array.isArray(context?.videos) ? context.videos : [];
 
-    const parsedVideos = videos.slice(0, 15).map(v => ({
+    const parsedVideos = videos.slice(0, 10).map(v => ({
       title: v.title || v.snippet?.title || "",
       views: Number(v.views || v.statistics?.viewCount || 0),
-      likes: Number(v.statistics?.likeCount || 0),
       publishedAt: v.publishedAt || v.snippet?.publishedAt || ""
     }));
 
@@ -68,9 +116,8 @@ export default async function handler(req, res) {
     const avgViews = parsedVideos.length ? Math.round(totalViews / parsedVideos.length) : 0;
 
     const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
-
-    const top = sorted[0] || {};
-    const worst = sorted[sorted.length-1] || {};
+    const topVideo = sorted[0] || {};
+    const worstVideo = sorted[sorted.length-1] || {};
 
     const nowTime = Date.now();
     const last7 = parsedVideos.filter(v=>{
@@ -80,33 +127,9 @@ export default async function handler(req, res) {
 
     const uploads7 = last7.length;
 
-    // ======================================================
-    // 🔥 SCORE REAL (SEM IA)
-    // ======================================================
-    let score = 50;
-
-    if (avgViews > 1000) score += 10;
-    if (avgViews > 5000) score += 10;
-    if (uploads7 >= 2) score += 10;
-    if (uploads7 >= 4) score += 10;
-
-    if (top.views > avgViews * 2) score += 10;
-
-    if (uploads7 === 0) score -= 15;
-
-    score = Math.max(0, Math.min(100, score));
-
-    // ======================================================
-    // 🔥 PADRÃO VIRAL
-    // ======================================================
-    const viralPattern = parsedVideos
-      .filter(v => v.views > avgViews * 1.8)
-      .map(v => v.title)
-      .slice(0, 3);
-
     const videoSummary = parsedVideos
-      .slice(0,5)
-      .map(v=>`- ${v.title} (${v.views})`)
+      .slice(0,3)
+      .map(v=>`- ${v.title} (${v.views} views)`)
       .join("\n");
 
     // ======================================================
@@ -114,65 +137,97 @@ export default async function handler(req, res) {
     // ======================================================
     let finalPrompt = "";
 
-    if (tipo === "strategy") {
+    if (tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional") {
 
       finalPrompt = `
-Você é um especialista em crescimento no YouTube.
+Crie 4 títulos curtos e altamente clicáveis.
+Máx 70 caracteres.
 
-📊 DADOS REAIS:
-- Média de views: ${avgViews}
-- Uploads últimos 7 dias: ${uploads7}
+Base:
+"${prompt}"
+`;
 
-🔥 Melhor vídeo:
-${top.title} (${top.views})
+    } else if (tipo === "descricao") {
 
-⚠️ Pior vídeo:
-${worst.title} (${worst.views})
+      finalPrompt = `
+Crie uma descrição otimizada para YouTube.
 
-📺 Vídeos:
+Inclua:
+- introdução forte
+- SEO natural
+- CTA leve
+
+Base:
+"${prompt}"
+`;
+
+    } else if (tipo === "ideas") {
+
+      finalPrompt = `
+Baseado nesses vídeos:
+
 ${videoSummary}
 
-🔥 PADRÃO VIRAL:
-${viralPattern.join("\n") || "Nenhum padrão claro"}
+Crie 5 ideias novas.
 
----
+Regras:
+- não repetir
+- máximo 12 palavras
+- foco em viral
+`;
 
-Gere:
+    } else if (tipo === "strategy") {
 
-1. 📈 PADRÃO DO CANAL
-2. ❌ ERRO CRÍTICO
-3. 🚀 ESTRATÉGIA DE CRESCIMENTO
-4. 🎯 3 TÍTULOS PRONTOS
+      finalPrompt = `
+Dados:
+Média views: ${avgViews}
+Uploads 7 dias: ${uploads7}
 
-⚠️ Seja direto e específico.
+Top vídeo:
+${topVideo.title} (${topVideo.views})
+
+Pior vídeo:
+${worstVideo.title} (${worstVideo.views})
+
+Crie uma estratégia:
+- o que funciona
+- erro crítico
+- plano de crescimento
+- 3 títulos
 `;
 
     } else {
 
-      finalPrompt = prompt;
+      finalPrompt = `
+${prompt}
+
+Dados:
+${videoSummary}
+
+Analise o canal e sugira melhorias reais.
+`;
+
     }
 
     // ======================================================
-    // ⚡ CACHE INTELIGENTE
+    // ⚡ CACHE
     // ======================================================
-    const stableKey = parsedVideos
-      .slice(0,5)
-      .map(v => (v.title || "").slice(0,30))
-      .sort()
-      .join("|");
+const stableKey = parsedVideos
+  .slice(0,5)
+  .map(v => (v.title || "").slice(0,30).toLowerCase().trim())
+  .sort()
+  .join("|");
 
-    const cacheKey = `${tipo}_${stableKey}`;
+const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
 
     global.__tubexCache = global.__tubexCache || {};
 
     const cache = global.__tubexCache[cacheKey];
 
-    if (cache && (Date.now() - cache.timestamp < 1000 * 60 * 60)) {
+    if (cache && (Date.now() - cache.timestamp < 3600000)) {
       return res.status(200).json({
-        success:true,
-        text: cache.text,
-        score,
-        pattern: viralPattern
+        success: true,
+        text: cache.text
       });
     }
 
@@ -188,16 +243,24 @@ Gere:
       body: JSON.stringify({
         model:"gpt-4o-mini",
         messages:[
-          { role:"system", content:"Especialista em crescimento YouTube." },
+          { role:"system", content:"Especialista em YouTube growth." },
           { role:"user", content: finalPrompt }
         ],
         temperature: 0.7,
-        max_tokens: 900
+        max_tokens: 800
       })
     });
 
     if (!response.ok) {
-      return res.status(500).json({ success:false, error:"openai_error" });
+
+      const err = await response.text();
+
+      console.error("💥 OPENAI:", err);
+
+      return res.status(500).json({
+        success:false,
+        error:"openai_error"
+      });
     }
 
     const data = await response.json();
@@ -205,7 +268,10 @@ Gere:
     const text = data?.choices?.[0]?.message?.content?.trim();
 
     if (!text) {
-      return res.status(500).json({ success:false, error:"empty_ai_response" });
+      return res.status(500).json({
+        success:false,
+        error:"empty_response"
+      });
     }
 
     global.__tubexCache[cacheKey] = {
@@ -215,9 +281,7 @@ Gere:
 
     return res.status(200).json({
       success:true,
-      text,
-      score,
-      pattern: viralPattern
+      text
     });
 
   } catch (err) {

@@ -1,335 +1,290 @@
+// ======================================================
+// 🧠 TubeX AI (SAFE PRODUCTION VERSION)
+// ======================================================
+
 export default async function handler(req, res) {
 
+  // ======================================================
+  // 🌐 CORS (controlado)
+  // ======================================================
   const origin = req.headers.origin || "*";
 
   res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, x-api-key, authorization"
-  );
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   res.setHeader("Vary", "Origin");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  const apiKey =
-    req.headers["x-api-key"] ||
-    req.headers["authorization"]?.replace("Bearer ", "");
-
-  if (apiKey !== process.env.API_KEY) {
-    return res.status(403).json({
-      success: false,
-      error: "unauthorized",
-      text: ""
-    });
-  }
-
+  // ======================================================
+  // 🚫 METHOD
+  // ======================================================
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      error: "Método não permitido",
-      text: ""
+      error: "method_not_allowed"
     });
   }
 
   try {
 
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    // ======================================================
+    // 📦 BODY PARSE
+    // ======================================================
+    let body;
 
-    let prompt = body?.prompt;
-    const context = body?.context || {};
-    const tipo = body?.tipo || "";
-
-    if (!prompt) {
+    try {
+      body = typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
+    } catch {
       return res.status(400).json({
         success: false,
-        error: "prompt obrigatório",
-        text: ""
+        error: "invalid_json"
       });
     }
 
-    prompt = String(prompt).slice(0, 2000);
+    const email = body?.email;
 
-    const videos = Array.isArray(context.videos) ? context.videos : [];
-
-    if (!videos || videos.length < 3) {
-      console.warn("⚠️ sem vídeos → IA sem contexto");
+    // ======================================================
+    // 🔒 USER REQUIRED
+    // ======================================================
+    if (!email || typeof email !== "string") {
+      return res.status(401).json({
+        success: false,
+        error: "unauthorized"
+      });
     }
 
-    const parsedVideos = videos.slice(0, 20).map(v => ({
+    // ======================================================
+    // 🔥 RATE LIMIT (ANTI ABUSE)
+    // ======================================================
+    global.__tubexRate = global.__tubexRate || {};
+    const now = Date.now();
+
+    if (!global.__tubexRate[email]) {
+      global.__tubexRate[email] = [];
+    }
+
+    global.__tubexRate[email] =
+      global.__tubexRate[email].filter(t => now - t < 60000);
+
+    if (global.__tubexRate[email].length >= 5) {
+      return res.status(429).json({
+        success: false,
+        error: "rate_limit"
+      });
+    }
+
+    global.__tubexRate[email].push(now);
+
+    // ======================================================
+    // 🔒 OPENAI KEY
+    // ======================================================
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: "missing_openai_key"
+      });
+    }
+
+    // ======================================================
+    // 🧠 INPUT
+    // ======================================================
+    let { prompt, context, tipo } = body;
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "invalid_prompt"
+      });
+    }
+
+    prompt = prompt.slice(0, 500);
+
+    const videos = Array.isArray(context?.videos) ? context.videos : [];
+
+    const parsedVideos = videos.slice(0, 10).map(v => ({
       title: v.title || v.snippet?.title || "",
       views: Number(v.views || v.statistics?.viewCount || 0),
-      likes: Number(v.statistics?.likeCount || 0),
-      comments: Number(v.statistics?.commentCount || 0),
       publishedAt: v.publishedAt || v.snippet?.publishedAt || ""
     }));
 
-    const totalViews = parsedVideos.reduce((acc, v) => acc + v.views, 0);
-    const avgViews = parsedVideos.length
-      ? Math.round(totalViews / parsedVideos.length)
-      : 0;
+    const totalViews = parsedVideos.reduce((a,v)=>a+v.views,0);
+    const avgViews = parsedVideos.length ? Math.round(totalViews / parsedVideos.length) : 0;
 
     const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
-
     const topVideo = sorted[0] || {};
-    const worstVideo = sorted[sorted.length - 1] || {};
+    const worstVideo = sorted[sorted.length-1] || {};
 
-    const now = Date.now();
-    const last7 = parsedVideos.filter(v => {
+    const nowTime = Date.now();
+    const last7 = parsedVideos.filter(v=>{
       const t = new Date(v.publishedAt).getTime();
-      return (now - t) <= (7 * 24 * 60 * 60 * 1000);
+      return (nowTime - t) <= 604800000;
     });
 
     const uploads7 = last7.length;
 
-    const videoSummary = parsedVideos.slice(0, 3).map(v => {
-      return `- ${v.title} (${v.views} views)`;
-    }).join("\n");
+    const videoSummary = parsedVideos
+      .slice(0,3)
+      .map(v=>`- ${v.title} (${v.views} views)`)
+      .join("\n");
 
-    // =========================================
-    // 🧠 PROMPT CONTROLADO (CORREÇÃO REAL)
-    // =========================================
+    // ======================================================
+    // 🧠 PROMPT ENGINE
+    // ======================================================
     let finalPrompt = "";
 
-    if(tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional"){
+    if (tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional") {
 
       finalPrompt = `
-Crie 4 títulos curtos, altamente clicáveis para YouTube.
+Crie 4 títulos curtos e altamente clicáveis.
 Máx 70 caracteres.
 
 Base:
 "${prompt}"
 `;
 
-    }
-
-    else if(tipo === "descricao"){
+    } else if (tipo === "descricao") {
 
       finalPrompt = `
 Crie uma descrição otimizada para YouTube.
 
 Inclua:
 - introdução forte
-- palavras-chave naturais
+- SEO natural
 - CTA leve
 
 Base:
 "${prompt}"
 `;
 
-    }
+    } else if (tipo === "ideas") {
 
-
-// =========================
-// 💡 IDEIAS DE VÍDEO (FIX)
-// =========================
-else if(tipo === "ideas"){
-
-  finalPrompt = `
-Você é um especialista em crescimento no YouTube.
-
-Baseado nos vídeos abaixo:
+      finalPrompt = `
+Baseado nesses vídeos:
 
 ${videoSummary}
 
-Crie 5 ideias de vídeos NOVOS para este canal.
+Crie 5 ideias novas.
 
 Regras:
-- Baseadas no estilo do canal
-- Não repetir títulos existentes
-- 1 linha por ideia
-- Máx 12 palavras
-- Foco em CTR e viralização
-- Não explique
-
-Responda apenas com as ideias.
+- não repetir
+- máximo 12 palavras
+- foco em viral
 `;
 
-}
+    } else if (tipo === "strategy") {
 
-else if(tipo === "strategy"){
+      finalPrompt = `
+Dados:
+Média views: ${avgViews}
+Uploads 7 dias: ${uploads7}
 
-  finalPrompt = `
-Você é um consultor especialista em crescimento no YouTube.
+Top vídeo:
+${topVideo.title} (${topVideo.views})
 
-📊 DADOS REAIS:
-- Média de views: ${avgViews}
-- Uploads últimos 7 dias: ${uploads7}
+Pior vídeo:
+${worstVideo.title} (${worstVideo.views})
 
-🔥 Melhor vídeo:
-${topVideo?.title || "N/A"} (${topVideo?.views || 0} views)
-
-⚠️ Pior vídeo:
-${worstVideo?.title || "N/A"} (${worstVideo?.views || 0} views)
-
-📺 Vídeos:
-${videoSummary}
-
----
-
-Gere uma estratégia PROFISSIONAL:
-
-1. 📈 PADRÃO DO CANAL
-- O que está funcionando de verdade
-
-2. ❌ ERRO CRÍTICO
-- O que está travando crescimento (sem genérico)
-
-3. 🚀 ESTRATÉGIA DE ESCALA
-- O que repetir
-- O que parar
-- O que testar
-
-4. 🎯 3 TÍTULOS PRONTOS
-- Baseados no padrão que funciona
-
----
-
-⚠️ Regras:
-- Proibido resposta genérica
-- Seja direto
-- Baseado apenas nos dados
+Crie uma estratégia:
+- o que funciona
+- erro crítico
+- plano de crescimento
+- 3 títulos
 `;
-}
 
-
-    // 🔥 SE NÃO FOR TÍTULO/DESCRIÇÃO → USA INTELLIGENCE NORMAL
-    if(!finalPrompt){
+    } else {
 
       finalPrompt = `
 ${prompt}
 
-========================
-📊 DADOS REAIS DO CANAL
-========================
-
-Média de views: ${avgViews}
-Uploads últimos 7 dias: ${uploads7}
-
-🔥 Melhor vídeo:
-${topVideo?.title || "N/A"} (${topVideo?.views || 0} views)
-
-⚠️ Pior vídeo:
-${worstVideo?.title || "N/A"} (${worstVideo?.views || 0} views)
-
-📺 Amostra de vídeos:
+Dados:
 ${videoSummary}
 
-========================
-📌 INSTRUÇÕES
-========================
-
-Faça uma análise PROFUNDA e prática do canal.
-
-Inclua:
-- O que está funcionando
-- O que está travando crescimento
-- Padrões de vídeos que performam melhor
-- Erros estratégicos
-- Oportunidades reais de crescimento
-- Sugestões acionáveis (não genéricas)
-
-Seja direto, estratégico e profissional.
+Analise o canal e sugira melhorias reais.
 `;
 
     }
 
-    // ===============================
+    // ======================================================
     // ⚡ CACHE
-    // ===============================
-const stableKey = parsedVideos
-  .slice(0,5)
-  .map(v => (v.title || "").slice(0,30).toLowerCase().trim())
-  .sort() // 🔥 ESSENCIAL
-  .join("|");
-
-const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
+    // ======================================================
+    const cacheKey = `${tipo}_${prompt.slice(0,80)}`;
 
     global.__tubexCache = global.__tubexCache || {};
 
     const cache = global.__tubexCache[cacheKey];
 
-    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 60 * 6)){
-      console.log("⚡ usando cache IA");
+    if (cache && (Date.now() - cache.timestamp < 3600000)) {
       return res.status(200).json({
         success: true,
         text: cache.text
       });
     }
 
+    // ======================================================
+    // 🤖 OPENAI
+    // ======================================================
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model:"gpt-4o-mini",
+        messages:[
+          { role:"system", content:"Especialista em YouTube growth." },
+          { role:"user", content: finalPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 800
+      })
+    });
 
-let temp = 0.6;
+    if (!response.ok) {
 
-if (tipo === "ideas") temp = 0.8;
-if (tipo === "descricao") temp = 0.5;
-if (tipo === "strategy") temp = 0.7;
+      const err = await response.text();
 
- const response = await fetch("https://api.openai.com/v1/chat/completions", {
-  method:"POST",
-  headers:{
-    "Content-Type":"application/json",
-    "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
-  },
-  body: JSON.stringify({
-    model:"gpt-4o-mini",
-    messages:[
-      { role:"system", content:"Você é especialista em YouTube e SEO." },
-      { role:"user", content: finalPrompt }
-    ],
-temperature: temp,
-max_tokens: 1200
-  })
-});
+      console.error("💥 OPENAI:", err);
 
-// 🚨 TRATAMENTO REAL
-if (!response.ok) {
-  const errorText = await response.text();
-  console.error("💥 OPENAI ERROR:", errorText);
+      return res.status(500).json({
+        success:false,
+        error:"openai_error"
+      });
+    }
 
-  return res.status(500).json({
-    success:false,
-    error:"openai_error",
-    message:errorText
-  });
-}
+    const data = await response.json();
 
-const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content?.trim();
 
-console.log("🧠 OPENAI RAW:", data);
+    if (!text) {
+      return res.status(500).json({
+        success:false,
+        error:"empty_response"
+      });
+    }
 
-// 🔥 EXTRAÇÃO SEGURA
-const text = data?.choices?.[0]?.message?.content?.trim();
+    global.__tubexCache[cacheKey] = {
+      text,
+      timestamp: Date.now()
+    };
 
-if (!text) {
-  return res.status(500).json({
-    success:false,
-    error:"empty_ai_response"
-  });
-}
+    return res.status(200).json({
+      success:true,
+      text
+    });
 
-global.__tubexCache[cacheKey] = {
-  text,
-  timestamp: Date.now()
-};
+  } catch (err) {
 
-return res.status(200).json({
-  success:true,
-  text
-});
-
-  } catch (e) {
-
-    console.error("💥 AI backend error:", e);
+    console.error("💥 ERROR:", err);
 
     return res.status(500).json({
       success:false,
-      error:"Erro interno",
-      text:""
+      error:"internal_error"
     });
   }
 }

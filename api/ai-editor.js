@@ -1,16 +1,26 @@
+// ======================================================
+// 🧠 TubeX AI Titles/Description (SAFE VERSION)
+// ======================================================
+
 export default async function handler(req, res) {
 
-  // =====================================
-  // 🌐 CORS
-  // =====================================
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // ======================================================
+  // 🌐 CORS CONTROLADO
+  // ======================================================
+  const origin = req.headers.origin || "*";
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
+  // ======================================================
+  // 🚫 METHOD
+  // ======================================================
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -20,33 +30,74 @@ export default async function handler(req, res) {
 
   try {
 
-    // =====================================
-    // 📦 BODY SAFE PARSE
-    // =====================================
-    let body = {};
+    // ======================================================
+    // 📦 BODY SAFE
+    // ======================================================
+    let body;
 
     try {
       body = typeof req.body === "string"
         ? JSON.parse(req.body)
         : (req.body || {});
-    } catch (e) {
-      console.warn("⚠ JSON inválido recebido");
-      body = {};
+    } catch {
+      return res.status(400).json({
+        success: false,
+        error: "invalid_json"
+      });
     }
 
-    // =====================================
-    // 🔒 NORMALIZAÇÃO SEGURA
-    // =====================================
-    const tipo = String(body?.tipo || "")
-      .toLowerCase()
-      .trim();
+    // ======================================================
+    // 👤 USER VALIDATION
+    // ======================================================
+    const email = body?.email;
 
-    const prompt = String(body?.prompt || "")
-      .trim();
+    if (!email || typeof email !== "string") {
+      return res.status(401).json({
+        success: false,
+        error: "unauthorized"
+      });
+    }
 
-    // =====================================
-    // 🚫 VALIDAÇÃO
-    // =====================================
+    // ======================================================
+    // 🔥 RATE LIMIT
+    // ======================================================
+    global.__tubexRate = global.__tubexRate || {};
+    const now = Date.now();
+
+    if (!global.__tubexRate[email]) {
+      global.__tubexRate[email] = [];
+    }
+
+    global.__tubexRate[email] =
+      global.__tubexRate[email].filter(t => now - t < 60000);
+
+    if (global.__tubexRate[email].length >= 10) {
+      return res.status(429).json({
+        success: false,
+        error: "rate_limit"
+      });
+    }
+
+    global.__tubexRate[email].push(now);
+
+    // ======================================================
+    // 🔒 OPENAI KEY
+    // ======================================================
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: "missing_openai_key"
+      });
+    }
+
+    // ======================================================
+    // 🧠 INPUT
+    // ======================================================
+    let { tipo, prompt } = body;
+
+    tipo = String(tipo || "").toLowerCase().trim();
+    prompt = String(prompt || "").trim();
+
     if (!prompt) {
       return res.status(400).json({
         success: false,
@@ -61,15 +112,20 @@ export default async function handler(req, res) {
       });
     }
 
-    // =====================================
-    // 🧠 PROMPT BUILDER
-    // =====================================
+    // 🔥 LIMITA CUSTO
+    if (prompt.length > 300) {
+      prompt = prompt.slice(0, 300);
+    }
+
+    // ======================================================
+    // 🧠 PROMPT ENGINE
+    // ======================================================
     let finalPrompt = "";
 
     if (tipo === "titulo" || tipo === "tituloseo") {
 
       finalPrompt = `
-Crie 4 títulos curtos, altamente clicáveis para YouTube.
+Crie 4 títulos curtos e altamente clicáveis para YouTube.
 Máx 70 caracteres.
 
 Base:
@@ -83,7 +139,7 @@ Crie uma descrição otimizada para YouTube.
 
 Inclua:
 - introdução forte
-- palavras-chave naturais
+- SEO natural
 - CTA leve
 - até 2 hashtags
 
@@ -100,9 +156,25 @@ Base:
 
     }
 
-    // =====================================
+    // ======================================================
+    // ⚡ CACHE
+    // ======================================================
+    const cacheKey = `${tipo}_${prompt.slice(0,80)}`;
+
+    global.__tubexCache = global.__tubexCache || {};
+
+    const cache = global.__tubexCache[cacheKey];
+
+    if (cache && (Date.now() - cache.timestamp < 3600000)) {
+      return res.status(200).json({
+        success: true,
+        text: cache.text
+      });
+    }
+
+    // ======================================================
     // 🤖 OPENAI REQUEST
-    // =====================================
+    // ======================================================
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -114,53 +186,50 @@ Base:
         messages: [
           {
             role: "system",
-            content: "Você é especialista em YouTube e SEO."
+            content: "Especialista em YouTube e SEO."
           },
           {
             role: "user",
             content: finalPrompt
           }
         ],
-        temperature: 0.6
+        temperature: 0.6,
+        max_tokens: 500
       })
     });
 
-    // =====================================
+    // ======================================================
     // ❌ OPENAI ERROR
-    // =====================================
+    // ======================================================
     if (!response.ok) {
+
       const errorText = await response.text();
 
       console.error("💥 OPENAI ERROR:", errorText);
 
       return res.status(500).json({
         success: false,
-        error: "openai_error",
-        message: errorText
+        error: "openai_error"
       });
     }
 
-    // =====================================
-    // 🔒 PARSE SEGURO
-    // =====================================
+    // ======================================================
+    // 🔒 PARSE SAFE
+    // ======================================================
     let data;
 
     try {
       data = await response.json();
-    } catch (e) {
-      console.error("💥 JSON PARSE ERROR:", e);
-
+    } catch {
       return res.status(500).json({
         success: false,
         error: "invalid_json_openai"
       });
     }
 
-    console.log("🧠 OPENAI RAW:", data);
-
-    // =====================================
-    // 🧠 EXTRAÇÃO SEGURA
-    // =====================================
+    // ======================================================
+    // 🧠 EXTRAÇÃO
+    // ======================================================
     let text = data?.choices?.[0]?.message?.content;
 
     if (Array.isArray(text)) {
@@ -169,9 +238,6 @@ Base:
 
     text = String(text || "").trim();
 
-    // =====================================
-    // 🚫 RESPOSTA VAZIA
-    // =====================================
     if (!text) {
       return res.status(500).json({
         success: false,
@@ -179,9 +245,17 @@ Base:
       });
     }
 
-    // =====================================
-    // ✅ SUCCESS
-    // =====================================
+    // ======================================================
+    // 💾 CACHE SAVE
+    // ======================================================
+    global.__tubexCache[cacheKey] = {
+      text,
+      timestamp: Date.now()
+    };
+
+    // ======================================================
+    // ✅ RESPONSE
+    // ======================================================
     return res.status(200).json({
       success: true,
       text

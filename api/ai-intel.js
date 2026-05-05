@@ -1,32 +1,75 @@
+// ======================================================
+// 🚀 TubeX AI SERVER (SAFE PRODUCTION)
+// ======================================================
+
 import express from "express";
 import cors from "cors";
 
 const app = express();
-
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.API_KEY;
+
 const OPENAI_KEY = process.env.OPENAI_KEY;
 
-app.use(cors({ origin: "*", methods: ["GET","POST"], allowedHeaders: ["Content-Type","x-api-key"] }));
+// ======================================================
+// 🌐 CORS CONTROLADO
+// ======================================================
+app.use(cors({
+  origin: true,
+  methods: ["POST"],
+  allowedHeaders: ["Content-Type"]
+}));
+
 app.use(express.json({ limit: "1mb" }));
 
 // ======================================================
-// 🔒 AUTH
+// 🔥 RATE LIMIT GLOBAL
 // ======================================================
-function auth(req,res,next){
-  if(req.headers["x-api-key"] !== API_KEY){
-    return res.status(401).json({ success:false });
+global.__tubexRate = global.__tubexRate || {};
+
+// ======================================================
+// 🔒 MIDDLEWARE SEGURANÇA
+// ======================================================
+function secure(req, res, next){
+
+  const email = req.body?.email;
+
+  if (!email || typeof email !== "string") {
+    return res.status(401).json({
+      success:false,
+      error:"unauthorized"
+    });
   }
+
+  const now = Date.now();
+
+  if (!global.__tubexRate[email]) {
+    global.__tubexRate[email] = [];
+  }
+
+  global.__tubexRate[email] =
+    global.__tubexRate[email].filter(t => now - t < 60000);
+
+  if (global.__tubexRate[email].length >= 10) {
+    return res.status(429).json({
+      success:false,
+      error:"rate_limit"
+    });
+  }
+
+  global.__tubexRate[email].push(now);
+
   next();
 }
 
-app.use("/api/ai", auth);
-
 // ======================================================
-// 🧠 IA CORE
+// 🤖 IA CORE (SAFE)
 // ======================================================
 async function callAI(prompt){
+
+  if (!OPENAI_KEY) return null;
+
   try{
+
     const res = await fetch("https://api.openai.com/v1/chat/completions",{
       method:"POST",
       headers:{
@@ -36,26 +79,31 @@ async function callAI(prompt){
       body:JSON.stringify({
         model:"gpt-4o-mini",
         temperature:0.6,
+        max_tokens:500,
         messages:[
-          { role:"system", content:"Especialista em crescimento no YouTube, direto e estratégico." },
-          { role:"user", content: prompt }
+          { role:"system", content:"Especialista em crescimento no YouTube." },
+          { role:"user", content: prompt.slice(0,500) }
         ]
       })
     });
 
-    if(!res.ok) return null;
+    if(!res.ok){
+      console.error("💥 OPENAI FAIL:", await res.text());
+      return null;
+    }
 
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content || null;
+
+    return data?.choices?.[0]?.message?.content?.trim() || null;
 
   }catch(e){
-    console.error("AI FAIL", e);
+    console.error("AI ERROR", e);
     return null;
   }
 }
 
 // ======================================================
-// 📊 ENGINE (SEM IA)
+// 📊 ANALYTICS (SEM IA)
 // ======================================================
 function analyzeChannel(stats, videos){
 
@@ -64,17 +112,10 @@ function analyzeChannel(stats, videos){
   const uploads7 = Number(stats.uploads7 || 0);
   const views7 = Number(stats.views7 || 0);
 
-  // consistência
   const consistency = Math.min(10, uploads7 * 2);
-
-  // performance
   const performance = subs > 0 ? Math.min(10, (avg / subs) * 10) : 0;
-
-  // crescimento
   const growth = subs > 0 ? (views7 / subs) : 0;
-
   const potential = Math.min(10, growth * 5);
-
   const positioning = avg > 0 ? 6 : 2;
 
   const score = Math.round(
@@ -91,9 +132,9 @@ function analyzeChannel(stats, videos){
 }
 
 // ======================================================
-// 🧠 DIAGNOSIS (HYBRID)
+// 🧠 DIAGNOSIS
 // ======================================================
-app.post("/api/ai/diagnosis", async (req,res)=>{
+app.post("/api/ai/diagnosis", secure, async (req,res)=>{
 
   try{
 
@@ -102,26 +143,18 @@ app.post("/api/ai/diagnosis", async (req,res)=>{
     if(videos.length < 3){
       return res.json({
         success:true,
-        data:{
-          score:0,
-          message:"Dados insuficientes"
-        }
+        data:{ score:0, message:"Dados insuficientes" }
       });
     }
 
     const base = analyzeChannel(stats, videos);
 
-    // ======================================================
-    // 🧠 IA COMPLEMENTAR
-    // ======================================================
     const titles = videos
       .slice(0,10)
-      .map(v=>v?.snippet?.title || v?.title || "")
+      .map(v=>v?.title || "")
       .join("\n");
 
     const prompt = `
-Baseado nesses dados:
-
 Score: ${base.score}
 Consistência: ${base.consistency}
 Performance: ${base.performance}
@@ -129,12 +162,9 @@ Performance: ${base.performance}
 Títulos:
 ${titles}
 
-Gere:
-
-- 3 problemas principais
+Liste:
+- 3 problemas
 - 3 oportunidades
-
-Resposta curta
 `;
 
     const ai = await callAI(prompt);
@@ -143,28 +173,20 @@ Resposta curta
       success:true,
       data:{
         ...base,
-        insights: ai || "Sem insights disponíveis"
+        insights: ai || "Sem insights"
       }
     });
 
   }catch(e){
-
     console.error(e);
-
-    return res.json({
-      success:true,
-      data:{
-        score:0,
-        error:true
-      }
-    });
+    return res.json({ success:true, data:{ score:0 } });
   }
 });
 
 // ======================================================
-// 💡 VIDEO IDEAS (INTELIGENTE)
+// 💡 VIDEO IDEAS
 // ======================================================
-app.post("/api/ai/video-ideas", async (req,res)=>{
+app.post("/api/ai/video-ideas", secure, async (req,res)=>{
 
   try{
 
@@ -188,13 +210,11 @@ app.post("/api/ai/video-ideas", async (req,res)=>{
     const titles = top.map(v=>v.title).join("\n");
 
     const prompt = `
-Baseado nesses vídeos virais:
+Baseado nesses vídeos:
 
 ${titles}
 
-Crie 5 títulos altamente clicáveis
-
-Sem explicação
+Crie 5 títulos virais.
 `;
 
     const text = await callAI(prompt);
@@ -211,36 +231,28 @@ Sem explicação
     });
 
   }catch(e){
-
-    return res.json({
-      success:true,
-      ideas:["Erro ao gerar ideias"]
-    });
+    return res.json({ success:true, ideas:["Erro"] });
   }
 });
 
 // ======================================================
-// 🧠 NICHE (SEM IA - RÁPIDO)
+// 🧠 NICHE (SEM IA)
 // ======================================================
-app.post("/api/ai/niche", async (req,res)=>{
+app.post("/api/ai/niche", secure, (req,res)=>{
 
   const { videos=[] } = req.body;
 
   if(videos.length < 3){
-    return res.json({
-      success:true,
-      niche:"Geral",
-      confidence:0
-    });
+    return res.json({ success:true, niche:"Geral", confidence:0 });
   }
 
   const text = videos.map(v=>v.title).join(" ").toLowerCase();
 
   const map = {
-    youtube:["youtube","canal","views"],
-    games:["game","minecraft","fps"],
-    anime:["naruto","anime","episodio"],
-    dinheiro:["dinheiro","renda","lucro"]
+    youtube:["youtube","canal"],
+    games:["game","fps"],
+    anime:["anime","naruto"],
+    dinheiro:["dinheiro","renda"]
   };
 
   let best = "Geral";
@@ -266,5 +278,5 @@ app.post("/api/ai/niche", async (req,res)=>{
 
 // ======================================================
 app.listen(PORT, ()=>{
-  console.log("🚀 ENTERPRISE AI RUNNING");
+  console.log("🚀 TubeX SAFE SERVER RUNNING");
 });

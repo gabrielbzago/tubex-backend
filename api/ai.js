@@ -102,35 +102,69 @@ export default async function handler(req, res) {
       });
     }
 
-    prompt = prompt.slice(0, 500);
-
+prompt = prompt.slice(0, 1000);
     const videos = Array.isArray(context?.videos) ? context.videos : [];
 
-    const parsedVideos = videos.slice(0, 10).map(v => ({
-      title: v.title || v.snippet?.title || "",
-      views: Number(v.views || v.statistics?.viewCount || 0),
-      publishedAt: v.publishedAt || v.snippet?.publishedAt || ""
-    }));
+ // ======================================================
+// 🔥 ENGINE DE DADOS (NOVA - NÃO QUEBRA NADA)
+// ======================================================
 
-    const totalViews = parsedVideos.reduce((a,v)=>a+v.views,0);
-    const avgViews = parsedVideos.length ? Math.round(totalViews / parsedVideos.length) : 0;
+const parsedVideos = videos.slice(0, 20).map(v => ({
+  title: v.title || v.snippet?.title || "",
+  views: Number(v.views || v.statistics?.viewCount || 0),
+  likes: Number(v.statistics?.likeCount || 0),
+  comments: Number(v.statistics?.commentCount || 0),
+  publishedAt: v.publishedAt || v.snippet?.publishedAt || ""
+}));
 
-    const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
-    const topVideo = sorted[0] || {};
-    const worstVideo = sorted[sorted.length-1] || {};
+const totalViews = parsedVideos.reduce((acc, v) => acc + v.views, 0);
+const avgViews = parsedVideos.length
+  ? Math.round(totalViews / parsedVideos.length)
+  : 0;
 
-    const nowTime = Date.now();
-    const last7 = parsedVideos.filter(v=>{
-      const t = new Date(v.publishedAt).getTime();
-      return (nowTime - t) <= 604800000;
-    });
+const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
 
-    const uploads7 = last7.length;
+const topVideo = sorted[0] || {};
+const worstVideo = sorted[sorted.length - 1] || {};
 
-    const videoSummary = parsedVideos
-      .slice(0,3)
-      .map(v=>`- ${v.title} (${v.views} views)`)
-      .join("\n");
+const now = Date.now();
+const last7 = parsedVideos.filter(v => {
+  const t = new Date(v.publishedAt).getTime();
+  return (now - t) <= (7 * 24 * 60 * 60 * 1000);
+});
+
+const uploads7 = last7.length;
+
+// ======================================================
+// 🔥 SCORE REAL (SEM IA)
+// ======================================================
+let score = 50;
+
+if (avgViews > 1000) score += 10;
+if (avgViews > 5000) score += 10;
+if (uploads7 >= 2) score += 10;
+if (uploads7 >= 4) score += 10;
+
+if (topVideo.views > avgViews * 2) score += 10;
+if (uploads7 === 0) score -= 15;
+
+score = Math.max(0, Math.min(100, score));
+
+// ======================================================
+// 🔥 PADRÃO VIRAL
+// ======================================================
+const viralVideos = parsedVideos
+  .filter(v => v.views > avgViews * 1.8)
+  .slice(0, 3);
+
+const viralPattern = viralVideos.map(v => v.title);
+
+// ======================================================
+// 🔥 VIDEO SUMMARY
+// ======================================================
+const videoSummary = parsedVideos.slice(0, 5).map(v => {
+  return `- ${v.title} (${v.views} views)`;
+}).join("\n");
 
     // ======================================================
     // 🧠 PROMPT ENGINE
@@ -176,38 +210,82 @@ Regras:
 - foco em viral
 `;
 
-    } else if (tipo === "strategy") {
+    }
 
-      finalPrompt = `
-Dados:
-Média views: ${avgViews}
-Uploads 7 dias: ${uploads7}
+else if (tipo === "strategy") {
 
-Top vídeo:
-${topVideo.title} (${topVideo.views})
+  finalPrompt = `
+Você é um especialista em crescimento no YouTube.
 
-Pior vídeo:
-${worstVideo.title} (${worstVideo.views})
+📊 DADOS REAIS:
+- Média de views: ${avgViews}
+- Uploads últimos 7 dias: ${uploads7}
+- Score do canal: ${score}/100
 
-Crie uma estratégia:
-- o que funciona
-- erro crítico
-- plano de crescimento
-- 3 títulos
-`;
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
 
-    } else {
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
 
-      finalPrompt = `
-${prompt}
-
-Dados:
+📺 Vídeos:
 ${videoSummary}
 
-Analise o canal e sugira melhorias reais.
+🔥 PADRÃO VIRAL:
+${viralPattern.join("\n") || "Nenhum padrão claro"}
+
+---
+
+Gere:
+
+1. 📈 PADRÃO DO CANAL
+2. ❌ ERRO CRÍTICO (REAL)
+3. 🚀 ESTRATÉGIA DE ESCALA
+4. 🎯 3 TÍTULOS PRONTOS
+
+⚠️ PROIBIDO resposta genérica
+⚠️ Baseado apenas nos dados acima
 `;
 
     }
+
+else if (tipo === "diagnosis") {
+
+  finalPrompt = `
+Você é um analista profissional de canais do YouTube.
+
+📊 DADOS:
+- Média de views: ${avgViews}
+- Uploads últimos 7 dias: ${uploads7}
+- Score do canal: ${score}/100
+
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
+
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
+
+📺 Vídeos:
+${videoSummary}
+
+🔥 PADRÃO VIRAL:
+${viralPattern.join("\n") || "Nenhum padrão detectado"}
+
+---
+
+Gere um diagnóstico COMPLETO:
+
+1. 📊 NOTA DO CANAL (0 a 100)
+2. 📈 O QUE ESTÁ FUNCIONANDO
+3. ❌ ERROS CRÍTICOS
+4. 🚀 OPORTUNIDADES CLARAS
+5. 🎯 PLANO DE AÇÃO PRÁTICO
+
+⚠️ Seja direto
+⚠️ Baseado SOMENTE nos dados acima
+⚠️ Proibido resposta genérica
+`;
+}
 
     // ======================================================
     // ⚡ CACHE
@@ -224,12 +302,18 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
 
     const cache = global.__tubexCache[cacheKey];
 
-    if (cache && (Date.now() - cache.timestamp < 3600000)) {
-      return res.status(200).json({
-        success: true,
-        text: cache.text
-      });
-    }
+if (cache && (Date.now() - cache.timestamp < 3600000)) {
+  console.log("⚡ cache hit");
+
+  return res.status(200).json({
+    success: true,
+    text: cache.text,
+    score,
+    pattern: viralPattern,
+    topVideo,
+    worstVideo
+  });
+}
 
     // ======================================================
     // 🤖 OPENAI
@@ -280,9 +364,13 @@ const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
     };
 
     return res.status(200).json({
-      success:true,
-      text
-    });
+  success:true,
+  text,
+  score,
+  pattern: viralPattern,
+  topVideo,
+  worstVideo
+});
 
   } catch (err) {
 

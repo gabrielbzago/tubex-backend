@@ -93,17 +93,23 @@ export default async function handler(req, res) {
     // ======================================================
     // 🧠 INPUT
     // ======================================================
-    let { prompt, context, tipo } = body;
+   let { prompt, context, tipo } = body;
 
-    if (!prompt || typeof prompt !== "string") {
-      return res.status(400).json({
-        success: false,
-        error: "invalid_prompt"
-      });
-    }
+if (!prompt || typeof prompt !== "string") {
+  return res.status(400).json({
+    success: false,
+    error: "invalid_prompt"
+  });
+}
 
 prompt = prompt.slice(0, 1000);
-    const videos = Array.isArray(context?.videos) ? context.videos : [];
+
+// ✅ CORREÇÃO CRÍTICA
+let videos = Array.isArray(context?.videos) ? context.videos : [];
+
+if (!videos.length) {
+  console.warn("⚠️ Nenhum vídeo recebido no backend");
+}
 
  // ======================================================
 // 🔥 ENGINE DE DADOS (NOVA - NÃO QUEBRA NADA)

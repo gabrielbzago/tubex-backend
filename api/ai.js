@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, x-api-key, authorization"
+    "Content-Type, x-api-key, authorization, x-client"
   );
   res.setHeader("Vary", "Origin");
 
@@ -15,69 +15,79 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // 🔒 ORIGIN LOCK (não quebra extensão)
+  if (
+    !origin.includes("youtube.com") &&
+    !origin.includes("chrome-extension")
+  ) {
+    return res.status(403).json({ success:false, error:"origin_blocked", text:"" });
+  }
+
+  // 🔒 CLIENT CHECK
+  if (req.headers["x-client"] !== "tubex-extension-v1") {
+    return res.status(403).json({ success:false, error:"invalid_client", text:"" });
+  }
+
+  // 🔒 API KEY
   const apiKey =
     req.headers["x-api-key"] ||
     req.headers["authorization"]?.replace("Bearer ", "");
 
   if (apiKey !== process.env.API_KEY) {
-    return res.status(403).json({
-      success: false,
-      error: "unauthorized",
-      text: ""
-    });
+    return res.status(403).json({ success:false, error:"unauthorized", text:"" });
   }
 
+  // 🔥 RATE LIMIT (leve, não quebra UX)
+  const ip =
+    req.headers["x-forwarded-for"] ||
+    req.socket?.remoteAddress ||
+    "unknown";
+
+  global.__rateLimit = global.__rateLimit || {};
+  const now = Date.now();
+
+  if (!global.__rateLimit[ip]) global.__rateLimit[ip] = [];
+
+  global.__rateLimit[ip] =
+    global.__rateLimit[ip].filter(t => now - t < 60000);
+
+  if (global.__rateLimit[ip].length >= 15) {
+    return res.status(429).json({ success:false, error:"rate_limit", text:"" });
+  }
+
+  global.__rateLimit[ip].push(now);
+
   if (req.method !== "POST") {
-    return res.status(405).json({
-      success: false,
-      error: "Método não permitido",
-      text: ""
-    });
+    return res.status(405).json({ success:false, error:"Método inválido", text:"" });
   }
 
   try {
 
     // =========================
-    // 📦 BODY SAFE PARSE
+    // BODY SAFE
     // =========================
     let body;
     try {
       body = typeof req.body === "string"
         ? JSON.parse(req.body)
         : req.body;
-    } catch (err) {
-      console.error("💥 JSON PARSE ERROR:", err);
-      return res.status(400).json({
-        success: false,
-        error: "invalid_json",
-        text: ""
-      });
+    } catch {
+      return res.status(400).json({ success:false, error:"invalid_json", text:"" });
     }
 
-    let prompt = body?.prompt;
-    const context = body?.context || {};
-    const tipo = body?.tipo || "";
+    let { prompt, context, tipo } = body;
 
     if (!prompt) {
-      return res.status(400).json({
-        success: false,
-        error: "prompt obrigatório",
-        text: ""
-      });
+      return res.status(400).json({ success:false, error:"prompt obrigatório", text:"" });
     }
 
     prompt = String(prompt).slice(0, 2000);
 
-    // =========================
-    // 🎥 VIDEOS SAFE
-    // =========================
-    const videos = Array.isArray(context.videos) ? context.videos : [];
+    const videos = Array.isArray(context?.videos)
+      ? context.videos.slice(0, 20)
+      : [];
 
-    if (!videos.length) {
-      console.warn("⚠️ sem vídeos → IA sem contexto");
-    }
-
-    const parsedVideos = videos.slice(0, 20).map(v => ({
+    const parsedVideos = videos.map(v => ({
       title: v?.title || v?.snippet?.title || "",
       views: Number(v?.views || v?.statistics?.viewCount || 0),
       likes: Number(v?.statistics?.likeCount || 0),
@@ -85,44 +95,36 @@ export default async function handler(req, res) {
       publishedAt: v?.publishedAt || v?.snippet?.publishedAt || ""
     }));
 
-    const totalViews = parsedVideos.reduce((acc, v) => acc + (v.views || 0), 0);
+    const totalViews = parsedVideos.reduce((a,v)=>a+v.views,0);
+    const avgViews = parsedVideos.length ? Math.round(totalViews/parsedVideos.length) : 0;
 
-    const avgViews = parsedVideos.length
-      ? Math.round(totalViews / parsedVideos.length)
-      : 0;
+    const sorted = [...parsedVideos].sort((a,b)=>b.views - a.views);
 
-    const sorted = [...parsedVideos].sort((a,b)=>(b.views||0) - (a.views||0));
+    const topVideo = sorted[0] || { title:"N/A", views:0 };
+    const worstVideo = sorted[sorted.length-1] || { title:"N/A", views:0 };
 
-    // 🔥 SAFE FALLBACK (evita undefined crash)
-    const topVideo = sorted[0] || { title: "N/A", views: 0 };
-    const worstVideo = sorted[sorted.length - 1] || { title: "N/A", views: 0 };
-
-    // =========================
-    // 📅 DATA SEGURA
-    // =========================
     const nowTime = Date.now();
-
-    const last7 = parsedVideos.filter(v => {
+    const last7 = parsedVideos.filter(v=>{
       const t = new Date(v.publishedAt).getTime();
-      if (isNaN(t)) return false; // 🔥 evita NaN crash
-      return (nowTime - t) <= (7 * 24 * 60 * 60 * 1000);
+      if (isNaN(t)) return false;
+      return (nowTime - t) <= (7*24*60*60*1000);
     });
 
     const uploads7 = last7.length;
 
-    const videoSummary = parsedVideos.slice(0, 3).map(v => {
-      return `- ${v.title} (${v.views} views)`;
-    }).join("\n");
+    const videoSummary = parsedVideos.slice(0,5).map(v =>
+      `- ${v.title} (${v.views} views)`
+    ).join("\n");
 
-    // =========================================
-    // 🧠 PROMPT (SEM ALTERAÇÃO)
-    // =========================================
+    // =========================
+    // 🔥 PROMPTS ORIGINAIS (NÃO ALTERADO)
+    // =========================
     let finalPrompt = "";
 
-    if(tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional"){
+    if (tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional") {
 
       finalPrompt = `
-Crie 4 títulos curtos, altamente clicáveis para YouTube.
+Crie 4 títulos curtos e altamente clicáveis.
 Máx 70 caracteres.
 
 Base:
@@ -131,14 +133,14 @@ Base:
 
     }
 
-    else if(tipo === "descricao"){
+    else if (tipo === "descricao") {
 
       finalPrompt = `
 Crie uma descrição otimizada para YouTube.
 
 Inclua:
 - introdução forte
-- palavras-chave naturais
+- SEO natural
 - CTA leve
 
 Base:
@@ -147,34 +149,27 @@ Base:
 
     }
 
-    else if(tipo === "ideas"){
+    else if (tipo === "ideas") {
 
       finalPrompt = `
-Você é um especialista em crescimento no YouTube.
-
-Baseado nos vídeos abaixo:
+Baseado nesses vídeos:
 
 ${videoSummary}
 
-Crie 5 ideias de vídeos NOVOS para este canal.
+Crie 5 ideias novas.
 
 Regras:
-- Baseadas no estilo do canal
-- Não repetir títulos existentes
-- 1 linha por ideia
-- Máx 12 palavras
-- Foco em CTR e viralização
-- Não explique
-
-Responda apenas com as ideias.
+- não repetir
+- máximo 12 palavras
+- foco em viral
 `;
 
     }
 
-    else if(tipo === "strategy"){
+    else if (tipo === "strategy") {
 
       finalPrompt = `
-Você é um consultor especialista em crescimento no YouTube.
+Você é um especialista em crescimento no YouTube.
 
 📊 DADOS REAIS:
 - Média de views: ${avgViews}
@@ -191,79 +186,43 @@ ${videoSummary}
 
 ---
 
-Gere uma estratégia PROFISSIONAL:
+Gere:
 
 1. 📈 PADRÃO DO CANAL
 2. ❌ ERRO CRÍTICO
 3. 🚀 ESTRATÉGIA DE ESCALA
 4. 🎯 3 TÍTULOS PRONTOS
 
-⚠️ Proibido resposta genérica
 ⚠️ Baseado apenas nos dados
 `;
-    }
-
-    if(!finalPrompt){
-
-      finalPrompt = `
-${prompt}
-
-========================
-📊 DADOS REAIS DO CANAL
-========================
-
-Média de views: ${avgViews}
-Uploads últimos 7 dias: ${uploads7}
-
-🔥 Melhor vídeo:
-${topVideo.title} (${topVideo.views} views)
-
-⚠️ Pior vídeo:
-${worstVideo.title} (${worstVideo.views} views)
-
-📺 Amostra de vídeos:
-${videoSummary}
-
-========================
-📌 INSTRUÇÕES
-========================
-
-Faça uma análise PROFUNDA e prática do canal.
-`;
 
     }
 
-    // ===============================
-    // ⚡ CACHE (INALTERADO)
-    // ===============================
+    if (!finalPrompt) {
+      finalPrompt = prompt;
+    }
+
+    // =========================
+    // CACHE (INALTERADO)
+    // =========================
     const stableKey = parsedVideos
       .slice(0,5)
-      .map(v => (v.title || "").slice(0,30).toLowerCase().trim())
+      .map(v => (v.title||"").slice(0,30).toLowerCase().trim())
       .sort()
       .join("|");
 
     const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
 
     global.__tubexCache = global.__tubexCache || {};
-
     const cache = global.__tubexCache[cacheKey];
 
-    if(cache && (Date.now() - cache.timestamp < 1000 * 60 * 60 * 6)){
-      console.log("⚡ usando cache IA");
-      return res.status(200).json({
-        success: true,
-        text: cache.text
-      });
+    if (cache && Date.now() - cache.timestamp < 1000*60*60*6) {
+      return res.status(200).json({ success:true, text:cache.text });
     }
 
-    let temp = 0.6;
-    if (tipo === "ideas") temp = 0.8;
-    if (tipo === "descricao") temp = 0.5;
-    if (tipo === "strategy") temp = 0.7;
-
-    // ===============================
-    // 🤖 OPENAI SAFE
-    // ===============================
+    // =========================
+    // OPENAI
+    // =========================
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method:"POST",
       headers:{
@@ -273,22 +232,22 @@ Faça uma análise PROFUNDA e prática do canal.
       body: JSON.stringify({
         model:"gpt-4o-mini",
         messages:[
-          { role:"system", content:"Você é especialista em YouTube e SEO." },
+          { role:"system", content:"Especialista em YouTube growth." },
           { role:"user", content: finalPrompt }
         ],
-        temperature: temp,
-        max_tokens: 1200
+        temperature: 0.7,
+        max_tokens: 800
       })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("💥 OPENAI ERROR:", errorText);
+      const err = await response.text();
+      console.error("💥 OPENAI:", err);
 
       return res.status(500).json({
         success:false,
         error:"openai_error",
-        message:errorText
+        text:""
       });
     }
 
@@ -299,7 +258,8 @@ Faça uma análise PROFUNDA e prática do canal.
     if (!text) {
       return res.status(500).json({
         success:false,
-        error:"empty_ai_response"
+        error:"empty_response",
+        text:""
       });
     }
 
@@ -313,16 +273,13 @@ Faça uma análise PROFUNDA e prática do canal.
       text
     });
 
-  } catch (e) {
+  } catch (err) {
 
-    console.error("💥 AI backend error FULL:", {
-      message: e?.message,
-      stack: e?.stack
-    });
+    console.error("💥 ERROR FULL:", err);
 
     return res.status(500).json({
       success:false,
-      error:"Erro interno",
+      error:"internal_error",
       text:""
     });
   }

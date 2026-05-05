@@ -179,20 +179,33 @@ Base:
 `;
     }
 
-    else if (tipo === "ideas") {
-      finalPrompt = `
+else if (tipo === "ideas") {
+  finalPrompt = `
 Baseado nesses vídeos:
 
 ${videoSummary}
 
 Crie 5 ideias novas.
 
-Regras:
-- não repetir
-- máximo 12 palavras
-- foco em viral
+REGRAS:
+- NÃO escreva introdução
+- NÃO diga "Claro"
+- NÃO explique nada
+- NÃO use markdown (**)
+- NÃO use aspas
+- NÃO numere com texto extra
+
+FORMATO EXATO (OBRIGATÓRIO):
+Uma ideia por linha
+
+EXEMPLO:
+Titulo 1
+Titulo 2
+Titulo 3
+Titulo 4
+Titulo 5
 `;
-    }
+}
 
     else if (tipo === "strategy") {
     finalPrompt = `

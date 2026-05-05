@@ -1,5 +1,5 @@
 // ======================================================
-// 🎨 TubeX — Image Generator (SAFE LAUNCH VERSION)
+// 🎨 TubeX — Image Generator (PRODUCTION SAFE)
 // ======================================================
 
 export default async function handler(req, res) {
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     global.__tubexRate[email] =
       global.__tubexRate[email].filter(t => now - t < 60000);
 
-    if (global.__tubexRate[email].length >= 5) {
+    if (global.__tubexRate[email].length >= 2) {
       return res.status(429).json({
         success: false,
         error: "rate_limit"
@@ -95,6 +95,22 @@ export default async function handler(req, res) {
       prompt = prompt.slice(0, 500);
     }
 
+    // ======================================================
+    // 🔒 CACHE BACKEND (ANTI CUSTO)
+    // ======================================================
+    global.__tubexPromptCache = global.__tubexPromptCache || {};
+
+    const promptKey = prompt.toLowerCase().replace(/\s+/g, " ").slice(0, 120);
+
+    if (global.__tubexPromptCache[promptKey]) {
+      console.log("⚡ CACHE BACKEND HIT");
+      return res.status(200).json({
+        success: true,
+        images: global.__tubexPromptCache[promptKey],
+        cached: true
+      });
+    }
+
     // 🔥 trava custo (LANÇAMENTO)
     const quantidade = 1;
 
@@ -121,13 +137,13 @@ STYLE:
     // ======================================================
     // 🔁 CONFIG
     // ======================================================
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 1;
     const TIMEOUT = 45000;
 
     let lastError = null;
 
     // ======================================================
-    // 🔁 RETRY LOOP
+    // 🔁 RETRY LOOP (CONTROLADO)
     // ======================================================
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 
@@ -147,7 +163,7 @@ STYLE:
             body: JSON.stringify({
               model: "gpt-image-1",
               prompt: enhancedPrompt,
-              size: attempt === 1 ? "1536x1024" : "1024x1024",
+              size: "1536x1024", // 🔥 mantido igual
               n: quantidade
             }),
             signal: controller.signal
@@ -178,8 +194,8 @@ STYLE:
             });
           }
 
-          if (response.status === 429) {
-            await delay(2000 * attempt);
+          if (response.status === 429 && attempt < MAX_RETRIES) {
+            await delay(1500);
             continue;
           }
 
@@ -202,6 +218,11 @@ STYLE:
 
         if (!images.length) throw new Error("invalid_images");
 
+        // ======================================================
+        // 💾 SAVE CACHE
+        // ======================================================
+        global.__tubexPromptCache[promptKey] = images;
+
         return res.status(200).json({
           success: true,
           images
@@ -212,15 +233,11 @@ STYLE:
         clearTimeout(timeout);
         lastError = err;
 
-        if (err.name === "AbortError") {
-          await delay(1500 * attempt);
+        if (err.name === "AbortError" && attempt < MAX_RETRIES) {
+          await delay(1000);
           continue;
         }
 
-        if (attempt < MAX_RETRIES) {
-          await delay(1000 * attempt);
-          continue;
-        }
       }
     }
 

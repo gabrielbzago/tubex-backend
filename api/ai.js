@@ -221,6 +221,8 @@ ${videoSummary}
 
 REGRAS:
 - Não fale coisas óbvias (tipo "poste mais")
+- Não fale de impulsionar vídeos
+- Não fale para compartilhar conteúdo em outras redes sociais
 - Não fale "defina nicho"
 - Baseie-se nos dados
 - Seja direto e estratégico

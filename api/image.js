@@ -1,12 +1,9 @@
 // ======================================================
-// 🎨 TubeX — Image Generator (PRODUCTION SAFE)
+// 🎨 TubeX — Image Generator (PRODUCTION SCALE)
 // ======================================================
 
 export default async function handler(req, res) {
 
-  // ======================================================
-  // 🚫 METHOD
-  // ======================================================
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -17,7 +14,7 @@ export default async function handler(req, res) {
   try {
 
     // ======================================================
-    // 📦 BODY PARSE (SAFE)
+    // 📦 BODY SAFE
     // ======================================================
     let body;
 
@@ -28,241 +25,170 @@ export default async function handler(req, res) {
     } catch {
       return res.status(400).json({
         success: false,
-        error: "invalid_json_body"
+        error: "invalid_json"
       });
     }
 
-    // ======================================================
-    // 👤 USER VALIDATION (ANTI ABUSE)
-    // ======================================================
-    const email = body?.email;
+    const { prompt, email, plan = "free", n } = body;
 
-    if (!email || typeof email !== "string") {
+    // ======================================================
+    // 🔒 VALIDAÇÃO
+    // ======================================================
+    if (!email) {
       return res.status(401).json({
         success: false,
         error: "unauthorized"
       });
     }
 
-    // ======================================================
-    // 🔥 RATE LIMIT (POR USUÁRIO)
-    // ======================================================
-    global.__tubexRate = global.__tubexRate || {};
-
-    const now = Date.now();
-
-    if (!global.__tubexRate[email]) {
-      global.__tubexRate[email] = [];
-    }
-
-    // mantém só últimos 60s
-    global.__tubexRate[email] =
-      global.__tubexRate[email].filter(t => now - t < 60000);
-
-    if (global.__tubexRate[email].length >= 2) {
-      return res.status(429).json({
-        success: false,
-        error: "rate_limit"
-      });
-    }
-
-    global.__tubexRate[email].push(now);
-
-    // ======================================================
-    // 🔒 OPENAI KEY
-    // ======================================================
-    if (!process.env.OPENAI_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        error: "missing_openai_key"
-      });
-    }
-
-    // ======================================================
-    // 🧠 INPUT
-    // ======================================================
-    let { prompt } = body;
-
-    if (!prompt || typeof prompt !== "string" || prompt.length < 3) {
+    if (!prompt || prompt.length < 3) {
       return res.status(400).json({
         success: false,
         error: "invalid_prompt"
       });
     }
 
-    // 🔥 evita custo absurdo
-    if (prompt.length > 500) {
-      prompt = prompt.slice(0, 500);
-    }
+    // ======================================================
+    // 🧠 NORMALIZA PROMPT (ANTI SPAM)
+    // ======================================================
+    const safePrompt = prompt
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 400);
+
+    const cacheKey = safePrompt.toLowerCase();
 
     // ======================================================
-    // 🔒 CACHE BACKEND (ANTI CUSTO)
+    // ⚡ CACHE GLOBAL (ANTI CUSTO REAL)
     // ======================================================
-    global.__tubexPromptCache = global.__tubexPromptCache || {};
+    global.__tubexCache = global.__tubexCache || {};
 
-    const promptKey = prompt.toLowerCase().replace(/\s+/g, " ").slice(0, 120);
-
-    if (global.__tubexPromptCache[promptKey]) {
-      console.log("⚡ CACHE BACKEND HIT");
+    if (global.__tubexCache[cacheKey]) {
+      console.log("⚡ CACHE HIT");
       return res.status(200).json({
         success: true,
-        images: global.__tubexPromptCache[promptKey],
+        images: global.__tubexCache[cacheKey],
         cached: true
       });
     }
 
-    // 🔥 trava custo (LANÇAMENTO)
-    const quantidade = 1;
-
     // ======================================================
-    // 🎯 PROMPT OTIMIZADO
+    // 🚫 DEDUPE (ANTI MULTI CLICK)
     // ======================================================
-    const enhancedPrompt = `
-YouTube thumbnail, ultra high CTR, viral, clickbait style.
+    global.__tubexPending = global.__tubexPending || {};
 
-IDEA:
-${prompt}
-
-STYLE:
-- Bold readable text
-- High contrast
-- Emotional impact
-- Bright colors
-- Cinematic lighting
-- Designed for high CTR
-`;
-
-    console.log("🎨 REQUEST:", email, prompt.slice(0, 40));
-
-    // ======================================================
-    // 🔁 CONFIG
-    // ======================================================
-    const MAX_RETRIES = 1;
-    const TIMEOUT = 45000;
-
-    let lastError = null;
-
-    // ======================================================
-    // 🔁 RETRY LOOP (CONTROLADO)
-    // ======================================================
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), TIMEOUT);
-
-      try {
-
-        const response = await fetch(
-          "https://api.openai.com/v1/images/generations",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: "gpt-image-1",
-              prompt: enhancedPrompt,
-              size: "1536x1024", // 🔥 mantido igual
-              n: quantidade
-            }),
-            signal: controller.signal
-          }
-        );
-
-        clearTimeout(timeout);
-
-        let data;
-
-        try {
-          data = await response.json();
-        } catch {
-          throw new Error("invalid_json");
-        }
-
-        // ======================================================
-        // ❌ OPENAI ERROR
-        // ======================================================
-        if (!response.ok) {
-
-          console.error("❌ OPENAI:", data);
-
-          if (data?.error?.type === "insufficient_quota") {
-            return res.status(402).json({
-              success: false,
-              error: "quota_exceeded"
-            });
-          }
-
-          if (response.status === 429 && attempt < MAX_RETRIES) {
-            await delay(1500);
-            continue;
-          }
-
-          throw new Error(data?.error?.message || "openai_error");
-        }
-
-        // ======================================================
-        // ✅ PROCESS IMAGES
-        // ======================================================
-        const raw = data?.data || [];
-
-        if (!raw.length) throw new Error("no_images");
-
-        const images = raw
-          .map(img => img?.b64_json
-            ? `data:image/png;base64,${img.b64_json}`
-            : null
-          )
-          .filter(Boolean);
-
-        if (!images.length) throw new Error("invalid_images");
-
-        // ======================================================
-        // 💾 SAVE CACHE
-        // ======================================================
-        global.__tubexPromptCache[promptKey] = images;
-
-        return res.status(200).json({
-          success: true,
-          images
-        });
-
-      } catch (err) {
-
-        clearTimeout(timeout);
-        lastError = err;
-
-        if (err.name === "AbortError" && attempt < MAX_RETRIES) {
-          await delay(1000);
-          continue;
-        }
-
-      }
+    if (global.__tubexPending[cacheKey]) {
+      console.log("♻️ REQ DUPLICADA");
+      return res.status(200).json({
+        success: true,
+        images: await global.__tubexPending[cacheKey]
+      });
     }
 
     // ======================================================
-    // 💥 FAIL FINAL
+    // 🎯 QUANTIDADE POR PLANO
     // ======================================================
-    return res.status(500).json({
-      success: false,
-      error: lastError?.message || "generation_failed"
+    let quantidade = 1;
+
+    if (plan === "pro") quantidade = 2;
+    if (plan === "expert" || plan === "owner") quantidade = 3;
+
+    if (n && n <= 4) quantidade = n; // override controlado
+
+    // ======================================================
+    // 🎯 PROMPT ENGINE (CTR REAL)
+    // ======================================================
+    const enhancedPrompt = `
+Ultra high CTR YouTube thumbnail.
+
+IDEA:
+${safePrompt}
+
+STYLE:
+- BIG bold text (3 words max)
+- expressive face
+- strong emotion (shock, curiosity)
+- high contrast colors
+- cinematic lighting
+- clean composition
+- focus on clickbait effect
+
+IMPORTANT:
+No small text, no clutter, clear focal point.
+`;
+
+    // ======================================================
+    // 🔁 EXECUÇÃO COM DEDUPE
+    // ======================================================
+    global.__tubexPending[cacheKey] = (async () => {
+
+      const response = await fetch(
+        "https://api.openai.com/v1/images/generations",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-image-1",
+            prompt: enhancedPrompt,
+            size: "1536x1024",
+            n: quantidade
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+
+        console.error("❌ OPENAI ERROR:", data);
+
+        if (data?.error?.type === "insufficient_quota") {
+          throw new Error("quota_exceeded");
+        }
+
+        throw new Error("generation_failed");
+      }
+
+      const images = (data.data || [])
+        .map(img => img?.b64_json
+          ? `data:image/png;base64,${img.b64_json}`
+          : null
+        )
+        .filter(Boolean);
+
+      if (!images.length) {
+        throw new Error("no_images");
+      }
+
+      // 💾 CACHE
+      global.__tubexCache[cacheKey] = images;
+
+      return images;
+
+    })();
+
+    const images = await global.__tubexPending[cacheKey];
+
+    delete global.__tubexPending[cacheKey];
+
+    // ======================================================
+    // ✅ RESPONSE
+    // ======================================================
+    return res.status(200).json({
+      success: true,
+      images
     });
 
   } catch (err) {
 
-    console.error("💥 FATAL:", err);
+    console.error("💥 THUMB ERROR:", err);
 
     return res.status(500).json({
       success: false,
-      error: "internal_error"
+      error: err.message || "internal_error"
     });
   }
-}
-
-// ======================================================
-// ⏳ UTIL
-// ======================================================
-function delay(ms) {
-  return new Promise(res => setTimeout(res, ms));
 }

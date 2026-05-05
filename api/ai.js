@@ -146,7 +146,7 @@ export default async function handler(req, res) {
 
     const uploads7 = last7.length;
 
-    const videoSummary = parsedVideos.slice(0,5).map(v =>
+    const videoSummary = parsedVideos.slice(0,10).map(v =>
       `- ${v.title} (${v.views} views)`
     ).join("\n");
 
@@ -195,10 +195,16 @@ Regras:
     }
 
     else if (tipo === "strategy") {
-      finalPrompt = `
-Você é um especialista em crescimento no YouTube.
+    finalPrompt = `
+Você é um estrategista de crescimento avançado no YouTube.
 
-📊 DADOS REAIS:
+Você NÃO pode dar dicas genéricas.
+
+Seu trabalho é analisar dados reais e identificar oportunidades de crescimento ESCALÁVEL.
+
+---
+
+📊 DADOS:
 - Média de views: ${avgViews}
 - Uploads últimos 7 dias: ${uploads7}
 
@@ -208,18 +214,38 @@ ${topVideo.title} (${topVideo.views} views)
 ⚠️ Pior vídeo:
 ${worstVideo.title} (${worstVideo.views} views)
 
-📺 Vídeos:
+📺 Amostra de vídeos:
 ${videoSummary}
 
 ---
 
-Gere:
+REGRAS:
+- Não fale coisas óbvias (tipo "poste mais")
+- Não fale "defina nicho"
+- Baseie-se nos dados
+- Seja direto e estratégico
+- Linguagem de consultoria premium
 
-1. 📈 PADRÃO DO CANAL
-2. ❌ ERRO CRÍTICO
-3. 🚀 ESTRATÉGIA DE ESCALA
-4. 🎯 3 TÍTULOS PRONTOS
+---
+
+ENTREGUE:
+
+1. 🔍 PADRÃO REAL DE PERFORMANCE  
+   (o que realmente gera views nesse canal)
+
+2. 💣 GARGALO DE CRESCIMENTO  
+   (o maior limitador hoje)
+
+3. 🚀 ESTRATÉGIA DE ESCALA  
+   (o que fazer para crescer rápido)
+
+4. 🎯 AÇÃO PRÁTICA IMEDIATA  
+   (o próximo passo claro)
+
+5. 🧠 3 IDEIAS ALTAMENTE ESCALÁVEIS  
+   (baseadas no padrão que funciona)
 `;
+
     }
 
     if (!finalPrompt) {
@@ -268,7 +294,7 @@ Gere:
           { role:"user", content: finalPrompt }
         ],
         temperature: temp,
-        max_tokens: 1200
+        max_tokens: 700
       })
     });
 

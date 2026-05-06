@@ -103,13 +103,13 @@ export default async function handler(req, res) {
     const context = body?.context || {};
     const tipo = body?.tipo || "";
 
-    if (!prompt) {
-      return res.status(400).json({
-        success: false,
-        error: "prompt obrigatório",
-        text: ""
-      });
-    }
+    if (!prompt && tipo !== "diagnosis" && tipo !== "strategy") {
+  return res.status(400).json({
+    success: false,
+    error: "prompt obrigatório",
+    text: ""
+  });
+}
 
     prompt = String(prompt).slice(0, 2000);
 

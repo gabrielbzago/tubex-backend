@@ -74,22 +74,20 @@ const key = safePrompt.toLowerCase() + "_" + quantidade + "_" + plan;
 
 
 
-    // ======================================================
-    // 🔁 DEDUPE
-    // ======================================================
-    global.__tubexPending = global.__tubexPending || {};
-    if (global.__tubexPending[key]) {
-  console.log("♻️ REQ DUPLICADA");
+ // ======================================================
+// 🔁 DEDUPE (CORRIGIDO)
+// ======================================================
+global.__tubexPending = global.__tubexPending || {};
 
-  const images = await global.__tubexPending[key];
+if (global.__tubexPending[key]) {
+  console.log("♻️ REQ DUPLICADA - aguardando");
 
-  delete global.__tubexPending[key];
-
-  return res.status(200).json({
-    success: true,
-    images
+  return res.status(202).json({
+    success: false,
+    error: "processing"
   });
 }
+
     // ======================================================
     // 🎯 PROMPT ENGINE
     // ======================================================

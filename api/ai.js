@@ -358,7 +358,7 @@ if (!finalPrompt) {
       .sort()
       .join("|");
 
-    const cacheKey = `${tipo}_${stableKey}_${context.subscribers || 0}`;
+    const cacheKey = `v2_${tipo}_${stableKey}_${context.subscribers || 0}`;
 
     global.__tubexCache = global.__tubexCache || {};
     const cache = global.__tubexCache[cacheKey];

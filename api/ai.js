@@ -341,9 +341,12 @@ ENTREGUE:
 
     }
 
-    if (!finalPrompt) {
-  console.warn("⚠️ tipo não tratado:", tipo);
-  finalPrompt = prompt || "analise canal";
+if (!finalPrompt) {
+  return res.status(400).json({
+    success:false,
+    error:"invalid_tipo",
+    text:""
+  });
 }
 
     // ======================================================

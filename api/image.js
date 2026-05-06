@@ -32,13 +32,34 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "invalid_prompt" });
     }
 
+   
+
+  
+
+
+
     // ======================================================
+    // 🎯 QUANTIDADE
+    // ======================================================
+  let quantidade = 1;
+
+// só gera múltiplas se vier explícito do front
+if (typeof n === "number" && n > 1 && n <= 3) {
+  quantidade = n;
+}
+     
+
+     // ======================================================
     // 🧠 NORMALIZA
     // ======================================================
     const safePrompt = prompt.trim().replace(/\s+/g, " ").slice(0, 400);
-    const key = safePrompt.toLowerCase();
 
+     // ======================================================
+    // 🧠 Key
     // ======================================================
+const key = safePrompt.toLowerCase() + "_" + quantidade + "_" + plan;
+
+  // ======================================================
     // ⚡ CACHE
     // ======================================================
     global.__tubexCache = global.__tubexCache || {};
@@ -51,52 +72,100 @@ export default async function handler(req, res) {
       });
     }
 
+
+
     // ======================================================
     // 🔁 DEDUPE
     // ======================================================
     global.__tubexPending = global.__tubexPending || {};
     if (global.__tubexPending[key]) {
-      console.log("♻️ REQ DUPLICADA");
-      const images = await global.__tubexPending[key];
-      return res.status(200).json({ success: true, images });
-    }
+  console.log("♻️ REQ DUPLICADA");
 
-    // ======================================================
-    // 🎯 QUANTIDADE
-    // ======================================================
-    let quantidade = 1;
-    if (plan === "pro") quantidade = 2;
-    if (plan === "expert" || plan === "owner") quantidade = 3;
-    if (n && n <= 4) quantidade = n;
+  const images = await global.__tubexPending[key];
 
+  delete global.__tubexPending[key];
+
+  return res.status(200).json({
+    success: true,
+    images
+  });
+}
     // ======================================================
     // 🎯 PROMPT ENGINE
     // ======================================================
-    const enhancedPrompt = `
-Ultra high CTR YouTube thumbnail.
+const enhancedPrompt = `
+YouTube thumbnail, high CTR, expressive face, bold text, cinematic lighting, clean composition.
 
 IDEA:
 ${safePrompt}
-
-STYLE:
-- BIG bold text (max 3 words)
-- expressive face
-- high emotion (shock, curiosity)
-- strong contrast
-- cinematic lighting
-- clean composition
-
-IMPORTANT:
-No clutter, clear subject, clickbait style.
 `;
 
-    // ======================================================
-    // 🔁 PIPELINE (OpenAI → Stability)
+   // ======================================================
+    // 🔁 PIPELINE (Stability → OpenAI)
     // ======================================================
     global.__tubexPending[key] = (async () => {
 
+
+// ===============================
+// 🥈 STABILITY (ECONÔMICO + SEM LOOP)
+// ===============================
+try {
+
+  console.log("🎨 Stability tentativa...");
+
+  const r = await fetch(
+    "https://api.stability.ai/v2beta/stable-image/generate/core",
+    {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.STABILITY_API_KEY}`,
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        prompt: enhancedPrompt,
+        output_format: "png",
+        aspect_ratio: "16:9",
+        samples: quantidade // 🔥 1 request gera tudo
+      })
+    }
+  );
+
+  const data = await r.json();
+
+  if (!r.ok) {
+    console.error("❌ Stability erro:", data);
+    throw new Error(data?.message || "stability_fail");
+  }
+
+  // ======================================================
+  // 🔥 NORMALIZAÇÃO CORRETA
+  // ======================================================
+  const images = (data?.images || [])
+    .map(img => `data:image/png;base64,${img}`)
+    .filter(Boolean);
+
+  if (!images.length) {
+    console.warn("⚠️ Stability retornou vazio:", data);
+    throw new Error("stability_empty");
+  }
+
+  console.log("✅ Stability OK:", images.length, "imagens");
+
+  // ======================================================
+  // ⚡ CACHE
+  // ======================================================
+  global.__tubexCache[key] = images;
+
+  return images;
+
+} catch (e) {
+  console.warn("⚠️ Stability falhou → tentando OpenAI", e.message);
+}
+ 
+
       // ===============================
-      // 🥇 OPENAI
+      // 🥈 OPENAI (fallback premium)
       // ===============================
       try {
 
@@ -111,7 +180,7 @@ No clutter, clear subject, clickbait style.
           body: JSON.stringify({
             model: "gpt-image-1",
             prompt: enhancedPrompt,
-            size: "1536x1024",
+            size: "1024x1024",
             n: quantidade
           })
         });
@@ -137,61 +206,17 @@ No clutter, clear subject, clickbait style.
       } catch (e) {
 
         console.warn("⚠️ OpenAI falhou → fallback Stability", e.message);
+throw new Error("all_engines_failed");
 
       }
 
-      // ===============================
-      // 🥈 STABILITY
-      // ===============================
-      try {
+})(); // 🔥 FECHA O PIPELINE
 
-        console.log("🎨 Stability tentativa...");
-
-        const images = [];
-
-        for (let i = 0; i < quantidade; i++) {
-
-          const r = await fetch(
-            "https://api.stability.ai/v2beta/stable-image/generate/core",
-            {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${process.env.STABILITY_API_KEY}`,
-                "Accept": "application/json"
-              },
-              body: JSON.stringify({
-                prompt: enhancedPrompt,
-                output_format: "png",
-                aspect_ratio: "16:9"
-              })
-            }
-          );
-
-          const data = await r.json();
-
-          if (!r.ok) throw new Error(data?.message || "stability_fail");
-
-          if (data?.image) {
-            images.push(`data:image/png;base64,${data.image}`);
-          }
-        }
-
-        if (!images.length) throw new Error("stability_empty");
-
-        console.log("✅ Stability OK");
-
-        global.__tubexCache[key] = images;
-        return images;
-
-      } catch (e) {
-
-        console.error("💥 Stability falhou:", e.message);
-        throw new Error("all_engines_failed");
-      }
-
-    })();
-
+    // ======================================================
+    // 📤 RESPONSE FINAL (FORA DO PIPELINE)
+    // ======================================================
     const images = await global.__tubexPending[key];
+
     delete global.__tubexPending[key];
 
     return res.status(200).json({

@@ -111,7 +111,7 @@ export default async function handler(req, res) {
   });
 }
 
-    prompt = String(prompt).slice(0, 2000);
+    prompt = prompt ? String(prompt).slice(0, 2000) : "";
 
     // ======================================================
     // 🎥 CONTEXT SAFE
@@ -342,8 +342,9 @@ ENTREGUE:
     }
 
     if (!finalPrompt) {
-      finalPrompt = prompt;
-    }
+  console.warn("⚠️ tipo não tratado:", tipo);
+  finalPrompt = prompt || "analise canal";
+}
 
     // ======================================================
     // ⚡ CACHE
@@ -354,7 +355,7 @@ ENTREGUE:
       .sort()
       .join("|");
 
-    const cacheKey = `${tipo}_${prompt.slice(0,80)}_${stableKey}`;
+    const cacheKey = `${tipo}_${stableKey}_${context.subscribers || 0}`;
 
     global.__tubexCache = global.__tubexCache || {};
     const cache = global.__tubexCache[cacheKey];

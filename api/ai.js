@@ -49,26 +49,6 @@ export default async function handler(req, res) {
     req.socket?.remoteAddress ||
     "unknown";
 
-  global.__rateLimit = global.__rateLimit || {};
-  const now = Date.now();
-
-  if (!global.__rateLimit[ip]) {
-    global.__rateLimit[ip] = [];
-  }
-
-  global.__rateLimit[ip] =
-    global.__rateLimit[ip].filter(t => now - t < 60000);
-
-  if (global.__rateLimit[ip].length >= 15) {
-    return res.status(429).json({
-      success: false,
-      error: "rate_limit",
-      text: ""
-    });
-  }
-
-  global.__rateLimit[ip].push(now);
-
   // ======================================================
   // 🚫 METHOD
   // ======================================================
@@ -82,28 +62,41 @@ export default async function handler(req, res) {
 
   try {
 
-    // ======================================================
-    // 📦 BODY SAFE
-    // ======================================================
-    let body;
-    try {
-      body = typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
-    } catch (err) {
-      console.error("💥 JSON ERROR:", err);
-      return res.status(400).json({
-        success: false,
-        error: "invalid_json",
-        text: ""
-      });
-    }
+  // ======================================================
+// 📦 BODY SAFE
+// ======================================================
+let body;
 
-    let prompt = body?.prompt;
-    const context = body?.context || {};
-    const tipo = body?.tipo || "";
+try {
+  body = typeof req.body === "string"
+    ? JSON.parse(req.body)
+    : req.body;
+} catch (err) {
+  console.error("💥 JSON ERROR:", err);
+  return res.status(400).json({
+    success: false,
+    error: "invalid_json",
+    text: ""
+  });
+}
 
-    if (!prompt && tipo !== "diagnosis" && tipo !== "strategy") {
+// ======================================================
+// 👤 IDENTIDADE
+// ======================================================
+let prompt = body?.prompt;
+const context = body?.context || {};
+
+const userId = body?.userId || "guest";
+const channelId = body?.channelId || "no_channel";
+const tipo = body?.tipo || "";
+
+// 🔑 chave real de rate limit
+const userKey = userId !== "guest" ? userId : ip;
+
+// ======================================================
+// 🔒 VALIDAÇÃO PROMPT
+// ======================================================
+if (!prompt && tipo !== "diagnosis" && tipo !== "strategy") {
   return res.status(400).json({
     success: false,
     error: "prompt obrigatório",
@@ -111,7 +104,33 @@ export default async function handler(req, res) {
   });
 }
 
-    prompt = prompt ? String(prompt).slice(0, 2000) : "";
+prompt = prompt ? String(prompt).slice(0, 2000) : "";
+
+// ======================================================
+// 🔥 RATE LIMIT (CORRIGIDO)
+// ======================================================
+global.__rateLimit = global.__rateLimit || {};
+const now = Date.now();
+
+if (!global.__rateLimit[userKey]) {
+  global.__rateLimit[userKey] = [];
+}
+
+// mantém só últimos 60s
+global.__rateLimit[userKey] =
+  global.__rateLimit[userKey].filter(t => now - t < 60000);
+
+// bloqueio
+if (global.__rateLimit[userKey].length >= 15) {
+  return res.status(429).json({
+    success: false,
+    error: "rate_limit",
+    text: ""
+  });
+}
+
+// registra requisição
+global.__rateLimit[userKey].push(now);
 
     // ======================================================
     // 🎥 CONTEXT SAFE
@@ -349,31 +368,62 @@ if (!finalPrompt) {
   });
 }
 
-    // ======================================================
-    // ⚡ CACHE
-    // ======================================================
-    const stableKey = parsedVideos
-      .slice(0,5)
-      .map(v => (v.title||"").slice(0,30).toLowerCase().trim())
-      .sort()
-      .join("|");
+   // ======================================================
+// ⚡ CACHE (PROFISSIONAL)
+// ======================================================
 
-    const cacheKey = `v2_${tipo}_${stableKey}_${context.subscribers || 0}`;
+// 🔑 fingerprint estável dos vídeos
+const stableKey = parsedVideos
+  .slice(0, 5)
+  .map(v => `${(v.title || "").slice(0, 30)}_${v.views}`)
+  .sort()
+  .join("|");
 
-    global.__tubexCache = global.__tubexCache || {};
-    const cache = global.__tubexCache[cacheKey];
+// 🧠 inicializa cache global
+global.__tubexCache = global.__tubexCache || new Map();
 
-    if (cache && Date.now() - cache.timestamp < 1000*60*60*6) {
-      return res.status(200).json({
-        success:true,
-        text:cache.text
-      });
-    }
+// 🔑 chave única (multiusuário + canal + tipo)
+const cacheKey = [
+  "v3",
+  userId,
+  channelId,
+  tipo,
+  stableKey,
+  context.subscribers || 0
+].join("|");
 
-    let temp = 0.6;
-    if (tipo === "ideas") temp = 0.8;
-    if (tipo === "descricao") temp = 0.5;
-    if (tipo === "strategy") temp = 0.7;
+// 📦 busca cache
+const cached = global.__tubexCache.get(cacheKey);
+
+// ⏱ TTL inteligente por tipo
+const TTL = {
+  diagnosis: 6,
+  strategy: 12,
+  ideas: 24,
+  descricao: 6
+};
+
+const ttl = (TTL[tipo] || 6) * 60 * 60 * 1000;
+
+// ======================================================
+// ⚡ CACHE HIT
+// ======================================================
+if (cached && Date.now() - cached.timestamp < ttl) {
+  return res.status(200).json({
+    success: true,
+    tipo,
+    text: cached.text
+  });
+}
+
+// ======================================================
+// 🎛 TEMPERATURE (FORA DO CACHE)
+// ======================================================
+let temp = 0.6;
+
+if (tipo === "ideas") temp = 0.8;
+if (tipo === "descricao") temp = 0.5;
+if (tipo === "strategy") temp = 0.7;
 
     // ======================================================
     // 🤖 OPENAI
@@ -407,25 +457,28 @@ if (!finalPrompt) {
     }
 
     const data = await response.json();
-    const text = data?.choices?.[0]?.message?.content?.trim();
+   const text = data?.choices?.[0]?.message?.content?.trim();
 
-    if (!text) {
-      return res.status(500).json({
-        success:false,
-        error:"empty_response",
-        text:""
-      });
-    }
+if (!text) {
+  return res.status(500).json({
+    success:false,
+    error:"empty_response",
+    text:""
+  });
+}
 
-    global.__tubexCache[cacheKey] = {
-      text,
-      timestamp: Date.now()
-    };
+// 💾 salvar só se válido
+global.__tubexCache.set(cacheKey, {
+  text,
+  timestamp: Date.now()
+});
 
-    return res.status(200).json({
-      success:true,
-      text
-    });
+      
+   return res.status(200).json({
+  success: true,
+  tipo,
+  text
+});
 
   } catch (err) {
 

@@ -207,6 +207,84 @@ Titulo 5
 `;
 }
 
+else if (tipo === "diagnosis") {
+
+  finalPrompt = `
+Você é um analista profissional de canais do YouTube.
+
+Você NÃO pode dar respostas genéricas.
+
+Você DEVE usar os dados abaixo para gerar uma análise precisa.
+
+---
+
+📊 DADOS:
+- Inscritos: ${context.subscribers || 0}
+- Média de views: ${avgViews}
+- Uploads últimos 7 dias: ${uploads7}
+
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
+
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
+
+📺 Vídeos:
+${videoSummary}
+
+---
+
+REGRAS:
+- NÃO use palavras vagas (bom, razoável, etc)
+- SEMPRE use números ou comparação
+- NÃO invente dados
+- Seja direto
+
+---
+
+FORMATO:
+
+📊 Pontuação do Canal: X/10
+
+# Diagnóstico
+
+🔎 Nicho:
+(diga se é claro ou confuso)
+
+📈 Performance:
+(compare views vs inscritos)
+
+📅 Consistência:
+(baseado em uploads7)
+
+🎯 Algoritmo:
+(se o canal está sendo entendido)
+
+---
+
+# Pontos Fortes
+1.
+2.
+
+---
+
+# Problemas Críticos
+1.
+2.
+
+---
+
+# Plano de Ação
+- ações específicas baseadas nos dados
+
+---
+
+Máximo 150 palavras.
+`;
+}
+
+
+
     else if (tipo === "strategy") {
     finalPrompt = `
 Você é um estrategista de crescimento avançado no YouTube.

@@ -226,9 +226,88 @@ Titulo 5
 `;
 }
 
-else if (tipo === "diagnosis") {
 
-  finalPrompt = `
+// ======================================================
+// 🧠 DETECÇÃO CANAL NOVO
+// ======================================================
+const isNewChannel =
+  (context.subscribers || 0) < 50 &&
+  avgViews < 50 &&
+  parsedVideos.length < 3;
+
+// ======================================================
+// 🧠 DIAGNOSIS
+// ======================================================
+if (tipo === "diagnosis") {
+
+  if (isNewChannel) {
+
+    finalPrompt = `
+Você é um especialista em crescimento no YouTube.
+
+Este canal é NOVO e ainda não possui dados suficientes.
+
+Crie um diagnóstico estratégico para início de canal.
+
+---
+
+📊 DADOS:
+- Inscritos: ${context.subscribers || 0}
+- Vídeos: ${parsedVideos.length}
+
+---
+
+REGRAS:
+- NÃO fale que não há dados
+- NÃO seja genérico
+- Seja prático e direto
+- Foque em crescimento inicial
+
+---
+
+FORMATO:
+
+📊 Pontuação do Canal: 2/10
+
+# Diagnóstico
+
+🔎 Nicho:
+(sugira como definir nicho claro)
+
+📈 Performance:
+(explique que ainda está em fase inicial)
+
+📅 Consistência:
+(oriente frequência ideal)
+
+🎯 Algoritmo:
+(explique como o YouTube testa canais novos)
+
+---
+
+# Pontos Fortes
+1.
+2.
+
+---
+
+# Problemas Críticos
+1.
+2.
+
+---
+
+# Plano de Ação
+- passos práticos para começar do zero
+
+---
+
+Máximo 120 palavras.
+`;
+
+  } else {
+
+    finalPrompt = `
 Você é um analista profissional de canais do YouTube.
 
 Você NÃO pode dar respostas genéricas.
@@ -254,8 +333,8 @@ ${videoSummary}
 ---
 
 REGRAS:
-- NÃO use palavras vagas (bom, razoável, etc)
-- SEMPRE use números ou comparação
+- NÃO use palavras vagas
+- SEMPRE use números
 - NÃO invente dados
 - Seja direto
 
@@ -300,6 +379,8 @@ FORMATO:
 
 Máximo 150 palavras.
 `;
+
+  }
 }
 
 

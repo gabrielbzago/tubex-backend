@@ -245,25 +245,173 @@ export default async function handler(req, res) {
 
     const dominance = top / (median || 1);
     const competition = Math.min(100, Math.log10(dominance + 1) * 40);
+// =========================
+// 🏷️ REAL TAG ENGINE
+// =========================
 
-    const responseData = {
-      success: true,
-      items,
-      volume,
-      competition
-    };
+const stopwords = [
 
-    // =========================
-    // 💾 CACHE SAVE
-    // =========================
-    if (cacheKey) {
-      global.tubexSeoCache[cacheKey] = {
-        data: responseData,
-        expires: Date.now() + (5 * 60 * 1000)
-      };
+  "youtube",
+  "video",
+  "videos",
+  "viral",
+  "seo",
+  "2026",
+  "2025",
+  "oficial",
+  "novo",
+  "nova"
+
+];
+
+const tagMap = new Map();
+
+// =====================================
+// EXTRAI TAGS DOS VÍDEOS
+// =====================================
+
+items.forEach(video => {
+
+  const tags =
+    video?.snippet?.tags || [];
+
+  tags.forEach(tag => {
+
+    const normalized = tag
+
+      .toLowerCase()
+
+      .normalize("NFD")
+
+      .replace(/[\u0300-\u036f]/g, "")
+
+      .replace(/[^\w\s]/g," ")
+
+      .replace(/\s+/g," ")
+
+      .trim();
+
+    // filtros
+    if(
+      !normalized
+      ||
+      normalized.length < 5
+      ||
+      normalized.length > 45
+    ){
+      return;
     }
 
-    return res.status(200).json(responseData);
+    // lixo
+    if(
+
+      stopwords.some(sw =>
+
+        normalized.includes(sw)
+
+      )
+
+    ){
+      return;
+    }
+
+    // peso por views
+    const views =
+      Number(
+        video.statistics?.viewCount || 0
+      );
+
+    const weight =
+      Math.max(
+        1,
+        Math.log10(views + 1)
+      );
+
+    tagMap.set(
+
+      normalized,
+
+      (tagMap.get(normalized) || 0)
+
+      +
+
+      weight
+
+    );
+
+  });
+
+});
+
+// =====================================
+// ORDENA
+// =====================================
+
+const rankedTags =
+
+  [...tagMap.entries()]
+
+    .sort((a,b)=>
+
+      b[1] - a[1]
+
+    )
+
+    .slice(0,40)
+
+    .map(([keyword,score]) => ({
+
+      keyword,
+
+      score: Math.min(
+        99,
+        Math.round(
+          70 + (score * 3)
+        )
+      )
+
+    }));
+
+
+// =========================
+// 📦 RESPONSE
+// =========================
+
+const responseData = {
+
+  success: true,
+
+  items,
+
+  volume,
+
+  competition,
+
+  tags: rankedTags
+
+};
+
+// =========================
+// 💾 CACHE SAVE
+// =========================
+
+if (cacheKey) {
+
+  global.tubexSeoCache[cacheKey] = {
+
+    data: responseData,
+
+    expires:
+      Date.now() +
+      (5 * 60 * 1000)
+
+  };
+
+}
+
+return res
+  .status(200)
+  .json(responseData);
 
   } catch (e) {
 

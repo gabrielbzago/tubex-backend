@@ -395,18 +395,29 @@ Seu trabalho é analisar dados reais e identificar oportunidades de crescimento 
 
 ---
 
-📊 DADOS:
-- Média de views: ${avgViews}
-- Uploads últimos 7 dias: ${uploads7}
+Estruture a resposta EXATAMENTE neste formato:
 
-🔥 Melhor vídeo:
-${topVideo.title} (${topVideo.views} views)
+📊 Resumo Geral
 
-⚠️ Pior vídeo:
-${worstVideo.title} (${worstVideo.views} views)
+📈 Métricas Principais
 
-📺 Amostra de vídeos:
-${videoSummary}
+🔥 O que se destacou
+
+🧠 Análise e Insights
+
+⚠️ Problemas detectados
+
+🚀 Estratégia Recomendada
+
+🎯 Próximos Passos
+
+Use:
+- listas
+- bullets
+- insights objetivos
+- linguagem profissional
+- separação clara de blocos
+- métricas destacadas
 
 ---
 

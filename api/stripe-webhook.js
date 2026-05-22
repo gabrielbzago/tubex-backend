@@ -1,88 +1,509 @@
 import Stripe from "stripe";
 import { buffer } from "micro";
+import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// ======================================================
+// 🔥 STRIPE
+// ======================================================
+const stripe = new Stripe(
+  process.env.STRIPE_SECRET_KEY
+);
 
+// ======================================================
+// 🔥 SUPABASE
+// ======================================================
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// ======================================================
+// 🚫 BODY PARSER
+// ======================================================
 export const config = {
-  api: { bodyParser: false },
+  api: {
+    bodyParser: false
+  }
 };
 
+// ======================================================
+// 🔥 PLAN MAP
+// ======================================================
+// ⚠️ TROQUE PELOS PRICE IDs REAIS
 const PLAN_MAP = {
-  "price_start_123": "start",
-  "price_pro_456": "pro",
-  "price_expert_789": "expert"
+
+  "price_START_REAL": "start",
+
+  "price_PRO_REAL": "pro",
+
+  "price_EXPERT_REAL": "expert"
+
 };
 
-export default async function handler(req, res) {
+// ======================================================
+// 🚀 HANDLER
+// ======================================================
+export default async function handler(
+  req,
+  res
+){
 
-  if (req.method !== "POST") {
-    return res.status(405).end();
+  // ====================================================
+  // 🚫 METHOD
+  // ====================================================
+  if(req.method !== "POST"){
+
+    return res
+      .status(405)
+      .json({
+        success:false
+      });
+
   }
 
-  const sig = req.headers["stripe-signature"];
-  const buf = await buffer(req);
+  // ====================================================
+  // 🔐 SIGNATURE
+  // ====================================================
+  const signature =
+    req.headers["stripe-signature"];
+
+  const rawBody =
+    await buffer(req);
 
   let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      buf,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+  // ====================================================
+  // 🔒 VERIFY WEBHOOK
+  // ====================================================
+  try{
+
+    event =
+      stripe.webhooks.constructEvent(
+
+        rawBody,
+
+        signature,
+
+        process.env
+          .STRIPE_WEBHOOK_SECRET
+
+      );
+
+  }catch(err){
+
+    console.error(
+      "❌ webhook inválido:",
+      err.message
     );
-  } catch (err) {
-    console.error("❌ Webhook inválido:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+
+    return res
+      .status(400)
+      .send(
+        `Webhook Error: ${err.message}`
+      );
+
   }
 
-  try {
+  // ====================================================
+  // 🧠 EVENT
+  // ====================================================
+  try{
 
-    if (event.type === "checkout.session.completed") {
+    console.log(
+      "🔥 EVENT:",
+      event.type
+    );
 
-      const session = event.data.object;
+    // ==================================================
+    // ✅ CHECKOUT COMPLETED
+    // ==================================================
+    if(
+      event.type ===
+      "checkout.session.completed"
+    ){
+
+      const session =
+        event.data.object;
+
+      // ================================================
+      // 📧 EMAIL
+      // ================================================
+      const email = String(
+
+        session.customer_details?.email ||
+
+        session.customer_email ||
+
+        ""
+
+      )
+      .trim()
+      .toLowerCase();
+
+      // ================================================
+      // 🚫 NO EMAIL
+      // ================================================
+      if(!email){
+
+        console.warn(
+          "⚠ sem email checkout"
+        );
+
+        return res.json({
+          received:true
+        });
+
+      }
+
+      // ================================================
+      // 📦 LINE ITEMS
+      // ================================================
+      const fullSession =
+        await stripe
+          .checkout
+          .sessions
+          .retrieve(
+
+            session.id,
+
+            {
+              expand:["line_items"]
+            }
+
+          );
+
+      // ================================================
+      // 💰 PRICE
+      // ================================================
+      const priceId =
+
+        fullSession
+          ?.line_items
+          ?.data?.[0]
+          ?.price
+          ?.id;
+
+      // ================================================
+      // 🔥 PLAN
+      // ================================================
+      const plan =
+
+        PLAN_MAP[priceId] ||
+
+        "free";
+
+      // ================================================
+      // 🚀 SAVE USER
+      // ================================================
+      const { error } =
+        await supabase
+          .from("users")
+          .upsert({
+
+            email,
+
+            plan,
+
+            status:"active",
+
+            stripe_customer_id:
+              session.customer || null,
+
+            stripe_subscription_id:
+              session.subscription || null,
+
+            updated_at:
+              new Date()
+
+          });
+
+      if(error){
+
+        console.error(
+          "💥 supabase save:",
+          error
+        );
+
+      }else{
+
+        console.log(
+          "✅ usuário salvo:",
+          email,
+          plan
+        );
+
+      }
+
+    }
+
+    // ==================================================
+    // 🔄 SUB UPDATED
+    // ==================================================
+    if(
+      event.type ===
+      "customer.subscription.updated"
+    ){
+
+      const subscription =
+        event.data.object;
+
+      const customerId =
+        subscription.customer;
+
+      // ================================================
+      // 📧 CUSTOMER
+      // ================================================
+      const customer =
+        await stripe
+          .customers
+          .retrieve(
+            customerId
+          );
 
       const email =
-        session.customer_details?.email ||
-        session.customer_email ||
-        "sem-email";
+        String(
+          customer?.email || ""
+        )
+        .trim()
+        .toLowerCase();
 
-      const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
-      const priceId = lineItems.data[0]?.price?.id;
+      // ================================================
+      // 💰 PRICE
+      // ================================================
+      const priceId =
 
-      const plan = PLAN_MAP[priceId] || "free";
+        subscription
+          ?.items
+          ?.data?.[0]
+          ?.price
+          ?.id;
 
-      console.log("💰 Pagamento aprovado:", email, plan);
+      // ================================================
+      // 🔥 PLAN
+      // ================================================
+      const plan =
+
+        PLAN_MAP[priceId] ||
+
+        "free";
+
+      // ================================================
+      // 🚀 UPDATE USER
+      // ================================================
+      await supabase
+        .from("users")
+        .upsert({
+
+          email,
+
+          plan,
+
+          status:"active",
+
+          stripe_customer_id:
+            customerId,
+
+          stripe_subscription_id:
+            subscription.id,
+
+          updated_at:
+            new Date()
+
+        });
+
+      console.log(
+        "🔄 plano atualizado:",
+        email,
+        plan
+      );
+
     }
 
-    if (event.type === "customer.subscription.updated") {
+    // ==================================================
+    // ❌ SUB DELETED
+    // ==================================================
+    if(
+      event.type ===
+      "customer.subscription.deleted"
+    ){
 
-      const subscription = event.data.object;
+      const subscription =
+        event.data.object;
 
-      const customerId = subscription.customer;
-      const priceId = subscription.items.data[0]?.price?.id;
+      const customer =
+        await stripe
+          .customers
+          .retrieve(
+            subscription.customer
+          );
 
-      const plan = PLAN_MAP[priceId] || "free";
+      const email =
+        String(
+          customer?.email || ""
+        )
+        .trim()
+        .toLowerCase();
 
-      console.log("🔄 Plano atualizado:", customerId, plan);
+      // ================================================
+      // 🚫 CANCEL USER
+      // ================================================
+      await supabase
+        .from("users")
+        .update({
+
+          status:"canceled",
+
+          updated_at:
+            new Date()
+
+        })
+        .eq(
+          "email",
+          email
+        );
+
+      console.log(
+        "❌ assinatura cancelada:",
+        email
+      );
+
     }
 
-    if (event.type === "customer.subscription.deleted") {
+    // ==================================================
+    // ⚠ PAYMENT FAILED
+    // ==================================================
+    if(
+      event.type ===
+      "invoice.payment_failed"
+    ){
 
-      const subscription = event.data.object;
+      const invoice =
+        event.data.object;
 
-      console.log("❌ Assinatura cancelada:", subscription.customer);
+      const customer =
+        await stripe
+          .customers
+          .retrieve(
+            invoice.customer
+          );
+
+      const email =
+        String(
+          customer?.email || ""
+        )
+        .trim()
+        .toLowerCase();
+
+      // ================================================
+      // 🚫 PAST DUE
+      // ================================================
+      await supabase
+        .from("users")
+        .update({
+
+          status:"past_due",
+
+          updated_at:
+            new Date()
+
+        })
+        .eq(
+          "email",
+          email
+        );
+
+      console.log(
+        "⚠ pagamento falhou:",
+        email
+      );
+
     }
 
-    if (event.type === "invoice.payment_failed") {
+    // ==================================================
+    // 💰 INVOICE PAID
+    // ==================================================
+    if(
+      event.type ===
+      "invoice.paid"
+    ){
 
-      const invoice = event.data.object;
+      const invoice =
+        event.data.object;
 
-      console.log("⚠️ Pagamento falhou:", invoice.customer);
+      const customer =
+        await stripe
+          .customers
+          .retrieve(
+            invoice.customer
+          );
+
+      const email =
+        String(
+          customer?.email || ""
+        )
+        .trim()
+        .toLowerCase();
+
+      // ================================================
+      // 🔥 PRICE
+      // ================================================
+      const priceId =
+
+        invoice
+          ?.lines
+          ?.data?.[0]
+          ?.price
+          ?.id;
+
+      const plan =
+
+        PLAN_MAP[priceId] ||
+
+        "free";
+
+      // ================================================
+      // ✅ REACTIVATE
+      // ================================================
+      await supabase
+        .from("users")
+        .upsert({
+
+          email,
+
+          plan,
+
+          status:"active",
+
+          stripe_customer_id:
+            invoice.customer,
+
+          updated_at:
+            new Date()
+
+        });
+
+      console.log(
+        "💰 fatura paga:",
+        email,
+        plan
+      );
+
     }
 
-  } catch (err) {
-    console.error("💥 erro geral webhook:", err);
+  }catch(err){
+
+    console.error(
+      "💥 webhook error:",
+      err
+    );
+
   }
 
-  return res.json({ received: true });
+  // ====================================================
+  // ✅ RESPONSE
+  // ====================================================
+  return res.json({
+    received:true
+  });
+
 }

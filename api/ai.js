@@ -325,7 +325,7 @@ REGRAS IMPORTANTES:
 - Nunca escreva apenas títulos
 - Cada seção deve ter explicação real
 - Use insights acionáveis
-- Máximo 140 palavras
+- Máximo 750 palavras
 `;
 
   }
@@ -429,7 +429,7 @@ REGRAS IMPORTANTES:
 - Cada seção deve conter insights completos
 - Cada insight deve ter explicação prática
 - Evite frases genéricas
-- Máximo 180 palavras
+- Máximo 350 palavras
 `;
 
   }
@@ -530,7 +530,7 @@ ESTILO:
 
 ---
 
-Máximo 450 palavras
+Máximo 750 palavras
 `;
 
 }

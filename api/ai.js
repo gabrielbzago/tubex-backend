@@ -489,7 +489,13 @@ FORMATO OBRIGATÓRIO:
 REGRAS IMPORTANTES:
 
 - Nunca escreva apenas títulos
-- Cada seção deve ter pelo menos 2 insights
+Cada seção deve conter:
+- diagnóstico
+- impacto
+- motivo
+- ação prática
+
+Nunca deixe seções vazias.
 - Cada insight deve ter explicação prática
 - Explique:
   • o problema
@@ -524,7 +530,7 @@ ESTILO:
 
 ---
 
-Máximo 250 palavras
+Máximo 450 palavras
 `;
 
 }

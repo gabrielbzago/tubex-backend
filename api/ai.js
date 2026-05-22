@@ -236,87 +236,223 @@ const isNewChannel =
   parsedVideos.length < 3;
 
 // ======================================================
-// 🧠 DIAGNOSIS
+// 🧠 AI PROMPTS
 // ======================================================
+
 if (tipo === "diagnosis") {
+
+  // ====================================================
+  // 🆕 NEW CHANNEL
+  // ====================================================
 
   if (isNewChannel) {
 
     finalPrompt = `
-Você é um especialista em crescimento no YouTube.
+Você é um consultor profissional de crescimento no YouTube.
 
-Este canal é NOVO e ainda não possui dados suficientes.
+Este canal ainda está em fase inicial.
 
-Crie um diagnóstico estratégico para início de canal.
+Seu trabalho é criar um diagnóstico estratégico inteligente,
+sem parecer genérico.
 
 ---
 
-📊 DADOS:
+📊 DADOS DO CANAL:
 - Inscritos: ${context.subscribers || 0}
-- Vídeos: ${parsedVideos.length}
+- Vídeos publicados: ${parsedVideos.length}
 
 ---
 
 REGRAS:
-- NÃO fale que não há dados
+
+- NÃO diga que faltam dados
 - NÃO seja genérico
-- Seja prático e direto
+- NÃO escreva respostas vagas
+- Seja estratégico e objetivo
 - Foque em crescimento inicial
+- Use linguagem de consultoria premium
 
 ---
 
-FORMATO:
+FORMATO OBRIGATÓRIO:
 
-📊 Pontuação do Canal: 2/10
+📊 Pontuação do Canal: X/10
 
 # Diagnóstico
 
-🔎 Nicho:
-(sugira como definir nicho claro)
+🔎 Nicho
+- analise se o nicho parece claro
+- explique como fortalecer posicionamento
 
-📈 Performance:
-(explique que ainda está em fase inicial)
+📈 Performance
+- explique o momento atual do canal
+- analise potencial inicial
 
-📅 Consistência:
-(oriente frequência ideal)
+📅 Consistência
+- sugira frequência ideal
+- explique impacto da consistência
 
-🎯 Algoritmo:
-(explique como o YouTube testa canais novos)
+🎯 Algoritmo
+- explique como o YouTube interpreta canais novos
+- diga como acelerar aprendizado do algoritmo
 
 ---
 
 # Pontos Fortes
-1.
-2.
+
+- cite os principais pontos positivos
+- explique por que ajudam o crescimento
 
 ---
 
 # Problemas Críticos
-1.
-2.
+
+- explique o principal gargalo atual
+- diga o impacto no crescimento
 
 ---
 
 # Plano de Ação
-- passos práticos para começar do zero
+
+- entregue ações práticas imediatas
+- priorize o que gera mais impacto
+- explique o próximo passo ideal
 
 ---
 
-Máximo 120 palavras.
+REGRAS IMPORTANTES:
+
+- Nunca escreva apenas títulos
+- Cada seção deve ter explicação real
+- Use insights acionáveis
+- Máximo 140 palavras
 `;
 
-  } else {
+  }
+
+  // ====================================================
+  // 📊 NORMAL CHANNEL
+  // ====================================================
+
+  else {
 
     finalPrompt = `
 Você é um analista profissional de canais do YouTube.
 
-Você NÃO pode dar respostas genéricas.
+Seu trabalho é gerar uma análise estratégica baseada em dados reais.
 
-Você DEVE usar os dados abaixo para gerar uma análise precisa.
+Você NÃO pode dar respostas genéricas.
 
 ---
 
-📊 DADOS:
+📊 DADOS DO CANAL:
+- Inscritos: ${context.subscribers || 0}
+- Média de views: ${avgViews}
+- Taxa views/inscritos:
+${context.subscribers
+  ? Math.round((avgViews / context.subscribers) * 100)
+  : 0
+}%
+- Uploads últimos 7 dias: ${uploads7}
+
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
+
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
+
+📺 Últimos vídeos:
+${videoSummary}
+
+---
+
+REGRAS:
+
+- NÃO invente dados
+- NÃO use frases vagas
+- SEMPRE use números quando possível
+- Seja direto e estratégico
+- Use linguagem de consultoria premium
+- Analise padrões reais
+
+---
+
+FORMATO OBRIGATÓRIO:
+
+📊 Pontuação do Canal: X/10
+
+# Diagnóstico
+
+🔎 Nicho
+- diga se o nicho parece claro ou confuso
+- explique impacto disso no algoritmo
+
+📈 Performance
+- compare views vs inscritos
+- explique padrão de performance
+
+📅 Consistência
+- analise frequência recente
+- explique impacto no crescimento
+
+🎯 Algoritmo
+- diga se o YouTube parece entender o canal
+- explique sinais positivos ou negativos
+
+---
+
+# Pontos Fortes
+
+- cite os pontos mais fortes do canal
+- explique por que ajudam no crescimento
+
+---
+
+# Problemas Críticos
+
+- explique os principais gargalos atuais
+- diga o impacto desses problemas
+
+---
+
+# Plano de Ação
+
+- entregue ações práticas imediatas
+- priorize mudanças de maior impacto
+- explique o próximo passo ideal
+
+---
+
+REGRAS IMPORTANTES:
+
+- Nunca escreva apenas títulos
+- Cada seção deve conter insights completos
+- Cada insight deve ter explicação prática
+- Evite frases genéricas
+- Máximo 180 palavras
+`;
+
+  }
+
+}
+
+// ======================================================
+// 🚀 STRATEGY
+// ======================================================
+
+else if (tipo === "strategy") {
+
+  finalPrompt = `
+Você é um estrategista avançado de crescimento no YouTube.
+
+Seu trabalho é analisar dados reais
+e identificar oportunidades escaláveis.
+
+Você NÃO pode gerar respostas genéricas.
+
+---
+
+📊 DADOS DO CANAL:
 - Inscritos: ${context.subscribers || 0}
 - Média de views: ${avgViews}
 - Uploads últimos 7 dias: ${uploads7}
@@ -327,137 +463,84 @@ ${topVideo.title} (${topVideo.views} views)
 ⚠️ Pior vídeo:
 ${worstVideo.title} (${worstVideo.views} views)
 
-📺 Vídeos:
+📺 Últimos vídeos:
 ${videoSummary}
 
 ---
 
-REGRAS:
-- NÃO use palavras vagas
-- SEMPRE use números
-- NÃO invente dados
-- Seja direto
-
----
-
-FORMATO:
-
-📊 Pontuação do Canal: X/10
-
-# Diagnóstico
-
-🔎 Nicho:
-(diga se é claro ou confuso)
-
-📈 Performance:
-(compare views vs inscritos)
-
-📅 Consistência:
-(baseado em uploads7)
-
-🎯 Algoritmo:
-(se o canal está sendo entendido)
-
----
-
-# Pontos Fortes
-1.
-2.
-
----
-
-# Problemas Críticos
-1.
-2.
-
----
-
-# Plano de Ação
-- ações específicas baseadas nos dados
-
----
-
-Máximo 150 palavras.
-`;
-
-  }
-}
-
-
-
-    else if (tipo === "strategy") {
-    finalPrompt = `
-Você é um estrategista de crescimento avançado no YouTube.
-
-Você NÃO pode dar dicas genéricas.
-
-Seu trabalho é analisar dados reais e identificar oportunidades de crescimento ESCALÁVEL.
-
----
-
-Estruture a resposta EXATAMENTE neste formato:
+FORMATO OBRIGATÓRIO:
 
 📊 Resumo Geral
 
 📈 Métricas Principais
 
-🔥 O que se destacou
+🔥 O que mais performa
 
-🧠 Análise e Insights
+🧠 Insights Estratégicos
 
-⚠️ Problemas detectados
+⚠️ Gargalos de Crescimento
 
 🚀 Estratégia Recomendada
 
 🎯 Próximos Passos
 
-Use:
-- listas
-- bullets
-- insights objetivos
+---
+
+REGRAS IMPORTANTES:
+
+- Nunca escreva apenas títulos
+- Cada seção deve ter pelo menos 2 insights
+- Cada insight deve ter explicação prática
+- Explique:
+  • o problema
+  • o motivo
+  • o impacto
+  • como melhorar
+
+- NÃO fale coisas óbvias
+- NÃO diga "poste mais"
+- NÃO fale para divulgar em outras redes
+- NÃO sugira anúncios
+- NÃO use frases vagas
+
+- Use linguagem de consultoria premium
+- Seja específico
+- Use métricas reais
+- Analise padrões dos vídeos
+- Explique o que parece funcionar melhor
+- Explique o que limita crescimento
+- Sugira estratégias escaláveis reais
+
+---
+
+ESTILO:
+
 - linguagem profissional
-- separação clara de blocos
-- métricas destacadas
+- insights densos
+- leitura rápida
+- blocos organizados
+- bullets claros
+- visual estilo SaaS premium
 
 ---
 
-REGRAS:
-- Não fale coisas óbvias (tipo "poste mais")
-- Não fale de impulsionar vídeos
-- Não fale para compartilhar conteúdo em outras redes sociais
-- Não fale "defina nicho"
-- Baseie-se nos dados
-- Seja direto e estratégico
-- Linguagem de consultoria premium
-
----
-
-ENTREGUE:
-
-1. 🔍 PADRÃO REAL DE PERFORMANCE  
-   (o que realmente gera views nesse canal)
-
-2. 💣 GARGALO DE CRESCIMENTO  
-   (o maior limitador hoje)
-
-3. 🚀 ESTRATÉGIA DE ESCALA  
-   (o que fazer para crescer rápido)
-
-4. 🎯 AÇÃO PRÁTICA IMEDIATA  
-   (o próximo passo claro)
-
-5. 🧠 3 IDEIAS ALTAMENTE ESCALÁVEIS  
-   (baseadas no padrão que funciona)
+Máximo 250 palavras
 `;
 
-    }
+}
+
+// ======================================================
+// ❌ INVALID TYPE
+// ======================================================
 
 if (!finalPrompt) {
+
   return res.status(400).json({
-    success:false,
-    error:"invalid_tipo",
-    text:""
+    success: false,
+    error: "invalid_tipo",
+    text: ""
   });
+
 }
 
    // ======================================================
@@ -476,12 +559,13 @@ global.__tubexCache = global.__tubexCache || new Map();
 
 // 🔑 chave única (multiusuário + canal + tipo)
 const cacheKey = [
-  "v3",
+  "v4",
   userId,
   channelId,
   tipo,
   stableKey,
-  context.subscribers || 0
+  context.subscribers || 0,
+avgViews || 0
 ].join("|");
 
 // 📦 busca cache
@@ -511,11 +595,11 @@ if (cached && Date.now() - cached.timestamp < ttl) {
 // ======================================================
 // 🎛 TEMPERATURE (FORA DO CACHE)
 // ======================================================
-let temp = 0.6;
+let temp = 0.5;
 
 if (tipo === "ideas") temp = 0.8;
 if (tipo === "descricao") temp = 0.5;
-if (tipo === "strategy") temp = 0.7;
+if (tipo === "strategy") temp = 0.55;
 
     // ======================================================
     // 🤖 OPENAI
@@ -533,7 +617,10 @@ if (tipo === "strategy") temp = 0.7;
           { role:"user", content: finalPrompt }
         ],
         temperature: temp,
-        max_tokens: 700
+      max_tokens:
+  tipo === "strategy"
+    ? 700
+    : 500
       })
     });
 

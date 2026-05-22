@@ -102,6 +102,20 @@ export default async function handler(req, res){
       email
     );
 
+console.log(
+  "🔥 ENV:",
+  {
+    hasUrl:
+      !!process.env.SUPABASE_URL,
+
+    hasKey:
+      !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+
+    hasInternal:
+      !!process.env.INTERNAL_API_KEY
+  }
+);
+
     // ==================================================
     // 🔥 SUPABASE QUERY
     // ==================================================
@@ -117,8 +131,8 @@ export default async function handler(req, res){
         affiliate_code,
         stripe_customer_id
       `)
-      .eq("email", email)
-      .maybeSingle()
+     .ilike("email", email)
+.maybeSingle();
 
     // ==================================================
     // ⚠️ ERROR
@@ -173,18 +187,19 @@ export default async function handler(req, res){
     // ==================================================
     // 🚫 INACTIVE
     // ==================================================
-    if(
-      status !== "active"
-    ){
+if(
+  status !== "active" &&
+  status !== "approved"
+){
 
-      return res.status(200).json({
-        success:true,
-        plan:"free",
-        status,
-        fallback:false
-      });
+  return res.status(200).json({
+    success:true,
+    plan:"free",
+    status,
+    fallback:false
+  });
 
-    }
+}
 
     // ==================================================
     // ✅ SUCCESS

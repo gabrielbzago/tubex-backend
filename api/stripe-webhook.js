@@ -205,7 +205,7 @@ console.log(
       // ================================================
       const { error } =
         await supabase
-          .from("users")
+          .from("email")
         .upsert({
   email,
   plan,
@@ -291,7 +291,7 @@ console.log(
       // 🚀 UPDATE USER
       // ================================================
       await supabase
-        .from("users")
+        .from("email")
        .upsert({
   email,
   plan,
@@ -340,7 +340,7 @@ stripe_subscription_id: subscription.id || null,
       // 🚫 CANCEL USER
       // ================================================
       await supabase
-        .from("users")
+        .from("email")
         .update({
 
           status:"canceled",
@@ -390,7 +390,7 @@ stripe_subscription_id: subscription.id || null,
       // 🚫 PAST DUE
       // ================================================
       await supabase
-        .from("users")
+        .from("email")
         .update({
 
           status:"past_due",
@@ -457,7 +457,7 @@ stripe_subscription_id: subscription.id || null,
       // ✅ REACTIVATE
       // ================================================
       await supabase
-        .from("users")
+        .from("email")
       .upsert({
   email,
   plan,

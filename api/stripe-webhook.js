@@ -309,13 +309,19 @@ export default async function handler(
       // ================================================
       // 💰 PRODUCT
       // ================================================
-      const productId =
+   const product =
 
-        fullSession
-          ?.line_items
-          ?.data?.[0]
-          ?.price
-          ?.product;
+  fullSession
+    ?.line_items
+    ?.data?.[0]
+    ?.price
+    ?.product;
+
+const productId =
+
+  typeof product === "string"
+    ? product
+    : product?.id;
 
       console.log(
         "🔥 PRODUCT ID:",
@@ -381,12 +387,6 @@ export default async function handler(
         .toLowerCase();
 
       const productId =
-
-        subscription
-          ?.items
-          ?.data?.[0]
-          ?.price
-          ?.product;
 
       const plan =
 
@@ -532,13 +532,19 @@ export default async function handler(
         .trim()
         .toLowerCase();
 
-      const productId =
+   const product =
 
-        invoice
-          ?.lines
-          ?.data?.[0]
-          ?.price
-          ?.product;
+  invoice
+    ?.lines
+    ?.data?.[0]
+    ?.price
+    ?.product;
+
+const productId =
+
+  typeof product === "string"
+    ? product
+    : product?.id;
 
       const plan =
 

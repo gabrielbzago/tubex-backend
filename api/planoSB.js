@@ -152,22 +152,86 @@ console.log(
 
     }
 
-    // ==================================================
-    // 🚫 USER NOT FOUND
-    // ==================================================
-    if(!data){
+   // ==================================================
+// 🚫 USER NOT FOUND
+// ==================================================
+if(!data){
 
-      console.warn(
-        "⚠ usuário não encontrado"
-      );
+  // ==============================================
+  // 📄 FALLBACK SHEETS
+  // ==============================================
+  try{
+
+    const sheetRes = await fetch(
+
+      process.env.SHEETS_API_URL +
+
+      `?email=${encodeURIComponent(email)}`
+
+    );
+
+    const sheetData =
+      await sheetRes.json();
+
+    console.log(
+      "📄 SHEETS FALLBACK:",
+      sheetData
+    );
+
+    // ============================================
+    // ✅ ACHOU NO SHEETS
+    // ============================================
+    if(
+      sheetData &&
+      sheetData.plano &&
+      sheetData.plano !== "free"
+    ){
 
       return res.status(200).json({
+
         success:true,
-        plan:"free",
-        fallback:false
+
+        fallback:true,
+
+        source:"sheets",
+
+        email,
+
+        plan: String(
+          sheetData.plano
+        )
+        .toLowerCase()
+        .trim(),
+
+        status:"approved"
+
       });
 
     }
+
+  }catch(err){
+
+    console.warn(
+      "⚠ fallback sheets error:",
+      err
+    );
+
+  }
+
+  // ==============================================
+  // 🚫 FREE FINAL
+  // ==============================================
+  return res.status(200).json({
+
+    success:true,
+
+    plan:"free",
+
+    fallback:false
+
+  });
+
+}
 
     // ==================================================
     // 📦 DATA

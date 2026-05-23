@@ -203,38 +203,33 @@ console.log(
       // ================================================
       // 🚀 SAVE USER
       // ================================================
-      const { error } =
-        await supabase
-          .from("users")
-        .upsert({
-  email,
-  plan,
-  status:"active",
-  stripe_customer_id: session.customer || null,
-  stripe_subscription_id: session.subscription || null,
-  updated_at: new Date()
-},{
-  onConflict:"email"
-});
+   const { data, error } =
+  await supabase
+    .from("users")
+    .upsert(
+      {
+        email,
+        plan,
+        status:"active",
+        stripe_customer_id:
+          session.customer || null,
 
-      if(error){
+        stripe_subscription_id:
+          session.subscription || null,
 
-        console.error(
-          "💥 supabase save:",
-          error
-        );
-
-      }else{
-
-        console.log(
-          "✅ usuário salvo:",
-          email,
-          plan
-        );
-
+        updated_at:
+          new Date().toISOString()
+      },
+      {
+        onConflict:"email"
       }
+    );
 
-    }
+console.log(
+  "🔥 UPSERT DATA:",
+  data
+);
+}
 
     // ==================================================
     // 🔄 SUB UPDATED
@@ -290,26 +285,45 @@ console.log(
       // ================================================
       // 🚀 UPDATE USER
       // ================================================
-      await supabase
-        .from("users")
-       .upsert({
-  email,
-  plan,
-  status:"active",
-  stripe_customer_id: customerId || null,
-stripe_subscription_id: subscription.id || null,
-  updated_at: new Date()
-},{
-  onConflict:"email"
-});
-
-      console.log(
-        "🔄 plano atualizado:",
+const { error } =
+  await supabase
+    .from("users")
+    .upsert(
+      {
         email,
-        plan
-      );
+        plan,
+        status:"active",
 
-    }
+        stripe_customer_id:
+          customerId || null,
+
+        stripe_subscription_id:
+          subscription.id || null,
+
+        updated_at:
+          new Date().toISOString()
+      },
+      {
+        onConflict:"email"
+      }
+    );
+
+if(error){
+
+  console.error(
+    "💥 subscription update error:",
+    error
+  );
+
+}else{
+
+  console.log(
+    "🔄 assinatura atualizada:",
+    email,
+    plan
+  );
+}
+}
 
     // ==================================================
     // ❌ SUB DELETED
@@ -339,28 +353,26 @@ stripe_subscription_id: subscription.id || null,
       // ================================================
       // 🚫 CANCEL USER
       // ================================================
-      await supabase
-        .from("users")
-        .update({
+await supabase
+  .from("users")
+  .update({
 
-          status:"canceled",
+    status:"canceled",
 
-          updated_at:
-            new Date()
+    updated_at:
+      new Date().toISOString()
 
-        })
-        .eq(
-          "email",
-          email
-        );
+  })
+  .eq(
+    "email",
+    email
+  );
 
-      console.log(
-        "❌ assinatura cancelada:",
-        email
-      );
-
-    }
-
+console.log(
+  "❌ assinatura cancelada:",
+  email
+);
+}
     // ==================================================
     // ⚠ PAYMENT FAILED
     // ==================================================
@@ -456,28 +468,44 @@ stripe_subscription_id: subscription.id || null,
       // ================================================
       // ✅ REACTIVATE
       // ================================================
-      await supabase
-        .from("users")
-      .upsert({
-  email,
-  plan,
-  status:"active",
- stripe_customer_id: invoice.customer || null,
-stripe_subscription_id: invoice.subscription || null,
-  updated_at: new Date()
-},{
-  onConflict:"email"
-});
-
-      console.log(
-        "💰 fatura paga:",
+const { error } =
+  await supabase
+    .from("users")
+    .upsert(
+      {
         email,
-        plan
-      );
+        plan,
+        status:"active",
 
-    }
+        stripe_customer_id:
+          invoice.customer || null,
 
-  }catch(err){
+        stripe_subscription_id:
+          invoice.subscription || null,
+
+        updated_at:
+          new Date().toISOString()
+      },
+      {
+        onConflict:"email"
+      }
+    );
+
+if(error){
+
+  console.error(
+    "💥 invoice paid error:",
+    error
+  );
+}
+}
+
+
+  // ====================================================
+  // ✅ RESPONSE
+  // ====================================================
+
+   }catch(err){
 
     console.error(
       "💥 webhook error:",
@@ -486,9 +514,6 @@ stripe_subscription_id: invoice.subscription || null,
 
   }
 
-  // ====================================================
-  // ✅ RESPONSE
-  // ====================================================
   return res.json({
     received:true
   });

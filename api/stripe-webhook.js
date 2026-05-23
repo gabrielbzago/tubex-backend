@@ -386,7 +386,19 @@ const productId =
         .trim()
         .toLowerCase();
 
-      const productId =
+      const product =
+
+  subscription
+    ?.items
+    ?.data?.[0]
+    ?.price
+    ?.product;
+
+const productId =
+
+  typeof product === "string"
+    ? product
+    : product?.id;
 
       const plan =
 

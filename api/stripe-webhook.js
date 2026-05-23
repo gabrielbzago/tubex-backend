@@ -29,14 +29,12 @@ export const config = {
 // ======================================================
 // 🔥 PLAN MAP
 // ======================================================
-// ⚠️ TROQUE PELOS PRICE IDs REAIS
+
 const PLAN_MAP = {
 
-  "price_START_REAL": "start",
-
-  "price_PRO_REAL": "pro",
-
-  "price_EXPERT_REAL": "expert"
+  "prod_SlRU1DGWgG5nzq": "start",
+  "prod_SlRVtiheQa9IZG": "pro",
+  "prod_SlRWvDMlS5e9dR": "expert"
 
 };
 
@@ -175,22 +173,32 @@ export default async function handler(
       // ================================================
       // 💰 PRICE
       // ================================================
-      const priceId =
+      const productId =
 
-        fullSession
-          ?.line_items
-          ?.data?.[0]
-          ?.price
-          ?.id;
+  fullSession
+    ?.line_items
+    ?.data?.[0]
+    ?.price
+    ?.product;
+
+console.log(
+  "🔥 PRODUCT ID:",
+  productId
+);
 
       // ================================================
       // 🔥 PLAN
       // ================================================
-      const plan =
+     const plan =
 
-        PLAN_MAP[priceId] ||
+  PLAN_MAP[productId] ||
 
-        "free";
+  "free";
+
+console.log(
+  "🔥 PLAN:",
+  plan
+);
 
       // ================================================
       // 🚀 SAVE USER
@@ -198,24 +206,16 @@ export default async function handler(
       const { error } =
         await supabase
           .from("users")
-          .upsert({
-
-            email,
-
-            plan,
-
-            status:"active",
-
-            stripe_customer_id:
-              session.customer || null,
-
-            stripe_subscription_id:
-              session.subscription || null,
-
-            updated_at:
-              new Date()
-
-          });
+        .upsert({
+  email,
+  plan,
+  status:"active",
+  stripe_customer_id: session.customer || null,
+  stripe_subscription_id: session.subscription || null,
+  updated_at: new Date()
+},{
+  onConflict:"email"
+});
 
       if(error){
 
@@ -270,46 +270,38 @@ export default async function handler(
       // ================================================
       // 💰 PRICE
       // ================================================
-      const priceId =
+     const productId =
 
-        subscription
-          ?.items
-          ?.data?.[0]
-          ?.price
-          ?.id;
+  subscription
+    ?.items
+    ?.data?.[0]
+    ?.price
+    ?.product;
 
       // ================================================
       // 🔥 PLAN
       // ================================================
       const plan =
 
-        PLAN_MAP[priceId] ||
+  PLAN_MAP[productId] ||
 
-        "free";
+  "free";
 
       // ================================================
       // 🚀 UPDATE USER
       // ================================================
       await supabase
         .from("users")
-        .upsert({
-
-          email,
-
-          plan,
-
-          status:"active",
-
-          stripe_customer_id:
-            customerId,
-
-          stripe_subscription_id:
-            subscription.id,
-
-          updated_at:
-            new Date()
-
-        });
+       .upsert({
+  email,
+  plan,
+  status:"active",
+  stripe_customer_id: customerId || null,
+stripe_subscription_id: subscription.id || null,
+  updated_at: new Date()
+},{
+  onConflict:"email"
+});
 
       console.log(
         "🔄 plano atualizado:",
@@ -447,40 +439,35 @@ export default async function handler(
       // ================================================
       // 🔥 PRICE
       // ================================================
-      const priceId =
+     const productId =
 
-        invoice
-          ?.lines
-          ?.data?.[0]
-          ?.price
-          ?.id;
+  invoice
+    ?.lines
+    ?.data?.[0]
+    ?.price
+    ?.product;
 
-      const plan =
+    const plan =
 
-        PLAN_MAP[priceId] ||
+  PLAN_MAP[productId] ||
 
-        "free";
+  "free";
 
       // ================================================
       // ✅ REACTIVATE
       // ================================================
       await supabase
         .from("users")
-        .upsert({
-
-          email,
-
-          plan,
-
-          status:"active",
-
-          stripe_customer_id:
-            invoice.customer,
-
-          updated_at:
-            new Date()
-
-        });
+      .upsert({
+  email,
+  plan,
+  status:"active",
+ stripe_customer_id: invoice.customer || null,
+stripe_subscription_id: invoice.subscription || null,
+  updated_at: new Date()
+},{
+  onConflict:"email"
+});
 
       console.log(
         "💰 fatura paga:",

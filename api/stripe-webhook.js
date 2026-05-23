@@ -229,7 +229,18 @@ console.log(
   "🔥 UPSERT DATA:",
   data
 );
+
+if(error){
+
+  console.error(
+    "💥 checkout save error:",
+    error
+  );
+
 }
+
+}
+
 
     // ==================================================
     // 🔄 SUB UPDATED
@@ -408,7 +419,7 @@ console.log(
           status:"past_due",
 
           updated_at:
-            new Date()
+  new Date().toISOString()
 
         })
         .eq(

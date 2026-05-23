@@ -164,7 +164,7 @@ if(!data){
 
     const sheetRes = await fetch(
 
-      process.env.SHEETS_API_URL +
+      process.env.SHEETS_URL +
 
       `?email=${encodeURIComponent(email)}`
 

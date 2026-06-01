@@ -248,100 +248,231 @@ export default async function handler(req, res) {
 // =========================
 // 🏷️ REAL TAG ENGINE
 // =========================
+// =========================
+// 🧠 UNIVERSAL SEO ENGINE
+// =========================
 
-const stopwords = [
-
-  "youtube",
-  "video",
-  "videos",
-  "viral",
-  "seo",
-  "2026",
-  "2025",
-  "oficial",
-  "novo",
-  "nova"
-
-];
-
+// mapa final
 const tagMap = new Map();
 
 // =====================================
-// EXTRAI TAGS DOS VÍDEOS
+// LIMPA TEXTO
 // =====================================
 
-items.forEach(video => {
+function normalizeText(text = ""){
 
-  const tags =
-    video?.snippet?.tags || [];
+  return text
 
-  tags.forEach(tag => {
+    .toLowerCase()
 
-    const normalized = tag
+    .normalize("NFD")
 
-      .toLowerCase()
+    .replace(/[\u0300-\u036f]/g, "")
 
-      .normalize("NFD")
+    .replace(/[^\w\s-]/g, " ")
 
-      .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
 
-      .replace(/[^\w\s]/g," ")
+    .trim();
 
-      .replace(/\s+/g," ")
+}
 
-      .trim();
+// =====================================
+// TOKENIZA
+// =====================================
 
-    // filtros
-    if(
-      !normalized
-      ||
-      normalized.length < 5
-      ||
-      normalized.length > 45
-    ){
-      return;
-    }
+function tokenize(text = ""){
 
-    // lixo
-    if(
+  return normalizeText(text)
 
-      stopwords.some(sw =>
+    .split(" ")
 
-        normalized.includes(sw)
+    .filter(word =>
 
-      )
-
-    ){
-      return;
-    }
-
-    // peso por views
-    const views =
-      Number(
-        video.statistics?.viewCount || 0
-      );
-
-    const weight =
-      Math.max(
-        1,
-        Math.log10(views + 1)
-      );
-
-    tagMap.set(
-
-      normalized,
-
-      (tagMap.get(normalized) || 0)
-
-      +
-
-      weight
+      word.length >= 3
 
     );
 
+}
+
+// =====================================
+// EXTRAI TAGS DO TÍTULO
+// =====================================
+
+function extractTitleTags(title = ""){
+
+  const words = tokenize(title);
+
+  const tags = new Set();
+
+  // =================================
+  // PALAVRAS
+  // =================================
+
+  words.forEach(word => {
+
+    tags.add(word);
+
   });
 
+  // =================================
+  // BIGRAMAS
+  // =================================
+
+  for(let i=0;i<words.length-1;i++){
+
+    tags.add(
+
+      words[i] +
+      " " +
+      words[i+1]
+
+    );
+
+  }
+
+  // =================================
+  // TRIGRAMAS
+  // =================================
+
+  for(let i=0;i<words.length-2;i++){
+
+    tags.add(
+
+      words[i] +
+      " " +
+      words[i+1] +
+      " " +
+      words[i+2]
+
+    );
+
+  }
+
+  // =================================
+  // FRASE COMPLETA
+  // =================================
+
+  if(words.length >= 4){
+
+    tags.add(
+
+      words.join(" ")
+
+    );
+
+  }
+
+  return [...tags];
+
+}
+
+// =====================================
+// TAGS DO TÍTULO
+// =====================================
+
+const titleTags =
+  extractTitleTags(keyword);
+
+// adiciona peso forte
+titleTags.forEach(tag => {
+
+  tagMap.set(
+
+    tag,
+
+    (tagMap.get(tag) || 0)
+
+    + 20
+
+  );
+
 });
+
+// =====================================
+// API YOUTUBE COMPLEMENTAR
+// =====================================
+
+items
+
+  .sort((a,b)=>
+
+    Number(b.statistics?.viewCount || 0)
+
+    -
+
+    Number(a.statistics?.viewCount || 0)
+
+  )
+
+  .slice(0,10)
+
+  .forEach(video => {
+
+    const tags =
+      video?.snippet?.tags || [];
+
+    tags.forEach(tag => {
+
+      const normalized =
+        normalizeText(tag);
+
+      // tamanho
+      if(
+        !normalized
+        ||
+        normalized.length < 3
+        ||
+        normalized.length > 80
+      ){
+        return;
+      }
+
+      // relevância contextual
+      const relevance =
+        titleTags.some(titleTag =>
+
+          normalized.includes(titleTag)
+
+          ||
+
+          titleTag.includes(normalized)
+
+        );
+
+      if(!relevance){
+        return;
+      }
+
+      // views
+      const views =
+        Number(
+          video.statistics?.viewCount || 0
+        );
+
+      // peso
+      const weight =
+
+        Math.max(
+          1,
+          Math.log10(views + 1)
+        );
+
+      tagMap.set(
+
+        normalized,
+
+        (tagMap.get(normalized) || 0)
+
+        +
+
+        weight
+
+      );
+
+    });
+
+  });
 
 // =====================================
 // ORDENA
@@ -364,10 +495,13 @@ const rankedTags =
       keyword,
 
       score: Math.min(
+
         99,
+
         Math.round(
-          70 + (score * 3)
+          60 + (score * 2)
         )
+
       )
 
     }));

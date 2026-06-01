@@ -623,10 +623,21 @@ if (tipo === "strategy") temp = 0.55;
           { role:"user", content: finalPrompt }
         ],
         temperature: temp,
-      max_tokens:
+    max_tokens:
+
   tipo === "strategy"
-    ? 700
-    : 500
+    ? 1800
+
+  : tipo === "diagnosis"
+    ? 1600
+
+  : tipo === "descricao"
+    ? 1200
+
+  : tipo === "ideas"
+    ? 900
+
+  : 1000
       })
     });
 

@@ -448,18 +448,25 @@ const relevance =
 
   });
 
+
+// =====================================
+// FILTRO MAIS FLEXÍVEL
+// =====================================
+
 // remove somente lixo extremo
+
 if(
 
-  !relevance
+  normalized.length < 3
 
-  &&
+  ||
 
-  !normalized.includes(keyword.toLowerCase())
+  normalized.length > 80
 
 ){
   return;
-}     
+}
+
 
       // views
       const views =

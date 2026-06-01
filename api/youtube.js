@@ -488,7 +488,7 @@ const rankedTags =
 
     )
 
-    .slice(0,40)
+    .slice(0,100)
 
     .map(([keyword,score]) => ({
 

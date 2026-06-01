@@ -405,7 +405,7 @@ items
 
   )
 
-  .slice(0,10)
+  .slice(0,30)
 
   .forEach(video => {
 
@@ -428,21 +428,38 @@ items
         return;
       }
 
-      // relevância contextual
-      const relevance =
-        titleTags.some(titleTag =>
+    
+// =====================================
+// RELEVÂNCIA FLEXÍVEL
+// =====================================
 
-          normalized.includes(titleTag)
+const relevance =
 
-          ||
+  titleTags.some(titleTag => {
 
-          titleTag.includes(normalized)
+    const words =
+      titleTag.split(" ");
 
-        );
+    return words.some(word =>
 
-      if(!relevance){
-        return;
-      }
+      normalized.includes(word)
+
+    );
+
+  });
+
+// remove somente lixo extremo
+if(
+
+  !relevance
+
+  &&
+
+  !normalized.includes(keyword.toLowerCase())
+
+){
+  return;
+}     
 
       // views
       const views =

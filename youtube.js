@@ -1,0 +1,584 @@
+export default async function handler(req, res) {
+
+  // =========================
+  // 🔥 CORS
+  // =========================
+  const origin = req.headers.origin || "*";
+
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // =========================
+  // 🔐 API KEY
+  // =========================
+  if (req.headers["x-api-key"] !== process.env.API_KEY) {
+    return res.status(403).json({
+      success: false,
+      error: "unauthorized"
+    });
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      success: false,
+      error: "method_not_allowed"
+    });
+  }
+
+  try {
+
+    const body = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
+
+    const keyword = body?.keyword?.trim();
+    const mode = body?.mode || "seo";
+    const videoId = body?.videoId;
+
+    if (!keyword && !videoId) {
+      return res.status(400).json({
+        success: false,
+        error: "keyword_required"
+      });
+    }
+
+    // =========================
+    // 📦 CACHE SEO
+    // =========================
+    global.tubexSeoCache = global.tubexSeoCache || {};
+
+    const cacheKey = keyword ? `seo_${keyword.toLowerCase()}` : null;
+
+    if (cacheKey) {
+      const cached = global.tubexSeoCache[cacheKey];
+
+      if (cached && cached.expires > Date.now()) {
+        console.log("⚡ CACHE HIT SEO:", keyword);
+        return res.status(200).json(cached.data);
+      }
+    }
+
+    // =========================
+    // 🔑 API KEYS
+    // =========================
+    const keys = (process.env.YOUTUBE_API_KEY || "")
+      .split(",")
+      .map(k => k.trim())
+      .filter(Boolean);
+
+    let items = [];
+    let success = false;
+    let activeKey = null;
+
+    // =========================
+    // 🔁 MULTI KEY FETCH
+    // =========================
+    for (const key of keys.sort(() => 0.5 - Math.random())) {
+
+      try {
+
+        let allIds = [];
+        let nextPageToken = "";
+        let pageCount = 0;
+
+        let maxPages = 2;
+        if (body?.plan === "free") maxPages = 1;
+        if (body?.plan === "pro") maxPages = 3;
+
+        while (pageCount < maxPages) {
+
+          const searchUrl =
+            `https://www.googleapis.com/youtube/v3/search` +
+            `?part=snippet&type=video&maxResults=50` +
+            `&q=${encodeURIComponent(keyword)}` +
+            `&pageToken=${nextPageToken}` +
+            `&key=${key}`;
+
+          const searchRes = await fetch(searchUrl);
+
+          if (searchRes.status === 403 || searchRes.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const searchJson = await searchRes.json();
+
+          const ids = searchJson.items
+            ?.map(v => v.id?.videoId)
+            .filter(Boolean) || [];
+
+          allIds.push(...ids);
+
+          nextPageToken = searchJson.nextPageToken || "";
+          pageCount++;
+
+          if (!nextPageToken) break;
+        }
+
+        const uniqueIds = [...new Set(allIds)];
+
+        for (let i = 0; i < uniqueIds.length; i += 50) {
+
+          const chunk = uniqueIds.slice(i, i + 50).join(",");
+
+          const videosUrl =
+            `https://www.googleapis.com/youtube/v3/videos` +
+            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+
+          const resVideos = await fetch(videosUrl);
+
+          if (resVideos.status === 403 || resVideos.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const jsonVideos = await resVideos.json();
+
+          if (Array.isArray(jsonVideos.items)) {
+            items.push(...jsonVideos.items);
+          }
+        }
+
+        if (items.length) {
+          success = true;
+          activeKey = key;
+          break;
+        }
+
+      } catch (e) {
+        console.warn("🔁 tentando próxima key...");
+        continue;
+      }
+    }
+
+    // =========================
+    // 🚫 FALHA TOTAL
+    // =========================
+    if (!success) {
+      return res.status(200).json({
+        success: true,
+        items: [],
+        volume: 0,
+        competition: 0
+      });
+    }
+
+    // =========================
+    // 🎬 VIDEO MODE
+    // =========================
+    if (videoId) {
+
+      const url =
+        `https://www.googleapis.com/youtube/v3/videos` +
+        `?part=snippet&id=${videoId}&key=${activeKey}`;
+
+      const resYT = await fetch(url);
+      const json = await resYT.json();
+
+      return res.status(200).json({
+        success: true,
+        data: json.items?.[0] || { snippet: { tags: [] } }
+      });
+    }
+
+    // =========================
+    // 📊 SUMMARY MODE
+    // =========================
+    if (mode === "summary") {
+
+      const searchRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(keyword)}&key=${activeKey}`
+      );
+
+      const searchJson = await searchRes.json();
+      const channelId = searchJson.items?.[0]?.id?.channelId;
+
+      if (!channelId) {
+        return res.status(200).json({
+          success: false,
+          error: "channel_not_found"
+        });
+      }
+
+      const channelRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${activeKey}`
+      );
+
+      const stats = (await channelRes.json())?.items?.[0]?.statistics;
+
+      return res.status(200).json({
+        success: true,
+        channelId,
+        totalViews: Number(stats?.viewCount || 0),
+        totalVideos: Number(stats?.videoCount || 0),
+        subscribers: Number(stats?.subscriberCount || 0)
+      });
+    }
+
+    // =========================
+    // 📈 MÉTRICAS SEO
+    // =========================
+    items.sort((a, b) =>
+      Number(b.statistics.viewCount || 0) -
+      Number(a.statistics.viewCount || 0)
+    );
+
+    const totalViews = items.reduce((acc, v) =>
+      acc + Number(v.statistics?.viewCount || 0), 0
+    );
+
+    const avgViews = totalViews / items.length;
+
+    const top = Number(items[0]?.statistics?.viewCount || 0);
+    const median = Number(items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0);
+
+    const volume = Math.min(100,
+      Math.round(
+        (Math.log10(top + 1) * 10) +
+        (Math.log10(median + 1) * 5)
+      )
+    );
+
+    const dominance = top / (median || 1);
+    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
+// =========================
+// 🏷️ REAL TAG ENGINE
+// =========================
+// =========================
+// 🧠 UNIVERSAL SEO ENGINE
+// =========================
+
+// mapa final
+const tagMap = new Map();
+
+// =====================================
+// LIMPA TEXTO
+// =====================================
+
+function normalizeText(text = ""){
+
+  return text
+
+    .toLowerCase()
+
+    .normalize("NFD")
+
+    .replace(/[\u0300-\u036f]/g, "")
+
+    .replace(/[^\w\s-]/g, " ")
+
+    .replace(/\s+/g, " ")
+
+    .trim();
+
+}
+
+// =====================================
+// TOKENIZA
+// =====================================
+
+function tokenize(text = ""){
+
+  return normalizeText(text)
+
+    .split(" ")
+
+    .filter(word =>
+
+      word.length >= 3
+
+    );
+
+}
+
+// =====================================
+// EXTRAI TAGS DO TÍTULO
+// =====================================
+
+function extractTitleTags(title = ""){
+
+  const words = tokenize(title);
+
+  const tags = new Set();
+
+  // =================================
+  // PALAVRAS
+  // =================================
+
+  words.forEach(word => {
+
+    tags.add(word);
+
+  });
+
+  // =================================
+  // BIGRAMAS
+  // =================================
+
+  for(let i=0;i<words.length-1;i++){
+
+    tags.add(
+
+      words[i] +
+      " " +
+      words[i+1]
+
+    );
+
+  }
+
+  // =================================
+  // TRIGRAMAS
+  // =================================
+
+  for(let i=0;i<words.length-2;i++){
+
+    tags.add(
+
+      words[i] +
+      " " +
+      words[i+1] +
+      " " +
+      words[i+2]
+
+    );
+
+  }
+
+  // =================================
+  // FRASE COMPLETA
+  // =================================
+
+  if(words.length >= 4){
+
+    tags.add(
+
+      words.join(" ")
+
+    );
+
+  }
+
+  return [...tags];
+
+}
+
+// =====================================
+// TAGS DO TÍTULO
+// =====================================
+
+const titleTags =
+  extractTitleTags(keyword);
+
+// adiciona peso forte
+titleTags.forEach(tag => {
+
+  tagMap.set(
+
+    tag,
+
+    (tagMap.get(tag) || 0)
+
+    + 20
+
+  );
+
+});
+
+// =====================================
+// API YOUTUBE COMPLEMENTAR
+// =====================================
+
+items
+
+  .sort((a,b)=>
+
+    Number(b.statistics?.viewCount || 0)
+
+    -
+
+    Number(a.statistics?.viewCount || 0)
+
+  )
+
+  .slice(0,30)
+
+  .forEach(video => {
+
+    const tags =
+      video?.snippet?.tags || [];
+
+    tags.forEach(tag => {
+
+      const normalized =
+        normalizeText(tag);
+
+      // tamanho
+      if(
+        !normalized
+        ||
+        normalized.length < 3
+        ||
+        normalized.length > 80
+      ){
+        return;
+      }
+
+    
+// =====================================
+// RELEVÂNCIA FLEXÍVEL
+// =====================================
+
+const relevance =
+
+  titleTags.some(titleTag => {
+
+    const words =
+      titleTag.split(" ");
+
+    return words.some(word =>
+
+      normalized.includes(word)
+
+    );
+
+  });
+
+// =====================================
+// TAG MAIS AMPLA
+// =====================================
+
+if(!relevance){
+
+  tagMap.set(
+
+    normalized,
+
+    (tagMap.get(normalized) || 0)
+
+    + 1
+
+  );
+
+  return;
+}
+
+// views
+const views =
+  Number(
+    video.statistics?.viewCount || 0
+  );
+
+      
+
+      // peso
+      const weight =
+
+        Math.max(
+          1,
+          Math.log10(views + 1)
+        );
+
+      tagMap.set(
+
+        normalized,
+
+        (tagMap.get(normalized) || 0)
+
+        +
+
+        weight
+
+      );
+
+    });
+
+  });
+
+// =====================================
+// ORDENA
+// =====================================
+
+const rankedTags =
+
+  [...tagMap.entries()]
+
+    .sort((a,b)=>
+
+      b[1] - a[1]
+
+    )
+
+    .slice(0,100)
+
+    .map(([keyword,score]) => ({
+
+      keyword,
+
+      score: Math.min(
+
+        99,
+
+        Math.round(
+          60 + (score * 2)
+        )
+
+      )
+
+    }));
+
+
+// =========================
+// 📦 RESPONSE
+// =========================
+
+const responseData = {
+
+  success: true,
+
+  items,
+
+  volume,
+
+  competition,
+
+  tags: rankedTags
+
+};
+
+// =========================
+// 💾 CACHE SAVE
+// =========================
+
+if (cacheKey) {
+
+  global.tubexSeoCache[cacheKey] = {
+
+    data: responseData,
+
+    expires:
+      Date.now() +
+      (5 * 60 * 1000)
+
+  };
+
+}
+
+return res
+  .status(200)
+  .json(responseData);
+
+  } catch (e) {
+
+    console.error("💥 ERROR:", e);
+
+    return res.status(500).json({
+      success: false,
+      error: "internal_error"
+    });
+  }
+}

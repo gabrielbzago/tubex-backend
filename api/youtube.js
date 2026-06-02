@@ -79,7 +79,10 @@ export default async function handler(req, res) {
     // =========================
     // 🔁 MULTI KEY FETCH
     // =========================
-    for (const key of keys.sort(() => 0.5 - Math.random())) {
+    const shuffledKeys = [...keys]
+  .sort(() => Math.random() - 0.5);
+
+for (const key of shuffledKeys) { {
 
       try {
 
@@ -95,7 +98,7 @@ export default async function handler(req, res) {
 
           const searchUrl =
             `https://www.googleapis.com/youtube/v3/search` +
-            `?part=snippet&type=video&maxResults=50` +
+            `?part=snippet&type=video&order=relevance&maxResults=25` +
             `&q=${encodeURIComponent(keyword)}` +
             `&pageToken=${nextPageToken}` +
             `&key=${key}`;
@@ -139,8 +142,59 @@ export default async function handler(req, res) {
           const jsonVideos = await resVideos.json();
 
           if (Array.isArray(jsonVideos.items)) {
-            items.push(...jsonVideos.items);
-          }
+
+  // =====================================
+  // 🧹 FILTRO REAL SERP
+  // =====================================
+
+  const filtered = jsonVideos.items.filter(v => {
+
+    const title =
+      String(
+        v?.snippet?.title || ""
+      ).toLowerCase();
+
+    const views =
+      Number(
+        v?.statistics?.viewCount || 0
+      );
+
+    // remove shorts
+    if(
+      title.includes("#shorts")
+    ){
+      return false;
+    }
+
+    // remove vídeos mortos
+    const published =
+      new Date(
+        v?.snippet?.publishedAt
+      ).getTime();
+
+    const ageDays =
+
+      (
+        Date.now() - published
+      )
+
+      / (1000 * 60 * 60 * 24);
+
+    if(
+      ageDays > 900
+      &&
+      views < 5000
+    ){
+      return false;
+    }
+
+    return true;
+
+  });
+
+  items.push(...filtered);
+
+}
         }
 
         if (items.length) {
@@ -219,32 +273,364 @@ export default async function handler(req, res) {
       });
     }
 
+
     // =========================
-    // 📈 MÉTRICAS SEO
-    // =========================
-    items.sort((a, b) =>
-      Number(b.statistics.viewCount || 0) -
-      Number(a.statistics.viewCount || 0)
+// 🚀 REAL MARKET ENGINE
+// =========================
+
+items.sort((a,b)=>
+
+  Number(
+    b.statistics?.viewCount || 0
+  )
+
+  -
+
+  Number(
+    a.statistics?.viewCount || 0
+  )
+
+);
+
+const stats = items.map(v => ({
+
+  views:
+    Number(v.statistics?.viewCount || 0),
+
+  likes:
+    Number(v.statistics?.likeCount || 0),
+
+  comments:
+    Number(v.statistics?.commentCount || 0),
+
+  publishedAt:
+    v.snippet?.publishedAt || ""
+
+}))
+.filter(v => v.views > 0);
+
+const views =
+  stats
+    .map(v => v.views)
+    .sort((a,b)=>b-a);
+
+const top =
+  views[0] || 1;
+
+const top3avg =
+
+  (
+    (views[0] || 0)
+
+    +
+
+    (views[1] || 0)
+
+    +
+
+    (views[2] || 0)
+
+  )
+
+  / 3;
+
+const median =
+  views[
+    Math.floor(
+      views.length / 2
+    )
+  ] || 1;
+
+const low =
+  views[
+    views.length - 1
+  ] || 1;
+
+const avgViews =
+
+  views.reduce(
+    (a,b)=>a+b,
+    0
+  )
+
+  / Math.max(
+    views.length,
+    1
+  );
+
+// =========================
+// 📈 VOLUME REAL
+// =========================
+
+const safeLog =
+  n => Math.log10(n + 1);
+
+let volume =
+
+  (
+
+    safeLog(top3avg) * 0.45
+
+  )
+
+  +
+
+  (
+
+    safeLog(median) * 0.35
+
+  )
+
+  +
+
+  (
+
+    safeLog(avgViews) * 0.20
+
+  );
+
+volume *= 10.2;
+
+// =========================
+// 🔥 TREND
+// =========================
+
+const now = Date.now();
+
+const recentVideos =
+  stats.filter(v => {
+
+    const published =
+      new Date(
+        v.publishedAt
+      ).getTime();
+
+    return (
+      now - published
+    ) <= (
+      45 * 24 * 60 * 60 * 1000
     );
 
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
+  });
 
-    const avgViews = totalViews / items.length;
+const recentRatio =
+  recentVideos.length
+  / Math.max(stats.length,1);
 
-    const top = Number(items[0]?.statistics?.viewCount || 0);
-    const median = Number(items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0);
+if(recentRatio > 0.5){
 
-    const volume = Math.min(100,
-      Math.round(
-        (Math.log10(top + 1) * 10) +
-        (Math.log10(median + 1) * 5)
-      )
-    );
+  volume += 8;
 
-    const dominance = top / (median || 1);
-    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
+}else if(recentRatio > 0.3){
+
+  volume += 4;
+
+}
+
+// =========================
+// ⚔️ DOMINÂNCIA
+// =========================
+
+const dominance =
+  top / median;
+
+// =========================
+// 🔥 DISTRIBUIÇÃO
+// =========================
+
+const spread =
+  median / top;
+
+// =========================
+// 🔥 WEAK VIDEOS
+// =========================
+
+const weakVideos =
+  views.filter(v =>
+
+    v < 100000
+
+  ).length;
+
+// =========================
+// 💥 ENGAJAMENTO
+// =========================
+
+let engagement = 0;
+
+stats.forEach(v => {
+
+  engagement +=
+
+    (
+
+      v.likes +
+
+      (v.comments * 2)
+
+    )
+
+    / (v.views + 1);
+
+});
+
+engagement =
+  engagement / stats.length;
+
+// =========================
+// 🧠 QUERY SIZE
+// =========================
+
+const queryTerms =
+  keyword
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+
+// =========================
+// 🧠 MARKET ACCESSIBILITY
+// 100 = FÁCIL
+// =========================
+
+let competition = 58;
+
+// =========================
+// 🚫 DOMINÂNCIA
+// =========================
+
+if(dominance > 20){
+
+  competition -= 28;
+
+}else if(dominance > 12){
+
+  competition -= 18;
+
+}else if(dominance > 6){
+
+  competition -= 10;
+
+}else if(dominance > 3){
+
+  competition -= 4;
+
+}
+
+// =========================
+// 🚫 TOP MUITO FORTE
+// =========================
+
+if(top3avg > 10000000){
+
+  competition -= 20;
+
+}else if(top3avg > 3000000){
+
+  competition -= 14;
+
+}else if(top3avg > 1000000){
+
+  competition -= 8;
+
+}else if(top3avg > 300000){
+
+  competition -= 3;
+
+}
+
+// =========================
+// 🔥 DISTRIBUIÇÃO
+// =========================
+
+competition +=
+  spread * 18;
+
+// =========================
+// 🔥 ENTRY ACCESS
+// =========================
+
+competition +=
+  (low / top) * 30;
+
+// =========================
+// 🔥 VÍDEOS FRACOS
+// =========================
+
+if(weakVideos >= 5){
+
+  competition += 12;
+
+}else if(weakVideos >= 3){
+
+  competition += 6;
+
+}
+
+// =========================
+// 🚫 ENGAJAMENTO ALTO
+// =========================
+
+if(engagement > 0.15){
+
+  competition -= 10;
+
+}else if(engagement > 0.08){
+
+  competition -= 5;
+
+}
+
+// =========================
+// 🔥 LONG TAIL SUAVE
+// =========================
+
+if(queryTerms >= 6){
+
+  competition += 5;
+
+}else if(queryTerms >= 4){
+
+  competition += 2;
+
+}
+
+// =========================
+// 🚫 SATURAÇÃO
+// =========================
+
+if(avgViews > 1000000){
+
+  competition -= 8;
+
+}else if(avgViews > 300000){
+
+  competition -= 4;
+
+}
+
+// =========================
+// 🔒 CLAMP FINAL
+// =========================
+
+volume = Math.round(
+
+  Math.max(
+    5,
+    Math.min(100, volume)
+  )
+
+);
+
+competition = Math.round(
+
+  Math.max(
+    5,
+    Math.min(100, competition)
+  )
+
+);
+
 // =========================
 // 🏷️ REAL TAG ENGINE
 // =========================
@@ -405,7 +791,7 @@ items
 
   )
 
-  .slice(0,30)
+  .slice(0,20)
 
   .forEach(video => {
 
@@ -442,44 +828,45 @@ const relevance =
 
     return words.some(word =>
 
-      normalized.includes(word)
+  titleWordsSet.has(word)
 
-    );
+);
 
   });
 
-
 // =====================================
-// FILTRO MAIS FLEXÍVEL
+// TAG MAIS AMPLA
 // =====================================
 
-// remove somente lixo extremo
+if(!relevance){
 
-if(
+  tagMap.set(
 
-  normalized.length < 3
+    normalized,
 
-  ||
+    (tagMap.get(normalized) || 0)
 
-  normalized.length > 80
+    + 1
 
-){
+  );
+
   return;
 }
 
+// views
+const videoViews =
+  Number(
+    video.statistics?.viewCount || 0
+  );
 
-      // views
-      const views =
-        Number(
-          video.statistics?.viewCount || 0
-        );
+      
 
       // peso
       const weight =
 
         Math.max(
           1,
-          Math.log10(views + 1)
+          Math.log10(videoViews + 1)
         );
 
       tagMap.set(
@@ -561,7 +948,7 @@ if (cacheKey) {
 
     expires:
       Date.now() +
-      (5 * 60 * 1000)
+      (15 * 60 * 1000)
 
   };
 

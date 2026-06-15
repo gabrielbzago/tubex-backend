@@ -96,7 +96,12 @@ const userKey = userId !== "guest" ? userId : ip;
 // ======================================================
 // 🔒 VALIDAÇÃO PROMPT
 // ======================================================
-if (!prompt && tipo !== "diagnosis" && tipo !== "strategy") {
+if (
+  !prompt &&
+  tipo !== "diagnosis" &&
+  tipo !== "strategy" &&
+  tipo !== "niche"
+) {
   return res.status(400).json({
     success: false,
     error: "prompt obrigatório",
@@ -535,6 +540,65 @@ Máximo 750 palavras
 
 }
 
+else if (tipo === "niche") {
+
+  finalPrompt = `
+Você é especialista em classificação de canais do YouTube.
+
+Analise os vídeos abaixo.
+
+${videoSummary}
+
+Determine o nicho principal do canal com base no conjunto dos vídeos.
+
+IMPORTANTE:
+
+- Considere os vídeos mais visualizados como mais relevantes.
+- Não classifique como Tecnologia apenas porque existe IA, aplicativo ou celular no título.
+- Não classifique como Games apenas porque um jogo aparece em um vídeo isolado.
+- Procure o tema dominante do canal.
+- Se o canal falar de filmes, séries, personagens, quadrinhos, Marvel, DC, Disney ou cultura geek, classifique como Cultura Pop.
+- Se o canal for focado em animais, pets, aves ou criação animal, classifique como Animais.
+
+Categorias possíveis:
+
+- YouTube
+- Games
+- Anime
+- Cultura Pop
+- Filmes e Séries
+- Tecnologia
+- Educação
+- Finanças
+- Música
+- Humor
+- Notícias
+- Esportes
+- Automóveis
+- Animais
+- Saúde
+- Lifestyle
+- Conteúdo Infantil
+- Outro
+
+REGRAS:
+
+- Escolha apenas UM nicho.
+- Baseie-se exclusivamente nos títulos.
+- Não invente informações.
+- Retorne SOMENTE JSON.
+
+Formato:
+
+{
+  "niche": "",
+  "confidence": 0,
+  "reason": ""
+}
+`;
+
+}
+
 // ======================================================
 // ❌ INVALID TYPE
 // ======================================================
@@ -581,8 +645,8 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
+  niche: 24,
   ideas: 24,
-  descricao: 6
 };
 
 const ttl = (TTL[tipo] || 6) * 60 * 60 * 1000;
@@ -590,12 +654,47 @@ const ttl = (TTL[tipo] || 6) * 60 * 60 * 1000;
 // ======================================================
 // ⚡ CACHE HIT
 // ======================================================
-if (cached && Date.now() - cached.timestamp < ttl) {
+if (
+  cached &&
+  Date.now() - cached.timestamp < ttl
+) {
+
+  if (tipo === "niche") {
+
+    return res.status(200).json({
+
+      success: true,
+
+      niche:
+        cached.text?.niche ||
+
+        "Outro",
+
+      confidence:
+        cached.text?.confidence ||
+
+        0,
+
+      reason:
+        cached.text?.reason ||
+
+        ""
+
+    });
+
+  }
+
   return res.status(200).json({
+
     success: true,
+
     tipo,
-    text: cached.text
+
+    text:
+      cached.text
+
   });
+
 }
 
 // ======================================================
@@ -606,6 +705,7 @@ let temp = 0.5;
 if (tipo === "ideas") temp = 0.8;
 if (tipo === "descricao") temp = 0.5;
 if (tipo === "strategy") temp = 0.55;
+if (tipo === "niche") temp = 0.3;
 
     // ======================================================
     // 🤖 OPENAI
@@ -661,6 +761,65 @@ if (!text) {
     error:"empty_response",
     text:""
   });
+}
+
+// ======================================================
+// 🧠 NICHE JSON PARSER
+// ======================================================
+
+if (tipo === "niche") {
+
+  try {
+
+    const parsed =
+      JSON.parse(text);
+
+    global.__tubexCache.set(
+      cacheKey,
+      {
+        text: parsed,
+        timestamp: Date.now()
+      }
+    );
+
+    return res.status(200).json({
+
+      success: true,
+
+      niche:
+        parsed.niche || "Outro",
+
+      confidence:
+        parsed.confidence || 0,
+
+      reason:
+        parsed.reason || ""
+
+    });
+
+  } catch (e) {
+
+    console.error(
+      "💥 NICHE JSON:",
+      e
+    );
+
+    return res.status(200).json({
+
+      success: true,
+
+      niche:
+        "Conteúdo Geral",
+
+      confidence: 0,
+
+      reason:
+        "Falha ao interpretar resposta"
+
+    });
+
+  }
+
 }
 
 // 💾 salvar só se válido

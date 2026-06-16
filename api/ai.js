@@ -543,8 +543,6 @@ Máximo 750 palavras
 
 }
 
-
-
 else if (tipo === "niche") {
 
   finalPrompt = `
@@ -903,6 +901,11 @@ max_tokens:
     }
 
     const data = await response.json();
+console.log("================================");
+console.log("OPENAI JSON COMPLETO");
+console.dir(data,{depth:null});
+console.log("================================");
+
    const text = data?.choices?.[0]?.message?.content?.trim();
 console.log("================================");
 console.log("🤖 OPENAI RESPONSE");
@@ -990,22 +993,20 @@ catch(err){
       }
     );
 
-    return res.status(200).json({
+return res.status(200).json({
 
-      success: true,
+    success:true,
 
-   niche:
-    cached.text?.niche ||
+    niche:
+        parsed.niche,
 
-    "Conteúdo Geral",
+    confidence:
+        parsed.confidence,
 
-      confidence:
-        parsed.confidence || 0,
+    reason:
+        parsed.reason
 
-      reason:
-        parsed.reason || ""
-
-    });
+});
 
   } catch (e) {
 

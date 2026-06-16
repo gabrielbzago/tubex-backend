@@ -771,8 +771,29 @@ if (tipo === "niche") {
 
   try {
 
-    const parsed =
-      JSON.parse(text);
+let clean = text.trim();
+
+// remove markdown
+clean = clean.replace(/^```json/i, "");
+clean = clean.replace(/^```/i, "");
+clean = clean.replace(/```$/i, "");
+clean = clean.trim();
+
+// tenta localizar o primeiro JSON
+const start = clean.indexOf("{");
+const end = clean.lastIndexOf("}");
+
+if (start >= 0 && end > start) {
+    clean = clean.substring(start, end + 1);
+}
+
+console.log("========== GPT RAW ==========");
+console.log(text);
+
+console.log("========== GPT CLEAN ==========");
+console.log(clean);
+
+const parsed = JSON.parse(clean);
 
     global.__tubexCache.set(
       cacheKey,
@@ -799,26 +820,28 @@ if (tipo === "niche") {
 
   } catch (e) {
 
-    console.error(
-      "💥 NICHE JSON:",
-      e
-    );
+    console.error("💥 JSON ERROR");
+    console.error(e);
+
+    console.log("===== GPT ORIGINAL =====");
+    console.log(text);
+
+    console.log("===== GPT LIMPO =====");
+    console.log(clean);
 
     return res.status(200).json({
 
-      success: true,
+      success:false,
 
-      niche:
-        "Conteúdo Geral",
+      error:"json_parse",
 
-      confidence: 0,
+      raw:text,
 
-      reason:
-        "Falha ao interpretar resposta"
+      clean
 
     });
 
-  }
+}
 
 }
 

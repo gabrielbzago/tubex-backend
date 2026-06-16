@@ -543,6 +543,11 @@ Máximo 750 palavras
 
 }
 
+console.log("================================");
+console.log("OPENAI JSON COMPLETO");
+console.dir(data, { depth: null });
+console.log("================================");
+
 else if (tipo === "niche") {
 
   finalPrompt = `

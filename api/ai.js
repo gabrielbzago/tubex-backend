@@ -170,12 +170,9 @@ global.__rateLimit[userKey].push(now);
 
     const uploads7 = last7.length;
 
-   const videoSummary = parsedVideos
-  .slice(0, 20)
-  .map(v =>
-    `- ${v.title} (${v.views} views)`
-  )
-  .join("\n");
+    const videoSummary = parsedVideos.slice(0,10).map(v =>
+      `- ${v.title} (${v.views} views)`
+    ).join("\n");
 
     // ======================================================
     // 🧠 PROMPTS (INALTERADO)
@@ -546,169 +543,52 @@ Máximo 750 palavras
 else if (tipo === "niche") {
 
   finalPrompt = `
-Você é um especialista em análise semântica e classificação de canais do YouTube.
+Você é especialista em classificação de canais do YouTube.
 
-Sua tarefa é identificar o nicho principal de um canal analisando os títulos dos vídeos abaixo.
-
-Vídeos:
+Analise os vídeos abaixo.
 
 ${videoSummary}
 
-REGRAS DE ANÁLISE:
-
-- Analise TODOS os vídeos em conjunto.
-- Dê maior peso aos vídeos com mais visualizações.
-- Procure o tema dominante do canal.
-- Ignore vídeos isolados que estejam fora do padrão.
-- Nunca classifique o canal baseado em apenas um vídeo.
-- Quanto maior a repetição de um assunto, maior deve ser sua influência.
-- Utilize somente as informações presentes nos títulos enviados.
-- Não invente informações.
+Determine o nicho principal do canal com base no conjunto dos vídeos.
 
 IMPORTANTE:
 
-O nicho NÃO precisa pertencer a uma lista pré-definida.
+- Considere os vídeos mais visualizados como mais relevantes.
+- Não classifique como Tecnologia apenas porque existe IA, aplicativo ou celular no título.
+- Não classifique como Games apenas porque um jogo aparece em um vídeo isolado.
+- Procure o tema dominante do canal.
+- Se o canal falar de filmes, séries, personagens, quadrinhos, Marvel, DC, Disney ou cultura geek, classifique como Cultura Pop.
+- Se o canal for focado em animais, pets, aves ou criação animal, classifique como Animais.
 
-Retorne o nicho mais específico que ainda seja compreensível para qualquer pessoa.
-Nunca retorne o nome de um canal.
-Nunca retorne o nome de uma pessoa.
-Nunca retorne o nome de uma marca.
-Nunca retorne um produto específico.
-Sempre retorne uma categoria temática.
+Categorias possíveis:
 
-Exemplos válidos:
+- YouTube
+- Games
+- Anime
+- Cultura Pop
+- Filmes e Séries
+- Tecnologia
+- Educação
+- Finanças
+- Música
+- Humor
+- Notícias
+- Esportes
+- Automóveis
+- Animais
+- Saúde
+- Lifestyle
+- Conteúdo Infantil
+- Outro
 
-Games
-Games Mobile
-FPS
-Criação de Aves
-Animais
-Programação
-Desenvolvimento Web
-Finanças
-Criptomoedas
-Automóveis
-Música
-Culinária
-Fitness
-Saúde
-História
-Astronomia
-Marketing
-Inteligência Artificial
+REGRAS:
 
-Evite nichos excessivamente específicos como nomes de canais, marcas, pessoas ou espécies.
+- Escolha apenas UM nicho.
+- Baseie-se exclusivamente nos títulos.
+- Não invente informações.
+- Retorne SOMENTE JSON.
 
-Exemplos:
-
-Coleiros, Trinca-ferro, Canários, Papagaios
-→ Criação de Aves
-
-Cachorros, Gatos, Veterinário
-→ Animais
-
-Minecraft
-→ Games Minecraft
-
-Free Fire
-→ Games Mobile
-
-CS2
-→ FPS
-
-React
-→ Desenvolvimento Web
-
-Python
-→ Programação
-
-Photoshop
-→ Design Gráfico
-
-Bitcoin
-→ Criptomoedas
-
-Investimentos
-→ Finanças
-
-Piano
-→ Música
-
-Violão
-→ Música
-
-Receitas Fit
-→ Alimentação Saudável
-
-Receitas Italianas
-→ Culinária Italiana
-
-Cardiologia
-→ Medicina
-
-Astronomia
-→ Astronomia
-
-História da Segunda Guerra
-→ História
-
-Carros Antigos
-→ Automóveis
-
-BMW
-→ Automóveis Premium
-
-Marvel, DC, Disney, Star Wars
-→ Cultura Pop
-
-Anime Naruto
-→ Anime
-
-One Piece
-→ Anime
-
-Maquiagem
-→ Beleza
-
-Musculação
-→ Fitness
-
-CrossFit
-→ Fitness
-
-Marketing Digital
-→ Marketing
-
-Inteligência Artificial
-→ Inteligência Artificial
-
-Se existir um tema dominante, NUNCA responda "Conteúdo Geral".
-
-Somente utilize "Conteúdo Geral" quando os vídeos forem totalmente aleatórios e não houver qualquer padrão identificável.
-
-A confiança deve seguir estes critérios:
-
-100 = praticamente todos os vídeos pertencem ao mesmo nicho.
-
-90 = existe um nicho dominante muito claro.
-
-70 = existe um nicho predominante, porém com alguma variação.
-
-50 = o canal mistura diversos temas.
-
-0 = impossível identificar qualquer nicho.
-
-Retorne APENAS um JSON válido.
-
-Não utilize markdown.
-
-Não utilize \`\`\`json.
-
-Não escreva explicações.
-
-Não escreva texto antes ou depois.
-
-Formato obrigatório:
+Formato:
 
 {
   "niche": "",
@@ -718,6 +598,7 @@ Formato obrigatório:
 `;
 
 }
+
 // ======================================================
 // ❌ INVALID TYPE
 // ======================================================
@@ -738,7 +619,7 @@ if (!finalPrompt) {
 
 // 🔑 fingerprint estável dos vídeos
 const stableKey = parsedVideos
-  .slice(0, 10)
+  .slice(0, 5)
   .map(v => `${(v.title || "").slice(0, 30)}_${v.views}`)
   .sort()
   .join("|");
@@ -784,10 +665,10 @@ if (
 
       success: true,
 
-     niche:
-    cached.text?.niche ||
+      niche:
+        cached.text?.niche ||
 
-    "Conteúdo Geral",
+        "Outro",
 
       confidence:
         cached.text?.confidence ||
@@ -835,57 +716,28 @@ if (tipo === "niche") temp = 0.3;
         "Content-Type":"application/json",
         "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
       },
-    body: JSON.stringify({
+      body: JSON.stringify({
+        model:"gpt-4o-mini",
+        messages:[
+          { role:"system", content:"Você é especialista em YouTube e SEO." },
+          { role:"user", content: finalPrompt }
+        ],
+        temperature: temp,
+    max_tokens:
 
-    model:"gpt-4o-mini",
+  tipo === "strategy"
+    ? 1800
 
-    response_format:{
-        type:"json_object"
-    },
+  : tipo === "diagnosis"
+    ? 1600
 
-    messages:[
-        {
-            role:"system",
-            content: `
-Você é um especialista em classificação semântica de canais do YouTube.
+  : tipo === "descricao"
+    ? 1200
 
-Sua única função é identificar o nicho dominante de um canal.
+  : tipo === "ideas"
+    ? 900
 
-Sempre responda exclusivamente JSON válido.
-
-Nunca utilize markdown.
-
-Nunca utilize blocos de código.
-
-Nunca escreva texto fora do JSON.
-`
-        },
-        {
-            role:"user",
-            content:finalPrompt
-        }
-    ],
-
-  
-temperature: temp,
-
-max_tokens:
-
-    tipo === "strategy"
-        ? 1800
-
-    : tipo === "diagnosis"
-        ? 1600
-
-    : tipo === "descricao"
-        ? 1200
-
-    : tipo === "ideas"
-        ? 900
-
-    : 1000
-
-
+  : 1000
       })
     });
 
@@ -901,16 +753,7 @@ max_tokens:
     }
 
     const data = await response.json();
-console.log("================================");
-console.log("OPENAI JSON COMPLETO");
-console.dir(data,{depth:null});
-console.log("================================");
-
    const text = data?.choices?.[0]?.message?.content?.trim();
-console.log("================================");
-console.log("🤖 OPENAI RESPONSE");
-console.log(text);
-console.log("================================");
 
 if (!text) {
   return res.status(500).json({
@@ -928,62 +771,8 @@ if (tipo === "niche") {
 
   try {
 
-    let clean = String(text).trim();
-
-// remove markdown
-clean = clean.replace(/^```json/i, "");
-clean = clean.replace(/^```/i, "");
-clean = clean.replace(/```$/i, "");
-clean = clean
-  .replace(/\r/g, "")
-  .replace(/\t/g, "")
-  .trim();
-// extrai apenas o JSON
-const start = clean.indexOf("{");
-const end = clean.lastIndexOf("}");
-
-if (start !== -1 && end !== -1) {
-    clean = clean.slice(start, end + 1);
-}
-
-console.log("🧹 JSON LIMPO:");
-console.log(clean);
-
-let parsed;
-
-try {
-
-    parsed = JSON.parse(clean);
-if (
-    typeof parsed.niche !== "string" ||
-    !parsed.niche.trim()
-) {
-    throw new Error("Campo niche inválido");
-}
-
-parsed.confidence = Number(parsed.confidence || 0);
-
-if (isNaN(parsed.confidence))
-    parsed.confidence = 0;
-
-parsed.confidence = Math.max(
-    0,
-    Math.min(100, parsed.confidence)
-);
-
-parsed.reason = String(parsed.reason || "");
-parsed.niche = parsed.niche.trim();
-parsed.reason = parsed.reason.trim();
-
-}
-catch(err){
-
-    console.error("💥 JSON INVÁLIDO");
-    console.error(clean);
-
-    throw err;
-
-}
+    const parsed =
+      JSON.parse(text);
 
     global.__tubexCache.set(
       cacheKey,
@@ -993,20 +782,20 @@ catch(err){
       }
     );
 
-return res.status(200).json({
+    return res.status(200).json({
 
-    success:true,
+      success: true,
 
-    niche:
-        parsed.niche,
+      niche:
+        parsed.niche || "Outro",
 
-    confidence:
-        parsed.confidence,
+      confidence:
+        parsed.confidence || 0,
 
-    reason:
-        parsed.reason
+      reason:
+        parsed.reason || ""
 
-});
+    });
 
   } catch (e) {
 

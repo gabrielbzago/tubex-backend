@@ -915,26 +915,22 @@ if (tipo === "strategy") temp = 0.55;
 if (tipo === "niche") temp = 0.3;
 
     // ======================================================
-    // 🤖 OPENAI
-    // ======================================================
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
-      },
-    body: JSON.stringify({
+// 🤖 OPENAI
+// ======================================================
 
-    model:"gpt-4o-mini",
+// Prompt do sistema conforme o tipo
+let systemPrompt =
+`Você é um especialista em crescimento de canais do YouTube.
 
-    response_format:{
-        type:"json_object"
-    },
+Forneça respostas profissionais, objetivas e práticas.
 
-    messages:[
-        {
-            role:"system",
-            content: `
+Nunca invente dados.
+Sempre utilize as informações fornecidas pelo usuário.
+`;
+
+if (tipo === "niche") {
+
+  systemPrompt = `
 Você é um especialista em classificação semântica de canais do YouTube.
 
 Sua única função é identificar o nicho dominante de um canal.
@@ -946,45 +942,100 @@ Nunca utilize markdown.
 Nunca utilize blocos de código.
 
 Nunca escreva texto fora do JSON.
-`
-        },
+`;
+
+}
+
+if (tipo === "seo_workspace") {
+
+  systemPrompt = `
+Você é um especialista mundial em SEO para YouTube.
+
+Sua única função é analisar profundamente palavras-chave.
+
+Sempre responda exclusivamente JSON válido.
+
+Nunca utilize markdown.
+
+Nunca utilize blocos de código.
+
+Nunca escreva texto fora do JSON.
+`;
+
+}
+
+const response = await fetch(
+  "https://api.openai.com/v1/chat/completions",
+  {
+    method: "POST",
+
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+    },
+
+    body: JSON.stringify({
+
+      model: "gpt-4o-mini",
+
+      ...(tipo === "seo_workspace" || tipo === "niche"
+        ? {
+            response_format: {
+              type: "json_object"
+            }
+          }
+        : {}),
+
+      messages: [
+
         {
-            role:"user",
-            content:finalPrompt
+          role: "system",
+          content: systemPrompt
+        },
+
+        {
+          role: "user",
+          content: finalPrompt
         }
-    ],
 
-  
-temperature: temp,
+      ],
 
-max_tokens:
+      temperature: temp,
 
-tipo === "seo_workspace"
-    ? 1800
-: tipo === "strategy"
-    ? 1800
-: tipo === "diagnosis"
-    ? 1600
-: tipo === "descricao"
-    ? 1200
-: tipo === "ideas"
-    ? 900
-: 1000
+      max_tokens:
+        tipo === "seo_workspace"
+          ? 1800
+        : tipo === "strategy"
+          ? 1800
+        : tipo === "diagnosis"
+          ? 1600
+        : tipo === "descricao"
+          ? 1200
+        : tipo === "ideas"
+          ? 900
+        : tipo === "niche"
+          ? 600
+        : 1000
 
+    })
 
-      })
-    });
+  }
+);
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("💥 OPENAI:", err);
+if (!response.ok) {
 
-      return res.status(500).json({
-        success:false,
-        error:"openai_error",
-        text:""
-      });
-    }
+  const err = await response.text();
+
+  console.error("💥 OPENAI ERROR:");
+  console.error(err);
+
+  return res.status(500).json({
+    success: false,
+    error: "openai_error",
+    text: ""
+  });
+
+}
 
     const data = await response.json();
 console.log("================================");

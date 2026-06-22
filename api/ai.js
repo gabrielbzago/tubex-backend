@@ -15,31 +15,50 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // ======================================================
-  // 🔐 CLIENT (ANTI BOT)
-  // ======================================================
-  if (req.headers["x-client"] !== "tubex-extension-v1") {
-    return res.status(403).json({
-      success: false,
-      error: "invalid_client",
-      text: ""
-    });
-  }
+ // ======================================================
+// 🔐 CLIENT AUTH (EXTENSÃO + WORKSPACE)
+// ======================================================
 
-  // ======================================================
-  // 🔐 API KEY
-  // ======================================================
-  const apiKey =
-    req.headers["x-api-key"] ||
-    req.headers["authorization"]?.replace("Bearer ", "");
+const client = req.headers["x-client"] || "";
+
+const apiKey =
+  req.headers["x-api-key"] ||
+  req.headers["authorization"]?.replace("Bearer ", "") ||
+  "";
+
+// Extensão Chrome
+if (client === "tubex-extension-v1") {
 
   if (apiKey !== process.env.API_KEY) {
+
     return res.status(403).json({
       success: false,
       error: "unauthorized",
       text: ""
     });
+
   }
+
+}
+
+// Workspace Web
+else if (client === "tubex-workspace") {
+
+  // autenticação será feita pelo login do Workspace
+  // não exige API_KEY
+
+}
+
+// Cliente inválido
+else {
+
+  return res.status(403).json({
+    success: false,
+    error: "invalid_client",
+    text: ""
+  });
+
+}
 
   // ======================================================
   // 🔥 RATE LIMIT (IP)

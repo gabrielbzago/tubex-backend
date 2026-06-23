@@ -4,6 +4,35 @@
 
 export default async function handler(req, res) {
 
+ // ======================================================
+  // CORS
+  // ======================================================
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, x-client, x-api-key"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "POST, OPTIONS"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      success: false,
+      error: "method_not_allowed"
+    });
+  }
+
+  try {
+
   if (req.method !== "POST") {
     return res.status(405).json({ success: false, error: "method_not_allowed" });
   }
@@ -92,7 +121,7 @@ if (global.__tubexPending[key]) {
     // 🎯 PROMPT ENGINE
     // ======================================================
 const enhancedPrompt = `
-YouTube thumbnail, high CTR, expressive face, bold text, cinematic lighting, clean composition.
+YouTube thumbnail, high CTR, bold text, cinematic lighting, clean composition.
 
 IDEA:
 ${safePrompt}

@@ -115,18 +115,24 @@ const userKey = userId !== "guest" ? userId : ip;
 // ======================================================
 // 🔒 VALIDAÇÃO PROMPT
 // ======================================================
-if (
-  !prompt &&
-  tipo !== "diagnosis" &&
-  tipo !== "strategy" &&
-  tipo !== "niche" &&
-  tipo !== "seo_workspace"
-) {
+const requiresPrompt = [
+  "tituloSEO",
+  "tituloImpactante",
+  "tituloEmocional",
+  "descricao",
+  "ideas",
+  "seo_workspace",
+  "thumbnail_prompt"
+];
+
+if (!prompt && requiresPrompt.includes(tipo)) {
+
   return res.status(400).json({
-    success: false,
-    error: "prompt obrigatório",
-    text: ""
+    success:false,
+    error:"prompt obrigatório",
+    text:""
   });
+
 }
 
 prompt = prompt ? String(prompt).slice(0, 2000) : "";
@@ -225,6 +231,51 @@ Base:
 "${prompt}"
 `;
     }
+
+else if (tipo === "thumbnail_prompt") {
+
+finalPrompt = `
+Você é o melhor especialista do mundo em criação de prompts para IA de geração de imagens.
+
+Seu trabalho é transformar qualquer ideia em um prompt profissional para criar thumbnails extremamente chamativas para YouTube.
+
+Objetivo:
+
+Gerar imagens com CTR muito alto.
+
+Sempre inclua naturalmente:
+
+- cinematic lighting
+- dramatic shadows
+- vibrant colors
+- high contrast
+- ultra realistic
+- ultra detailed
+- expressive face (quando fizer sentido)
+- dynamic composition
+- shallow depth of field
+- professional photography
+- click-worthy
+- eye-catching
+- viral YouTube thumbnail
+- room for large title
+- 16:9 composition
+
+Nunca explique.
+
+Nunca utilize markdown.
+
+Nunca escreva listas.
+
+Nunca escreva aspas.
+
+Retorne SOMENTE o prompt em inglês.
+
+Ideia do usuário:
+
+"${prompt}"`;
+
+}
 
 else if (tipo === "ideas") {
   finalPrompt = `
@@ -852,11 +903,14 @@ const cached = global.__tubexCache.get(cacheKey);
 
 // ⏱ TTL inteligente por tipo
 const TTL = {
-  diagnosis: 6,
-  strategy: 12,
-  niche: 24,
-  ideas: 24,
-  seo_workspace: 12
+
+ diagnosis:6,
+ strategy:12,
+ niche:24,
+ ideas:24,
+ seo_workspace:12,
+ thumbnail_prompt:24
+
 };
 
 const ttl = (TTL[tipo] || 6) * 60 * 60 * 1000;
@@ -913,6 +967,7 @@ if (tipo === "ideas") temp = 0.8;
 if (tipo === "descricao") temp = 0.5;
 if (tipo === "strategy") temp = 0.55;
 if (tipo === "niche") temp = 0.3;
+if (tipo==="thumbnail_prompt") temp=0.9;
 
     // ======================================================
 // 🤖 OPENAI

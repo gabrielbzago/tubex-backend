@@ -1018,45 +1018,19 @@ Retorne SOMENTE JSON.
 Formato obrigatório:
 
 {
+  {
   "score":0,
 
-  "ctrScore":0,
-  "retentionScore":0,
-  "growthScore":0,
+  "ctr":0,
+  "retention":0,
+  "views30Days":0,
+  "subscribersGained":0,
 
-  "strengths":[
-    "",
-    "",
-    ""
-  ],
-
-  "weaknesses":[
-    "",
-    "",
-    ""
-  ],
-
-  "opportunities":[
-    "",
-    "",
-    ""
-  ],
-
-  "nextVideos":[
-    "",
-    "",
-    "",
-    "",
-    ""
-  ],
-
-  "recommendations":[
-    "",
-    "",
-    "",
-    "",
-    ""
-  ]
+  "strengths":[],
+  "weaknesses":[],
+  "opportunities":[],
+  "nextVideos":[],
+  "recommendations":[]
 }
 
 Nunca use markdown.
@@ -1154,6 +1128,15 @@ if (cached && (Date.now() - cached.timestamp) < ttl) {
   }
 
 if (tipo === "viral_content") {
+
+  return res.status(200).json({
+    success:true,
+    ...(cached.text || {})
+  });
+
+}
+
+if (tipo === "channel_analysis") {
 
   return res.status(200).json({
     success:true,

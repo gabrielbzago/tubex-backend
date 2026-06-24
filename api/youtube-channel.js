@@ -9,6 +9,16 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
 
+console.log(
+  "HEADER KEY:",
+  req.headers["x-api-key"]
+);
+
+console.log(
+  "ENV KEY:",
+  process.env.API_KEY
+);
+
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
     return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
   }

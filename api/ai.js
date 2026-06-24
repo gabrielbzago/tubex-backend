@@ -1447,6 +1447,16 @@ if (tipo === "channel_analysis") {
 
     const parsed = JSON.parse(text);
 
+    parsed.subscribers =
+      Number(
+        context.subscribers || 0
+      );
+
+    parsed.views30Days =
+      Number(
+        context.views30 || 0
+      );
+
     global.__tubexCache.set(cacheKey,{
       text: parsed,
       timestamp: Date.now()
@@ -1458,7 +1468,6 @@ if (tipo === "channel_analysis") {
     });
 
   } catch(err){
-
     console.error(err);
 
     return res.status(500).json({

@@ -823,6 +823,23 @@ Palavra-chave:
 
 Retorne SOMENTE JSON.
 
+IMPORTANTE PARA O CAMPO "description":
+
+- mínimo de 1500 caracteres
+- começar repetindo EXATAMENTE o valor de optimizedTitle
+- otimizada para SEO do YouTube
+- otimizada para SEO do Google
+- utilizar naturalmente a palavra-chave principal diversas vezes
+- utilizar palavras relacionadas
+- utilizar palavras long tail
+- criar vários parágrafos
+- incluir contexto aprofundado sobre o tema
+- incluir dúvidas comuns dos usuários
+- incluir benefícios do conteúdo
+- finalizar com CTA para inscrição
+
+A descrição deve ser significativamente mais completa que uma descrição comum de YouTube.
+
 Formato:
 
 {

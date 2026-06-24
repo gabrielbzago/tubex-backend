@@ -220,12 +220,28 @@ Base:
 
     else if (tipo === "descricao") {
       finalPrompt = `
-Crie uma descrição otimizada para YouTube.
+Crie uma descrição extremamente otimizada para SEO do YouTube.
 
-Inclua:
-- introdução forte
-- SEO natural
-- CTA leve
+REGRAS OBRIGATÓRIAS:
+
+- mínimo de 1500 caracteres
+- máximo de 3500 caracteres
+- começar repetindo EXATAMENTE o título otimizado
+- repetir naturalmente a palavra-chave principal diversas vezes ao longo do texto
+- incluir palavras-chave relacionadas
+- incluir palavras-chave long tail
+- escrever para ranqueamento na busca do YouTube
+- escrever para ranqueamento no Google
+- linguagem natural
+- evitar keyword stuffing
+- criar vários parágrafos
+- explicar o tema em profundidade
+- incluir benefícios do conteúdo
+- incluir dúvidas comuns dos usuários
+- incluir variações da keyword principal
+- finalizar com CTA para inscrição
+
+A descrição deve ser muito mais completa do que descrições normais de YouTube.
 
 Base:
 "${prompt}"

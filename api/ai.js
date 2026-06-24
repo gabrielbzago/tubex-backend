@@ -127,7 +127,11 @@ const requiresPrompt = [
   "channel_analysis"
 ];
 
-if (!prompt && requiresPrompt.includes(tipo)) {
+if (
+  !prompt &&
+  tipo !== "channel_analysis" &&
+  requiresPrompt.includes(tipo)
+) {
 
   return res.status(400).json({
     success:false,
@@ -1005,37 +1009,68 @@ Nunca escreva texto fora do JSON.
 else if (tipo === "channel_analysis") {
 
 finalPrompt = `
-Você é um consultor sênior de crescimento no YouTube.
+Você é um analista profissional de canais do YouTube.
 
-Analise os dados enviados.
+Analise SOMENTE os dados abaixo.
 
-Tema:
+DADOS DO CANAL
 
-"${prompt}"
+Canal:
+${context.title || ""}
+
+Inscritos:
+${context.subscribers || 0}
+
+Views Totais:
+${context.views || 0}
+
+Vídeos:
+${context.videoCount || 0}
+
+Últimos vídeos:
+
+${videoSummary}
+
+REGRAS:
+
+- NÃO invente dados
+- NÃO use valores fictícios
+- Baseie tudo nos números recebidos
+- Analise títulos
+- Analise frequência
+- Analise padrão de views
 
 Retorne SOMENTE JSON.
 
-Formato obrigatório:
-
 {
-  {
   "score":0,
-
   "ctr":0,
   "retention":0,
   "views30Days":0,
   "subscribersGained":0,
 
-  "strengths":[],
-  "weaknesses":[],
-  "opportunities":[],
-  "nextVideos":[],
-  "recommendations":[]
-}
+  "strengths":[
+    ""
+  ],
 
-Nunca use markdown.
-Nunca escreva texto fora do JSON.
+  "weaknesses":[
+    ""
+  ],
+
+  "opportunities":[
+    ""
+  ],
+
+  "nextVideos":[
+    ""
+  ],
+
+  "recommendations":[
+    ""
+  ]
+}
 `;
+
 }
 
 // ======================================================
@@ -1136,14 +1171,7 @@ if (tipo === "viral_content") {
 
 }
 
-if (tipo === "channel_analysis") {
 
-  return res.status(200).json({
-    success:true,
-    ...(cached.text || {})
-  });
-
-}
 
   // ==========================================
   // DEMAIS TIPOS

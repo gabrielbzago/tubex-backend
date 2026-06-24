@@ -122,6 +122,7 @@ const requiresPrompt = [
   "descricao",
   "ideas",
   "seo_workspace",
+"viral_content",
   "thumbnail_prompt"
 ];
 
@@ -928,6 +929,78 @@ Somente JSON.
 
 }
 
+else if (tipo === "viral_content") {
+
+finalPrompt = `
+Você é um especialista mundial em viralização de conteúdo.
+
+Sua missão é gerar conteúdo com máximo potencial de:
+
+- CTR
+- Curiosidade
+- Emoção
+- Compartilhamento
+- Retenção
+
+Tema:
+
+"${prompt}"
+
+Retorne SOMENTE JSON.
+
+Formato obrigatório:
+
+{
+  "viralScore":0,
+  "emotionScore":0,
+  "curiosityScore":0,
+  "shareScore":0,
+
+  "viralTitle":"",
+
+  "viralTitles":[
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+
+  "thumbnailIdeas":[
+    "",
+    "",
+    "",
+    ""
+  ],
+
+  "viralAngles":[
+    "",
+    "",
+    "",
+    ""
+  ],
+
+  "audienceTriggers":[
+    "",
+    "",
+    "",
+    ""
+  ],
+
+  "recommendations":[
+    "",
+    "",
+    "",
+    ""
+  ]
+}
+
+Nunca use markdown.
+Nunca escreva texto fora do JSON.
+`;
+
+}
+
 // ======================================================
 // ❌ INVALID TYPE
 // ======================================================
@@ -978,7 +1051,8 @@ const TTL = {
  niche:24,
  ideas:24,
  seo_workspace:12,
- thumbnail_prompt:24
+ thumbnail_prompt:24,
+ viral_content:24
 
 };
 
@@ -1015,6 +1089,15 @@ if (cached && (Date.now() - cached.timestamp) < ttl) {
 
   }
 
+if (tipo === "viral_content") {
+
+  return res.status(200).json({
+    success:true,
+    ...(cached.text || {})
+  });
+
+}
+
   // ==========================================
   // DEMAIS TIPOS
   // ==========================================
@@ -1037,6 +1120,8 @@ if (tipo === "descricao") temp = 0.5;
 if (tipo === "strategy") temp = 0.55;
 if (tipo === "niche") temp = 0.3;
 if (tipo==="thumbnail_prompt") temp=0.9;
+if (tipo==="viral_content")
+ temp=0.95;
 
     // ======================================================
 // 🤖 OPENAI
@@ -1102,7 +1187,9 @@ const response = await fetch(
 
       model: "gpt-4o-mini",
 
-      ...(tipo === "seo_workspace" || tipo === "niche"
+      ...(tipo === "seo_workspace" ||
+   tipo === "niche" ||
+   tipo === "viral_content"
         ? {
             response_format: {
               type: "json_object"
@@ -1129,6 +1216,8 @@ const response = await fetch(
       max_tokens:
         tipo === "seo_workspace"
           ? 3000
+: tipo === "viral_content"
+    ? 2200
         : tipo === "strategy"
           ? 1800
         : tipo === "diagnosis"
@@ -1206,6 +1295,35 @@ if (tipo === "seo_workspace") {
     return res.status(500).json({
       success: false,
       error: "invalid_json"
+    });
+
+  }
+
+}
+
+if (tipo === "viral_content") {
+
+  try {
+
+    const parsed = JSON.parse(text);
+
+    global.__tubexCache.set(cacheKey,{
+      text: parsed,
+      timestamp: Date.now()
+    });
+
+    return res.status(200).json({
+      success:true,
+      ...parsed
+    });
+
+  } catch(err){
+
+    console.error(err);
+
+    return res.status(500).json({
+      success:false,
+      error:"invalid_json"
     });
 
   }

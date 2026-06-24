@@ -1128,7 +1128,7 @@ const response = await fetch(
 
       max_tokens:
         tipo === "seo_workspace"
-          ? 1800
+          ? 3000
         : tipo === "strategy"
           ? 1800
         : tipo === "diagnosis"

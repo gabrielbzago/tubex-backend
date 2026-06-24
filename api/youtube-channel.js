@@ -7,6 +7,16 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key, authorization");
 
+console.log(
+  "HEADER:",
+  req.headers["x-api-key"]
+);
+
+console.log(
+  "ENV:",
+  process.env.API_KEY
+);
+
   if (req.method === "OPTIONS") return res.status(200).end();
 
 console.log(

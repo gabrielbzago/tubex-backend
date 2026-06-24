@@ -122,8 +122,9 @@ const requiresPrompt = [
   "descricao",
   "ideas",
   "seo_workspace",
-"viral_content",
-  "thumbnail_prompt"
+  "viral_content",
+  "thumbnail_prompt",
+  "channel_analysis"
 ];
 
 if (!prompt && requiresPrompt.includes(tipo)) {
@@ -1001,6 +1002,68 @@ Nunca escreva texto fora do JSON.
 
 }
 
+else if (tipo === "channel_analysis") {
+
+finalPrompt = `
+Você é um consultor sênior de crescimento no YouTube.
+
+Analise os dados enviados.
+
+Tema:
+
+"${prompt}"
+
+Retorne SOMENTE JSON.
+
+Formato obrigatório:
+
+{
+  "score":0,
+
+  "ctrScore":0,
+  "retentionScore":0,
+  "growthScore":0,
+
+  "strengths":[
+    "",
+    "",
+    ""
+  ],
+
+  "weaknesses":[
+    "",
+    "",
+    ""
+  ],
+
+  "opportunities":[
+    "",
+    "",
+    ""
+  ],
+
+  "nextVideos":[
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+
+  "recommendations":[
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]
+}
+
+Nunca use markdown.
+Nunca escreva texto fora do JSON.
+`;
+}
+
 // ======================================================
 // ❌ INVALID TYPE
 // ======================================================
@@ -1052,7 +1115,8 @@ const TTL = {
  ideas:24,
  seo_workspace:12,
  thumbnail_prompt:24,
- viral_content:24
+ viral_content:24,
+ channel_analysis:12
 
 };
 
@@ -1122,6 +1186,8 @@ if (tipo === "niche") temp = 0.3;
 if (tipo==="thumbnail_prompt") temp=0.9;
 if (tipo==="viral_content")
  temp=0.95;
+if (tipo==="channel_analysis")
+ temp=0.6;
 
     // ======================================================
 // 🤖 OPENAI
@@ -1189,7 +1255,8 @@ const response = await fetch(
 
       ...(tipo === "seo_workspace" ||
    tipo === "niche" ||
-   tipo === "viral_content"
+   tipo === "viral_content" ||
+   tipo === "channel_analysis"
         ? {
             response_format: {
               type: "json_object"
@@ -1217,6 +1284,8 @@ const response = await fetch(
         tipo === "seo_workspace"
           ? 3000
 : tipo === "viral_content"
+    ? 2200
+: tipo === "channel_analysis"
     ? 2200
         : tipo === "strategy"
           ? 1800
@@ -1301,6 +1370,20 @@ if (tipo === "seo_workspace") {
 
 }
 
+if (tipo === "channel_analysis") {
+
+systemPrompt = `
+Você é um especialista mundial em análise de canais do YouTube.
+
+Sempre responda exclusivamente JSON válido.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+`;
+
+}
+
 if (tipo === "viral_content") {
 
   try {
@@ -1341,6 +1424,37 @@ if (!text) {
     text:""
   });
 }
+
+
+if (tipo === "channel_analysis") {
+
+  try {
+
+    const parsed = JSON.parse(text);
+
+    global.__tubexCache.set(cacheKey,{
+      text: parsed,
+      timestamp: Date.now()
+    });
+
+    return res.status(200).json({
+      success:true,
+      ...parsed
+    });
+
+  } catch(err){
+
+    console.error(err);
+
+    return res.status(500).json({
+      success:false,
+      error:"invalid_json"
+    });
+
+  }
+
+}
+
 
 // ======================================================
 // 🧠 NICHE JSON PARSER

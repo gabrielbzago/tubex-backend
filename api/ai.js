@@ -176,13 +176,21 @@ global.__rateLimit[userKey].push(now);
       ? context.videos.slice(0, 20)
       : [];
 
-    const parsedVideos = videos.map(v => ({
-      title: v?.title || v?.snippet?.title || "",
-      views: Number(v?.views || v?.statistics?.viewCount || 0),
-      likes: Number(v?.statistics?.likeCount || 0),
-      comments: Number(v?.statistics?.commentCount || 0),
-      publishedAt: v?.publishedAt || v?.snippet?.publishedAt || ""
-    }));
+   const parsedVideos = videos.map(v => ({
+  title: v?.snippet?.title || "",
+  description: v?.snippet?.description || "",
+  tags: v?.snippet?.tags || [],
+  publishedAt: v?.snippet?.publishedAt || "",
+  channelTitle: v?.snippet?.channelTitle || "",
+  views: Number(v?.statistics?.viewCount || 0),
+  likes: Number(v?.statistics?.likeCount || 0),
+  comments: Number(v?.statistics?.commentCount || 0)
+}));
+
+console.log(
+  "PARSED VIDEOS",
+  JSON.stringify(parsedVideos, null, 2)
+);
 
     const totalViews = parsedVideos.reduce((a,v)=>a+(v.views||0),0);
     const avgViews = parsedVideos.length ? Math.round(totalViews/parsedVideos.length) : 0;
@@ -1042,32 +1050,28 @@ REGRAS:
 
 Retorne SOMENTE JSON.
 
+IMPORTANTE:
+
+- score deve ser entre 1 e 100
+- ctr deve ser uma estimativa realista
+- retention deve ser uma estimativa realista
+- views30Days deve ser calculado usando os vídeos enviados
+- subscribersGained deve ser uma estimativa baseada na performance
+
+Formato:
+
 {
-  "score":0,
-  "ctr":0,
-  "retention":0,
-  "views30Days":0,
-  "subscribersGained":0,
+  "score": 87,
+  "ctr": 4.2,
+  "retention": 41,
+  "views30Days": 15234,
+  "subscribersGained": 120,
 
-  "strengths":[
-    ""
-  ],
-
-  "weaknesses":[
-    ""
-  ],
-
-  "opportunities":[
-    ""
-  ],
-
-  "nextVideos":[
-    ""
-  ],
-
-  "recommendations":[
-    ""
-  ]
+  "strengths": [],
+  "weaknesses": [],
+  "opportunities": [],
+  "nextVideos": [],
+  "recommendations": []
 }
 `;
 

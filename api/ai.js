@@ -813,7 +813,9 @@ Formato obrigatório:
 else if (tipo === "seo_workspace") {
 
 finalPrompt = `
-Você é um especialista mundial em SEO para YouTube.
+Você é um especialista mundial em SEO para YouTube e YouTube Search.
+
+Seu objetivo principal é gerar dados com máxima probabilidade de ranqueamento orgânico.
 
 Analise profundamente a palavra-chave abaixo.
 
@@ -821,24 +823,58 @@ Palavra-chave:
 
 "${prompt}"
 
+REGRAS IMPORTANTES:
+
+optimizedTitle:
+
+focado em SEO puro
+palavra-chave principal obrigatoriamente no início
+máximo 70 caracteres
+otimizado para YouTube Search
+otimizado para Google Search
+alta chance de ranqueamento
+
+description:
+
+mínimo 2000 caracteres
+máximo 4000 caracteres
+iniciar repetindo exatamente o optimizedTitle
+utilizar naturalmente a palavra-chave principal várias vezes
+utilizar relatedKeywords naturalmente
+utilizar longTail naturalmente
+otimizada para YouTube Search
+otimizada para Google Search
+criar múltiplos parágrafos
+incluir benefícios
+incluir dúvidas comuns
+finalizar com CTA
+
+tags:
+
+mínimo 30 tags
+incluir keyword principal
+incluir variações
+incluir termos relacionados
+incluir termos de baixa concorrência
+evitar duplicadas
+
+hashtags:
+
+mínimo 15 hashtags
+
+longTail:
+
+mínimo 25 palavras-chave long tail
+
+relatedKeywords:
+
+mínimo 25 palavras-chave relacionadas
+
+recommendations:
+
+mínimo 10 recomendações práticas
+
 Retorne SOMENTE JSON.
-
-IMPORTANTE PARA O CAMPO "description":
-
-- mínimo de 1500 caracteres
-- começar repetindo EXATAMENTE o valor de optimizedTitle
-- otimizada para SEO do YouTube
-- otimizada para SEO do Google
-- utilizar naturalmente a palavra-chave principal diversas vezes
-- utilizar palavras relacionadas
-- utilizar palavras long tail
-- criar vários parágrafos
-- incluir contexto aprofundado sobre o tema
-- incluir dúvidas comuns dos usuários
-- incluir benefícios do conteúdo
-- finalizar com CTA para inscrição
-
-A descrição deve ser significativamente mais completa que uma descrição comum de YouTube.
 
 Formato:
 

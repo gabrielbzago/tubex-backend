@@ -199,17 +199,36 @@ if (!Array.isArray(videos) || videos.length === 0) {
     data: {
       channel,
       videos: [],
-      metrics: {
-        totalViews: 0,
-        avgViews: 0,
-        views7: 0,
-        uploads7: 0
-      }
+     metrics: {
+  totalViews: 0,
+  avgViews: 0,
+  views7: 0,
+  uploads7: 0,
+
+  subscribers:
+    Number(
+      channel?.statistics?.subscriberCount || 0
+    ),
+
+  totalVideos:
+    Number(
+      channel?.statistics?.videoCount || 0
+    ),
+
+  totalChannelViews:
+    Number(
+      channel?.statistics?.viewCount || 0
+    ),
+
+  views30:0,
+  uploads30:0
+}
     }
   };
 
   return res.status(200).json(finalData);
 }
+
 
     // ======================================================
     // 🧠 MÉTRICAS
@@ -227,6 +246,50 @@ if (!Array.isArray(videos) || videos.length === 0) {
     const views7 = last7.reduce((acc,v)=>acc+v.views,0);
     const uploads7 = last7.length;
 
+const subscribers =
+Number(
+  channel?.statistics?.subscriberCount || 0
+);
+
+const totalVideos =
+Number(
+  channel?.statistics?.videoCount || 0
+);
+
+const totalChannelViews =
+Number(
+  channel?.statistics?.viewCount || 0
+);
+
+const views30 = videos
+.filter(v => {
+
+  const days =
+    (Date.now() -
+    new Date(v.publishedAt).getTime())
+    / 86400000;
+
+  return days <= 30;
+
+})
+.reduce(
+  (acc,v)=>acc+v.views,
+  0
+);
+
+const uploads30 = videos
+.filter(v => {
+
+  const days =
+    (Date.now() -
+    new Date(v.publishedAt).getTime())
+    / 86400000;
+
+  return days <= 30;
+
+})
+.length;
+
 const finalData = {
   success:true,
   items:videos,
@@ -237,10 +300,18 @@ const finalData = {
       totalViews,
       avgViews,
       views7,
-      uploads7
+      uploads7,
+
+      subscribers,
+      totalVideos,
+      totalChannelViews,
+
+      views30,
+      uploads30
     }
   }
 };
+
 
 // 💾 SALVA CACHE
 global.tubexChannelCache[cacheKey] = {

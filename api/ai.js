@@ -841,12 +841,23 @@ ${body.keyword}
 
 VOLUME REAL:
 
-${youtube.volume}
+${youtube.metrics?.volume}
 
 CONCORRÊNCIA REAL:
 
-${youtube.competition}
+${youtube.metrics?.competition}
 
+MÉDIA DE VIEWS:
+
+${youtube.metrics?.averageViews}
+
+MÉDIA DE LIKES:
+
+${youtube.metrics?.averageLikes}
+
+MÉDIA DE COMENTÁRIOS:
+
+${youtube.metrics?.averageComments}
 -----------------------------------
 
 TOP VÍDEOS:
@@ -1199,13 +1210,7 @@ const response = await fetch(
     },
 
    body: JSON.stringify({
-  tipo: "seo_workspace",
-  keyword: keyword.trim(),
-  prompt: keyword.trim(),
-  youtube: ytData,
-  userId: "workspace",
-  channelId: "workspace"
-})
+
 
       model: "gpt-4o-mini",
 

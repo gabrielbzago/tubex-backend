@@ -829,7 +829,20 @@ finalPrompt = `
 
 Você é um especialista mundial em SEO para YouTube.
 
-Utilize EXCLUSIVAMENTE os dados reais enviados pela API do YouTube.
+Utilize SOMENTE os dados enviados.
+
+NÃO invente:
+
+- volume
+- concorrência
+- views
+- likes
+- comentários
+
+Caso alguma informação não exista,
+não estime.
+
+Use apenas os números recebidos.
 
 NUNCA invente métricas.
 
@@ -862,7 +875,33 @@ ${youtube.metrics?.averageComments}
 
 TOP VÍDEOS:
 
-${JSON.stringify(youtube.items)}
+${JSON.stringify(
+    youtube.items
+        ?.slice(0,10)
+        .map(v=>({
+
+            title:v.snippet?.title,
+
+            views:v.statistics?.viewCount,
+
+            likes:v.statistics?.likeCount,
+
+            comments:v.statistics?.commentCount,
+
+            publishedAt:v.snippet?.publishedAt,
+
+            tags:v.snippet?.tags
+
+        }))
+)}
+
+-----------------------------------
+
+PADRÕES IDENTIFICADOS:
+
+${JSON.stringify(youtube.patterns)}
+
+-----------------------------------
 
 -----------------------------------
 

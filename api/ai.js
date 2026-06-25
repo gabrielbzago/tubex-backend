@@ -1120,150 +1120,187 @@ else if (tipo === "viral_content") {
 finalPrompt = `
 Você é um especialista mundial em viralização de conteúdo para YouTube.
 
-Sua missão é criar os MELHORES títulos possíveis para maximizar:
+Sua missão possui DUAS ETAPAS.
 
-- CTR
-- Curiosidade
-- Emoção
-- Compartilhamento
-- Retenção
+======================================================
+ETAPA 1
+ANALISAR O POTENCIAL NATURAL DO TEMA
+======================================================
+
+Antes de criar qualquer título, analise a palavra-chave abaixo.
 
 Tema:
 
 "${prompt}"
 
-REGRAS
+Avalie exclusivamente o potencial natural do assunto.
 
-Crie EXATAMENTE 5 títulos.
+Considere:
 
-Todos diferentes.
+• potencial de curiosidade
+• potencial emocional
+• potencial de compartilhamento
+• facilidade de gerar cliques
+• potencial de retenção
+• força do tema
+• saturação do assunto
+• originalidade
+• tamanho do público
+• capacidade de gerar discussão
 
-Todos altamente clicáveis.
+IMPORTANTE
 
-O primeiro título deve ser aquele que você realmente publicaria hoje para maximizar CTR.
+Os scores NÃO representam a qualidade do título criado.
 
-Não utilize apenas pequenas variações.
+Os scores representam APENAS o potencial natural do tema pesquisado.
 
-Cada título deve atacar um gatilho psicológico diferente.
+Mesmo que você consiga criar excelentes títulos, uma palavra fraca deve continuar recebendo notas baixas.
 
-O primeiro SEMPRE deve ser o melhor.
+Evite notas muito altas.
 
-Nunca deixe nenhum campo vazio.
+Distribuição esperada:
 
-Todos os scores devem ficar entre 1 e 100.
+0-30 = Muito Fraco
 
-Retorne SOMENTE JSON.
+31-50 = Fraco
 
-Nunca use markdown.
+51-70 = Médio
+
+71-85 = Forte
+
+86-94 = Muito Forte
+
+95-100 = Extremamente Raro
+
+Notas acima de 95 devem acontecer apenas quando o tema realmente possuir enorme potencial de viralização.
+
+======================================================
+ETAPA 2
+CRIAR OS MELHORES TÍTULOS
+======================================================
+
+Agora sim crie os melhores títulos possíveis.
+
+Regras:
+
+• criar EXATAMENTE 5 títulos
+
+• todos diferentes
+
+• não fazer pequenas variações
+
+• cada título deve explorar um gatilho psicológico diferente
+
+• utilizar curiosidade
+
+• emoção
+
+• benefício
+
+• urgência
+
+• surpresa
+
+• autoridade
+
+• conflito quando fizer sentido
+
+O primeiro título deve ser aquele que você realmente publicaria hoje.
+
+======================================================
+SCORING DOS TÍTULOS
+======================================================
+
+Cada título deve receber notas próprias.
+
+score
+
+ctr
+
+emotion
+
+curiosity
+
+share
+
+Essas notas representam somente aquele título.
+
+Não representam o tema.
+
+======================================================
+THUMBNAILS
+======================================================
+
+Crie 4 ideias extremamente fortes de thumbnail.
+
+Cada uma utilizando uma estratégia diferente.
+
+======================================================
+ÂNGULOS
+======================================================
+
+Crie 4 ângulos diferentes para atacar o mesmo assunto.
+
+======================================================
+GATILHOS
+======================================================
+
+Crie 4 gatilhos psicológicos que aumentariam a viralização.
+
+======================================================
+RECOMENDAÇÕES
+======================================================
+
+Crie 4 recomendações específicas para aumentar o alcance.
+
+======================================================
+JSON
+
+Nunca utilize markdown.
 
 Nunca escreva texto antes ou depois.
 
-Formato obrigatório:
+Nunca deixe campos vazios.
+
+Retorne exatamente:
 
 {
-  "viralScore":92,
+  "viralScore":0,
+  "viralLevel":"",
+  "viralProbability":0,
 
-  "viralLevel":"Explosivo",
+  "emotionScore":0,
+  "curiosityScore":0,
+  "shareScore":0,
 
-  "viralProbability":94,
+  "ctrPrediction":"",
+  "retentionPrediction":"",
+  "algorithmRecommendation":"",
 
-  "emotionScore":89,
+  "bestAudience":"",
 
-  "curiosityScore":95,
-
-  "shareScore":86,
-
-  "ctrPrediction":"Muito Alta",
-
-  "retentionPrediction":"Alta",
-
-  "algorithmRecommendation":"Muito Recomendado",
-
-  "bestAudience":"Criadores de Conteúdo",
-
-  "difficulty":44,
-
-  "competition":67,
-
-  "confidence":98,
+  "difficulty":0,
+  "competition":0,
+  "confidence":0,
 
   "viralTitle":"",
 
   "viralTitles":[
     {
       "title":"",
-      "score":96,
-      "ctr":95,
-      "emotion":89,
-      "curiosity":97,
-      "share":90,
-      "reason":"..."
-    },
-    {
-      "title":"",
-      "score":92,
-      "ctr":90,
-      "emotion":86,
-      "curiosity":93,
-      "share":88,
-      "reason":"..."
-    },
-    {
-      "title":"",
-      "score":89,
-      "ctr":87,
-      "emotion":84,
-      "curiosity":90,
-      "share":86,
-      "reason":"..."
-    },
-    {
-      "title":"",
-      "score":85,
-      "ctr":83,
-      "emotion":81,
-      "curiosity":86,
-      "share":84,
-      "reason":"..."
-    },
-    {
-      "title":"",
-      "score":80,
-      "ctr":79,
-      "emotion":77,
-      "curiosity":82,
-      "share":80,
-      "reason":"..."
+      "score":0,
+      "ctr":0,
+      "emotion":0,
+      "curiosity":0,
+      "share":0,
+      "reason":""
     }
   ],
 
-  "thumbnailIdeas":[
-    "",
-    "",
-    "",
-    ""
-  ],
-
-  "viralAngles":[
-    "",
-    "",
-    "",
-    ""
-  ],
-
-  "audienceTriggers":[
-    "",
-    "",
-    "",
-    ""
-  ],
-
-  "recommendations":[
-    "",
-    "",
-    "",
-    ""
-  ]
+  "thumbnailIdeas":[],
+  "viralAngles":[],
+  "audienceTriggers":[],
+  "recommendations":[]
 }
 `;
 }

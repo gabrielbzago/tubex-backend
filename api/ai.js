@@ -930,6 +930,40 @@ Os valores abaixo são apenas um exemplo de formato.
 
 Calcule todos os campos usando os dados enviados.
 
+IMPORTANTE
+
+O campo "nivel" DEVE ser calculado usando o score.
+
+Nunca invente.
+
+Utilize obrigatoriamente esta tabela.
+
+VOLUME
+
+score 0-20 = Muito Baixo
+score 21-40 = Baixo
+score 41-60 = Médio
+score 61-80 = Alto
+score 81-100 = Muito Alto
+
+CONCORRÊNCIA
+
+score 0-20 = Muito Baixa
+score 21-40 = Baixa
+score 41-60 = Média
+score 61-80 = Alta
+score 81-100 = Muito Alta
+
+DIFFICULTY
+
+0-20 = Muito Fácil
+21-40 = Fácil
+41-60 = Moderada
+61-80 = Difícil
+81-100 = Muito Difícil
+
+Nunca retorne um nível incompatível com o score.
+
 {
   "score": 0,
 

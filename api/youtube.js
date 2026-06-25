@@ -555,31 +555,6 @@ const rankedTags =
     }));
 
 
-const averageViews =
-  Math.round(
-    totalViews / Math.max(items.length, 1)
-  );
-
-const averageLikes =
-  Math.round(
-    items.reduce(
-      (acc, v) =>
-        acc +
-        Number(v.statistics?.likeCount || 0),
-      0
-    ) / Math.max(items.length, 1)
-  );
-
-const averageComments =
-  Math.round(
-    items.reduce(
-      (acc, v) =>
-        acc +
-        Number(v.statistics?.commentCount || 0),
-      0
-    ) / Math.max(items.length, 1)
-  );
-
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -590,44 +565,11 @@ const responseData = {
 
   items,
 
-  metrics: {
+  volume,
 
-    volume,
+  competition,
 
-    competition,
-
-    averageViews,
-
-    averageLikes,
-
-    averageComments,
-
-    maxViews:
-      Number(items[0]?.statistics?.viewCount || 0),
-
-    minViews:
-      Number(
-        items[items.length - 1]?.statistics?.viewCount || 0
-      ),
-
-    medianViews:
-      Number(
-        items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-      )
-
-  },
-
-  tags: rankedTags,
-
-  patterns: {
-
-    commonWords: [],
-
-    commonTitles: [],
-
-    thumbnailPatterns: []
-
-  }
+  tags: rankedTags
 
 };
 

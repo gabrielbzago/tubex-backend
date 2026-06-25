@@ -108,7 +108,7 @@ const context = body?.context || {};
 const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
-const youtube = body?.youtube || {};
+
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -823,107 +823,123 @@ Formato obrigatório:
 // ======================================================
 // 🔍 SEO WORKSPACE
 // ======================================================
+
 else if (tipo === "seo_workspace") {
 
 finalPrompt = `
+Você é um especialista mundial em SEO para YouTube e YouTube Search.
 
-Você é um especialista mundial em SEO para YouTube.
+Seu objetivo principal é gerar dados com máxima probabilidade de ranqueamento orgânico.
 
-Utilize SOMENTE os dados enviados.
-
-NÃO invente:
-
-- volume
-- concorrência
-- views
-- likes
-- comentários
-
-Caso alguma informação não exista,
-não estime.
-
-Use apenas os números recebidos.
-
-NUNCA invente métricas.
+Analise profundamente a palavra-chave abaixo.
 
 Palavra-chave:
 
-${body.keyword}
+"${prompt}"
 
------------------------------------
+REGRAS IMPORTANTES:
 
-VOLUME REAL:
+optimizedTitle:
 
-${youtube.metrics?.volume}
+focado em SEO puro
+palavra-chave principal obrigatoriamente no início
+máximo 70 caracteres
+otimizado para YouTube Search
+otimizado para Google Search
+alta chance de ranqueamento
 
-CONCORRÊNCIA REAL:
+description:
 
-${youtube.metrics?.competition}
+mínimo 2000 caracteres
+máximo 4000 caracteres
+iniciar repetindo exatamente o optimizedTitle
+utilizar naturalmente a palavra-chave principal várias vezes
+utilizar relatedKeywords naturalmente
+utilizar longTail naturalmente
+otimizada para YouTube Search
+otimizada para Google Search
+criar múltiplos parágrafos
+incluir benefícios
+incluir dúvidas comuns
+finalizar com CTA
 
-MÉDIA DE VIEWS:
+tags:
 
-${youtube.metrics?.averageViews}
+mínimo 30 tags
+incluir keyword principal
+incluir variações
+incluir termos relacionados
+incluir termos de baixa concorrência
+evitar duplicadas
 
-MÉDIA DE LIKES:
+hashtags:
 
-${youtube.metrics?.averageLikes}
+mínimo 15 hashtags
 
-MÉDIA DE COMENTÁRIOS:
+longTail:
 
-${youtube.metrics?.averageComments}
------------------------------------
+mínimo 25 palavras-chave long tail
 
-TOP VÍDEOS:
+relatedKeywords:
 
-${JSON.stringify(
-    youtube.items
-        ?.slice(0,10)
-        .map(v=>({
+mínimo 25 palavras-chave relacionadas
 
-            title:v.snippet?.title,
+recommendations:
 
-            views:v.statistics?.viewCount,
-
-            likes:v.statistics?.likeCount,
-
-            comments:v.statistics?.commentCount,
-
-            publishedAt:v.snippet?.publishedAt,
-
-            tags:v.snippet?.tags
-
-        }))
-)}
-
------------------------------------
-
-PADRÕES IDENTIFICADOS:
-
-${JSON.stringify(youtube.patterns)}
-
------------------------------------
-
------------------------------------
-
-TAGS MAIS USADAS:
-
-${JSON.stringify(youtube.tags)}
-
------------------------------------
-
-Baseado nesses dados gere:
-
-- score SEO
-- título otimizado
-- descrição
-- tags
-- hashtags
-- palavras relacionadas
-- long tails
-- recomendações
+mínimo 10 recomendações práticas
 
 Retorne SOMENTE JSON.
+
+Formato:
+
+{
+"score":0,
+
+"volume":{
+"nivel":"",
+"score":0,
+"explicacao":""
+},
+
+"competition":{
+"nivel":"",
+"score":0,
+"explicacao":""
+},
+
+"difficulty":0,
+
+"keywordIntent":"",
+
+"searchIntent":"",
+
+"chanceRanking":"",
+
+"ctrPrediction":"",
+
+"optimizedTitle":"",
+
+"description":"",
+
+"tags":[],
+
+"hashtags":[],
+
+"longTail":[],
+
+"relatedKeywords":[],
+
+"recommendations":[]
+
+}
+
+Nunca responda texto.
+
+Nunca utilize markdown.
+
+Somente JSON.
 `;
+
 }
 
 else if (tipo === "viral_content") {
@@ -1238,14 +1254,7 @@ Nunca escreva texto fora do JSON.
 
 }
 
-console.log("================================");
-console.log("TIPO:", tipo);
-console.log("PROMPT:");
-console.log(finalPrompt);
-console.log("================================");
-
 const response = await fetch(
-
   "https://api.openai.com/v1/chat/completions",
   {
     method: "POST",
@@ -1255,8 +1264,7 @@ const response = await fetch(
       "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
     },
 
-   body: JSON.stringify({
-
+    body: JSON.stringify({
 
       model: "gpt-4o-mini",
 
@@ -1313,25 +1321,20 @@ const response = await fetch(
 
 if (!response.ok) {
 
-    const err = await response.text();
+  const err = await response.text();
 
-    console.error("OPENAI STATUS:", response.status);
+  console.error("💥 OPENAI ERROR:");
+  console.error(err);
 
-    console.error(err);
-
-    return res.status(500).json({
-
-        success:false,
-
-        error:err,
-
-        text:""
-
-    });
+  return res.status(500).json({
+    success: false,
+    error: "openai_error",
+    text: ""
+  });
 
 }
-    const data = await response.json();
 
+    const data = await response.json();
 console.log("================================");
 console.log("OPENAI JSON COMPLETO");
 console.dir(data,{depth:null});

@@ -1427,7 +1427,14 @@ const TTL = {
   ideas: 24,
 
   // SEO Workspace sem cache
-  seo_workspace: 0,
+ if (tipo !== "seo_workspace") {
+
+    global.__tubexCache.set(cacheKey,{
+        text: parsed,
+        timestamp: Date.now()
+    });
+
+}
 
   thumbnail_prompt: 24,
   viral_content: 24,
@@ -1440,6 +1447,19 @@ const ttl =
   ttlHours === 0
     ? 0
     : ttlHours * 60 * 60 * 1000;
+
+if (
+
+    ttl > 0 &&
+
+    cached &&
+
+    (Date.now() - cached.timestamp) < ttl
+
+) {
+
+    // cache hit
+
 
   // ==========================================
   // NICHE

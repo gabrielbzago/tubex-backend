@@ -830,181 +830,287 @@ finalPrompt = `
 
 Você é um especialista mundial em SEO para YouTube.
 
-Utilize SOMENTE os dados enviados.
-
-NÃO invente:
-
-- volume
-- concorrência
-- views
-- likes
-- comentários
-
-Caso alguma informação não exista,
-não estime.
-
-Use apenas os números recebidos.
-
-NUNCA invente métricas.
-
-Palavra-chave:
-
-${body.keyword}
-
------------------------------------
-
-VOLUME REAL:
-
-${youtube.volume}
-
-CONCORRÊNCIA REAL:
-
-${youtube.competition}
-
-MÉDIA DE VIEWS:
-
-${youtube.metrics?.averageViews}
-
-MÉDIA DE LIKES:
-
-${youtube.metrics?.averageLikes}
-
-MÉDIA DE COMENTÁRIOS:
-
-${youtube.metrics?.averageComments}
------------------------------------
-
-TOP VÍDEOS:
-
-${JSON.stringify(
-    youtube.items
-        ?.slice(0,10)
-        .map(v=>({
-
-            title:v.snippet?.title,
-
-            views:v.statistics?.viewCount,
-
-            likes:v.statistics?.likeCount,
-
-            comments:v.statistics?.commentCount,
-
-            publishedAt:v.snippet?.publishedAt,
-
-            tags:v.snippet?.tags
-
-        }))
-)}
-
------------------------------------
-
-PADRÕES IDENTIFICADOS:
-
-${JSON.stringify({
-    averageViews: youtube.metrics?.averageViews,
-    averageLikes: youtube.metrics?.averageLikes,
-    averageComments: youtube.metrics?.averageComments
-}, null, 2)}
------------------------------------
-
------------------------------------
-
-TAGS MAIS USADAS:
-
-${JSON.stringify(youtube.tags)}
-
------------------------------------
-
-Baseado SOMENTE nos dados acima retorne exatamente este JSON.
-
-Não mude nomes.
-
-Não remova campos.
-
-Não escreva markdown.
-
-Não escreva explicações.
-
-Retorne exatamente esta estrutura.
-
-Os valores abaixo são apenas um exemplo de formato.
-
-Calcule todos os campos usando os dados enviados.
+Sua missão é analisar uma palavra-chave utilizando dados reais do YouTube e gerar uma estratégia completa de SEO.
 
 IMPORTANTE
 
-O campo "nivel" DEVE ser calculado usando o score.
+Utilize SOMENTE os dados enviados.
 
-Nunca invente.
+Nunca invente:
 
-Utilize obrigatoriamente esta tabela.
+• volume
+• concorrência
+• views
+• likes
+• comentários
 
-VOLUME
+Caso algum dado não exista, apenas explique.
 
-score 0-20 = Muito Baixo
-score 21-40 = Baixo
-score 41-60 = Médio
-score 61-80 = Alto
-score 81-100 = Muito Alto
+Nunca estime números.
 
-CONCORRÊNCIA
+====================================
 
-score 0-20 = Muito Baixa
-score 21-40 = Baixa
-score 41-60 = Média
-score 61-80 = Alta
-score 81-100 = Muito Alta
+PALAVRA-CHAVE
 
-DIFFICULTY
+${body.keyword}
 
-0-20 = Muito Fácil
-21-40 = Fácil
-41-60 = Moderada
-61-80 = Difícil
-81-100 = Muito Difícil
+====================================
 
-Nunca retorne um nível incompatível com o score.
+MÉTRICAS REAIS
+
+Volume:
+${youtube.volume}
+
+Competition:
+${youtube.competition}
+
+Average Views:
+${youtube.metrics?.averageViews}
+
+Average Likes:
+${youtube.metrics?.averageLikes}
+
+Average Comments:
+${youtube.metrics?.averageComments}
+
+====================================
+
+TOP VÍDEOS
+
+${JSON.stringify(
+youtube.items
+?.slice(0,10)
+.map(v=>({
+title:v.snippet?.title,
+views:v.statistics?.viewCount,
+likes:v.statistics?.likeCount,
+comments:v.statistics?.commentCount,
+publishedAt:v.snippet?.publishedAt,
+tags:v.snippet?.tags
+}))
+)}
+
+====================================
+
+TAGS MAIS UTILIZADAS
+
+${JSON.stringify(youtube.tags)}
+
+====================================
+
+OBJETIVO
+
+Com base apenas nos dados acima faça uma análise profissional.
+
+Depois gere:
+
+• SEO Score
+
+• Volume
+
+• Competition
+
+• Difficulty
+
+• Keyword Intent
+
+• Search Intent
+
+• Chance Ranking
+
+• CTR Prediction
+
+• Melhor título possível para rankear.
+
+• Melhor descrição possível.
+
+• Tags.
+
+• Hashtags.
+
+• Long Tail.
+
+• Palavras relacionadas.
+
+• Recomendações.
+
+====================================
+
+REGRAS DO TÍTULO
+
+- entre 55 e 70 caracteres
+- altamente clicável
+- incluir a keyword principal
+- otimizado para CTR
+- otimizado para pesquisa
+
+====================================
+
+REGRAS DA DESCRIÇÃO
+
+Crie uma descrição extremamente otimizada para SEO.
+
+Obrigatório:
+
+• entre 2000 e 3000 caracteres
+
+• repetir naturalmente a keyword principal
+
+• incluir diversas palavras relacionadas
+
+• incluir long tails
+
+• possuir vários parágrafos
+
+• explicar completamente o assunto
+
+• responder dúvidas comuns
+
+• conter CTA para inscrição
+
+• otimizada para pesquisa do YouTube
+
+• otimizada para Google
+
+• escrita natural
+
+• sem keyword stuffing
+
+====================================
+
+REGRAS DAS TAGS
+
+Gerar exatamente 40 tags.
+
+Misturar:
+
+keyword principal
+
+long tails
+
+variações
+
+sinônimos
+
+intenção de pesquisa
+
+====================================
+
+REGRAS DAS HASHTAGS
+
+Gerar exatamente 20 hashtags.
+
+====================================
+
+REGRAS DAS LONG TAILS
+
+Gerar exatamente 30 palavras-chave long tail.
+
+====================================
+
+REGRAS DAS KEYWORDS RELACIONADAS
+
+Gerar exatamente 30 keywords relacionadas.
+
+====================================
+
+REGRAS DAS RECOMENDAÇÕES
+
+Gerar exatamente 10 recomendações específicas.
+
+====================================
+
+CLASSIFICAÇÃO
+
+Volume
+
+0-20 Muito Baixo
+
+21-40 Baixo
+
+41-60 Médio
+
+61-80 Alto
+
+81-100 Muito Alto
+
+Competition
+
+0-20 Muito Baixa
+
+21-40 Baixa
+
+41-60 Média
+
+61-80 Alta
+
+81-100 Muito Alta
+
+Difficulty
+
+0-20 Muito Fácil
+
+21-40 Fácil
+
+41-60 Moderada
+
+61-80 Difícil
+
+81-100 Muito Difícil
+
+====================================
+
+IMPORTANTE
+
+Nunca deixe nenhum campo vazio.
+
+Nunca retorne arrays vazios.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+
+Retorne exatamente:
 
 {
-  "score": 0,
+  "score":0,
 
-  "volume": {
-    "nivel": "",
-    "score": 0,
-    "explicacao": ""
+  "volume":{
+    "nivel":"",
+    "score":0,
+    "explicacao":""
   },
 
-  "competition": {
-    "nivel": "",
-    "score": 0,
-    "explicacao": ""
+  "competition":{
+    "nivel":"",
+    "score":0,
+    "explicacao":""
   },
 
-  "difficulty": 0,
+  "difficulty":0,
 
-  "keywordIntent": "",
+  "keywordIntent":"",
 
-  "searchIntent": "",
+  "searchIntent":"",
 
-  "chanceRanking": "",
+  "chanceRanking":"",
 
-  "ctrPrediction": "",
+  "ctrPrediction":"",
 
-  "optimizedTitle": "",
+  "optimizedTitle":"",
 
-  "description": "",
+  "description":"",
 
-  "tags": [],
+  "tags":[],
 
-  "hashtags": [],
+  "hashtags":[],
 
-  "longTail": [],
+  "longTail":[],
 
-  "relatedKeywords": [],
+  "relatedKeywords":[],
 
-  "recommendations": []
-}
-`;
+  "recommendations":[]
+}`;
 }
 
 else if (tipo === "viral_content") {

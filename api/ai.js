@@ -854,11 +854,11 @@ ${body.keyword}
 
 VOLUME REAL:
 
-${youtube.metrics?.volume}
+${youtube.volume}
 
 CONCORRÊNCIA REAL:
 
-${youtube.metrics?.competition}
+${youtube.competition}
 
 MÉDIA DE VIEWS:
 
@@ -899,8 +899,11 @@ ${JSON.stringify(
 
 PADRÕES IDENTIFICADOS:
 
-${JSON.stringify(youtube.patterns)}
-
+${JSON.stringify({
+    averageViews: youtube.metrics?.averageViews,
+    averageLikes: youtube.metrics?.averageLikes,
+    averageComments: youtube.metrics?.averageComments
+}, null, 2)}
 -----------------------------------
 
 -----------------------------------
@@ -921,7 +924,11 @@ Não escreva markdown.
 
 Não escreva explicações.
 
-Retorne somente JSON válido.
+Retorne exatamente esta estrutura.
+
+Os valores abaixo são apenas um exemplo de formato.
+
+Calcule todos os campos usando os dados enviados.
 
 {
   "score": 0,

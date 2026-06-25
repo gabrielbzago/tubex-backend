@@ -911,18 +911,57 @@ ${JSON.stringify(youtube.tags)}
 
 -----------------------------------
 
-Baseado nesses dados gere:
+Baseado SOMENTE nos dados acima retorne exatamente este JSON.
 
-- score SEO
-- título otimizado
-- descrição
-- tags
-- hashtags
-- palavras relacionadas
-- long tails
-- recomendações
+Não mude nomes.
 
-Retorne SOMENTE JSON.
+Não remova campos.
+
+Não escreva markdown.
+
+Não escreva explicações.
+
+Retorne somente JSON válido.
+
+{
+  "score": 0,
+
+  "volume": {
+    "nivel": "",
+    "score": 0,
+    "explicacao": ""
+  },
+
+  "competition": {
+    "nivel": "",
+    "score": 0,
+    "explicacao": ""
+  },
+
+  "difficulty": 0,
+
+  "keywordIntent": "",
+
+  "searchIntent": "",
+
+  "chanceRanking": "",
+
+  "ctrPrediction": "",
+
+  "optimizedTitle": "",
+
+  "description": "",
+
+  "tags": [],
+
+  "hashtags": [],
+
+  "longTail": [],
+
+  "relatedKeywords": [],
+
+  "recommendations": []
+}
 `;
 }
 

@@ -1067,30 +1067,6 @@ Formato obrigatório:
 }
 ],
 
-Para cada título calcule:
-
-score
-0-100
-
-ctr
-0-100
-
-emotion
-0-100
-
-curiosity
-0-100
-
-share
-0-100
-
-reason
-
-Explique em apenas uma frase por que recebeu essa nota.
-
-Ordene do MELHOR para o PIOR.
-
-O primeiro sempre deve ser o melhor título.
 
   "thumbnailIdeas":[
     "",
@@ -1120,6 +1096,30 @@ O primeiro sempre deve ser o melhor título.
     ""
   ]
 }
+Para cada título calcule:
+
+score
+0-100
+
+ctr
+0-100
+
+emotion
+0-100
+
+curiosity
+0-100
+
+share
+0-100
+
+reason
+
+Explique em apenas uma frase por que recebeu essa nota.
+
+Ordene do MELHOR para o PIOR.
+
+O primeiro sempre deve ser o melhor título.
 
 Nunca use markdown.
 Nunca escreva texto fora do JSON.

@@ -1372,6 +1372,119 @@ Formato:
 }
 
 // ======================================================
+// 🏷 ADVANCED TAGS
+// ======================================================
+
+else if (tipo === "advanced_tags") {
+
+finalPrompt = `
+
+Você é um especialista mundial em SEO para YouTube.
+
+Sua missão é gerar as MELHORES tags possíveis para um vídeo.
+
+Você NÃO deve inventar assuntos.
+
+Você deve utilizar apenas:
+
+- título informado
+- vídeos enviados
+- títulos concorrentes
+- descrições
+- tags existentes
+- contexto semântico
+
+=====================================
+
+TÍTULO
+
+${body.keyword}
+
+=====================================
+
+TOP VÍDEOS
+
+${JSON.stringify(body.videos || [], null, 2)}
+
+=====================================
+
+OBJETIVO
+
+Gerar tags extremamente inteligentes.
+
+Misture:
+
+• keyword principal
+
+• long tails
+
+• intenção de pesquisa
+
+• pesquisas relacionadas
+
+• entidades
+
+• variações semânticas
+
+• palavras que realmente ajudam o algoritmo do YouTube entender o vídeo.
+
+Nunca repita tags.
+
+Nunca gere tags genéricas.
+
+Nunca gere palavras soltas.
+
+Priorize frases.
+
+=====================================
+
+REGRAS
+
+- mínimo 30 tags
+
+- máximo 45 tags
+
+- cada tag entre 2 e 5 palavras
+
+- todas devem parecer pesquisas reais
+
+- todas devem possuir score
+
+- score entre 60 e 100
+
+- ordene da melhor para pior
+
+=====================================
+
+Retorne SOMENTE JSON.
+
+Nunca markdown.
+
+Nunca texto.
+
+Formato:
+
+{
+
+"tags":[
+
+{
+
+"keyword":"",
+
+"score":99
+
+}
+
+]
+
+}
+
+`;
+
+}
+
+// ======================================================
 // ❌ INVALID TYPE
 // ======================================================
 
@@ -1794,6 +1907,41 @@ if (tipo === "channel_analysis") {
     });
 
   }
+
+}
+
+if (tipo === "advanced_tags") {
+
+    try{
+
+        const parsed = JSON.parse(text);
+
+        global.__tubexCache.set(cacheKey,{
+            text:parsed,
+            timestamp:Date.now()
+        });
+
+        return res.status(200).json({
+
+            success:true,
+
+            tags:parsed.tags || []
+
+        });
+
+    }catch(err){
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success:false,
+
+            error:"invalid_json"
+
+        });
+
+    }
 
 }
 

@@ -1686,17 +1686,19 @@ if (tipo === "seo_workspace") {
       clean = clean.slice(start, end + 1);
     }
 
-    const parsed = JSON.parse(clean);
+const parsed = JSON.parse(clean);
 
-    global.__tubexCache.set(cacheKey, {
-      text: parsed,
-      timestamp: Date.now()
-    });
+if (tipo !== "seo_workspace") {
+  global.__tubexCache.set(cacheKey, {
+    text: parsed,
+    timestamp: Date.now()
+  });
+}
 
-    return res.status(200).json({
-      success: true,
-      ...parsed
-    });
+return res.status(200).json({
+  success: true,
+  ...parsed
+});
 
   } catch (err) {
 
@@ -1908,10 +1910,12 @@ return res.status(200).json({
 }
 
 // 💾 salvar só se válido
-global.__tubexCache.set(cacheKey, {
-  text,
-  timestamp: Date.now()
-});
+if (tipo !== "seo_workspace") {
+  global.__tubexCache.set(cacheKey, {
+    text,
+    timestamp: Date.now()
+  });
+}
 
       
    return res.status(200).json({

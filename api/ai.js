@@ -1094,8 +1094,10 @@ Retorne exatamente:
   "searchIntent":"",
 
   "chanceRanking":"",
+"chanceExplanation":"",
 
-  "ctrPrediction":"",
+"ctrPrediction":"",
+"ctrExplanation":"",
 
   "optimizedTitle":"",
 

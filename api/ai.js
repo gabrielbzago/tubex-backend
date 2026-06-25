@@ -1009,9 +1009,9 @@ Nunca retorne um nível incompatível com o score.
 else if (tipo === "viral_content") {
 
 finalPrompt = `
-Você é um especialista mundial em viralização de conteúdo.
+Você é um especialista mundial em viralização de conteúdo para YouTube.
 
-Sua missão é gerar conteúdo com máximo potencial de:
+Sua missão é criar os MELHORES títulos possíveis para maximizar:
 
 - CTR
 - Curiosidade
@@ -1023,50 +1023,106 @@ Tema:
 
 "${prompt}"
 
+REGRAS
+
+Crie EXATAMENTE 5 títulos.
+
+Todos diferentes.
+
+Todos altamente clicáveis.
+
+Ordene do MELHOR para o PIOR.
+
+O primeiro SEMPRE deve ser o melhor.
+
+Nunca deixe nenhum campo vazio.
+
+Todos os scores devem ficar entre 1 e 100.
+
 Retorne SOMENTE JSON.
+
+Nunca use markdown.
+
+Nunca escreva texto antes ou depois.
 
 Formato obrigatório:
 
 {
-  "viralScore":0,
+  "viralScore":92,
 
-  "viralLevel":"",
+  "viralLevel":"Explosivo",
 
-  "viralProbability":0,
+  "viralProbability":94,
 
-  "emotionScore":0,
+  "emotionScore":89,
 
-  "curiosityScore":0,
+  "curiosityScore":95,
 
-  "shareScore":0,
+  "shareScore":86,
 
-  "ctrPrediction":"",
+  "ctrPrediction":"Muito Alta",
 
-  "retentionPrediction":"",
+  "retentionPrediction":"Alta",
 
-  "algorithmRecommendation":"",
+  "algorithmRecommendation":"Muito Recomendado",
 
-  "bestAudience":"",
+  "bestAudience":"Criadores de Conteúdo",
 
-  "difficulty":0,
+  "difficulty":44,
 
-  "competition":0,
+  "competition":67,
 
-  "confidence":0,
+  "confidence":98,
+
   "viralTitle":"",
 
   "viralTitles":[
-{
-"title":"",
-"score":0,
-"ctr":0,
-"emotion":0,
-"curiosity":0,
-"share":0,
-"reason":""
-}
-],
-
+    {
+      "title":"",
+      "score":96,
+      "ctr":95,
+      "emotion":89,
+      "curiosity":97,
+      "share":90,
+      "reason":"..."
+    },
+    {
+      "title":"",
+      "score":92,
+      "ctr":90,
+      "emotion":86,
+      "curiosity":93,
+      "share":88,
+      "reason":"..."
+    },
+    {
+      "title":"",
+      "score":89,
+      "ctr":87,
+      "emotion":84,
+      "curiosity":90,
+      "share":86,
+      "reason":"..."
+    },
+    {
+      "title":"",
+      "score":85,
+      "ctr":83,
+      "emotion":81,
+      "curiosity":86,
+      "share":84,
+      "reason":"..."
+    },
+    {
+      "title":"",
+      "score":80,
+      "ctr":79,
+      "emotion":77,
+      "curiosity":82,
+      "share":80,
+      "reason":"..."
+    }
+  ],
 
   "thumbnailIdeas":[
     "",
@@ -1096,35 +1152,7 @@ Formato obrigatório:
     ""
   ]
 }
-Para cada título calcule:
-
-score
-0-100
-
-ctr
-0-100
-
-emotion
-0-100
-
-curiosity
-0-100
-
-share
-0-100
-
-reason
-
-Explique em apenas uma frase por que recebeu essa nota.
-
-Ordene do MELHOR para o PIOR.
-
-O primeiro sempre deve ser o melhor título.
-
-Nunca use markdown.
-Nunca escreva texto fora do JSON.
 `;
-
 }
 
 else if (tipo === "channel_analysis") {

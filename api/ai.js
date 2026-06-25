@@ -1238,7 +1238,14 @@ Nunca escreva texto fora do JSON.
 
 }
 
+console.log("================================");
+console.log("TIPO:", tipo);
+console.log("PROMPT:");
+console.log(finalPrompt);
+console.log("================================");
+
 const response = await fetch(
+
   "https://api.openai.com/v1/chat/completions",
   {
     method: "POST",
@@ -1306,20 +1313,25 @@ const response = await fetch(
 
 if (!response.ok) {
 
-  const err = await response.text();
+    const err = await response.text();
 
-  console.error("💥 OPENAI ERROR:");
-  console.error(err);
+    console.error("OPENAI STATUS:", response.status);
 
-  return res.status(500).json({
-    success: false,
-    error: "openai_error",
-    text: ""
-  });
+    console.error(err);
+
+    return res.status(500).json({
+
+        success:false,
+
+        error:err,
+
+        text:""
+
+    });
 
 }
-
     const data = await response.json();
+
 console.log("================================");
 console.log("OPENAI JSON COMPLETO");
 console.dir(data,{depth:null});

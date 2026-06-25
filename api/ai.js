@@ -820,6 +820,7 @@ Formato obrigatório:
 
 }
 
+
 // ======================================================
 // 🔍 SEO WORKSPACE
 // ======================================================
@@ -1031,7 +1032,11 @@ Todos diferentes.
 
 Todos altamente clicáveis.
 
-Ordene do MELHOR para o PIOR.
+O primeiro título deve ser aquele que você realmente publicaria hoje para maximizar CTR.
+
+Não utilize apenas pequenas variações.
+
+Cada título deve atacar um gatilho psicológico diferente.
 
 O primeiro SEMPRE deve ser o melhor.
 
@@ -1399,6 +1404,20 @@ Nunca invente dados.
 Sempre utilize as informações fornecidas pelo usuário.
 `;
 
+if (tipo === "viral_content") {
+
+  systemPrompt = `
+Você é o maior especialista do mundo em viralização para YouTube.
+
+Sempre responda exclusivamente JSON válido.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+`;
+
+}
+
 if (tipo === "niche") {
 
   systemPrompt = `
@@ -1455,7 +1474,7 @@ const response = await fetch(
    body: JSON.stringify({
 
 
-      model: "gpt-4o-mini",
+model: "gpt-4o-mini",
 
       ...(tipo === "seo_workspace" ||
    tipo === "niche" ||
@@ -1579,19 +1598,6 @@ if (tipo === "seo_workspace") {
 
 }
 
-if (tipo === "channel_analysis") {
-
-systemPrompt = `
-Você é um especialista mundial em análise de canais do YouTube.
-
-Sempre responda exclusivamente JSON válido.
-
-Nunca utilize markdown.
-
-Nunca escreva texto fora do JSON.
-`;
-
-}
 
 if (tipo === "viral_content") {
 

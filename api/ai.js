@@ -1383,30 +1383,31 @@ if (!finalPrompt) {
 
 }
 
-
-// ======================================================
+   // ======================================================
 // ⚡ CACHE (PROFISSIONAL)
 // ======================================================
 
-// 🔑 fingerprint estável dos vídeos
+// fingerprint dos vídeos
 const stableKey = parsedVideos
   .slice(0, 10)
-  .map(v => `${(v.title || "").slice(0, 30)}_${v.views}`)
+  .map(v => `${(v.title || "").slice(0,30)}_${v.views}`)
   .sort()
   .join("|");
 
-// 🧠 inicializa cache global
+// inicializa cache
 global.__tubexCache = global.__tubexCache || new Map();
 
-// 🔑 keyword normalizada
-const normalizedKeyword = String(body.keyword || prompt || "")
+// keyword normalizada
+const normalizedKeyword = String(
+  body.keyword || prompt || ""
+)
   .toLowerCase()
   .trim()
   .replace(/\s+/g, " ");
 
-// 🔑 chave única do cache
+// chave única do cache
 const cacheKey = [
-  "v5",
+  "v6",
   userId,
   channelId,
   tipo,
@@ -1416,54 +1417,41 @@ const cacheKey = [
   avgViews || 0
 ].join("|");
 
-// 📦 busca cache
+// procura cache
 const cached = global.__tubexCache.get(cacheKey);
 
-// ⏱ TTL inteligente por tipo
+// TTL por tipo
 const TTL = {
   diagnosis: 6,
   strategy: 12,
   niche: 24,
   ideas: 24,
 
-  // SEO Workspace sem cache
- if (tipo !== "seo_workspace") {
-
-    global.__tubexCache.set(cacheKey,{
-        text: parsed,
-        timestamp: Date.now()
-    });
-
-}
+  // SEO Workspace NÃO USA CACHE
+  seo_workspace: 0,
 
   thumbnail_prompt: 24,
   viral_content: 24,
   channel_analysis: 12
 };
 
-const ttlHours = TTL[tipo];
+const ttlHours = TTL[tipo] ?? 6;
 
 const ttl =
   ttlHours === 0
     ? 0
     : ttlHours * 60 * 60 * 1000;
 
+// ======================================================
+// CACHE HIT
+// ======================================================
+
 if (
-
-    ttl > 0 &&
-
-    cached &&
-
-    (Date.now() - cached.timestamp) < ttl
-
+  ttl > 0 &&
+  cached &&
+  (Date.now() - cached.timestamp) < ttl
 ) {
 
-    // cache hit
-
-
-  // ==========================================
-  // NICHE
-  // ==========================================
   if (tipo === "niche") {
 
     return res.status(200).json({
@@ -1475,20 +1463,24 @@ if (
 
   }
 
-if (tipo === "viral_content") {
+  if (tipo === "viral_content") {
 
-  return res.status(200).json({
-    success:true,
-    ...(cached.text || {})
-  });
+    return res.status(200).json({
+      success: true,
+      ...(cached.text || {})
+    });
 
-}
+  }
 
+  if (tipo === "channel_analysis") {
 
+    return res.status(200).json({
+      success: true,
+      ...(cached.text || {})
+    });
 
-  // ==========================================
-  // DEMAIS TIPOS
-  // ==========================================
+  }
+
   return res.status(200).json({
     success: true,
     tipo,
@@ -1496,7 +1488,6 @@ if (tipo === "viral_content") {
   });
 
 }
-
 // ======================================================
 // 🎛 TEMPERATURE (FORA DO CACHE)
 // ======================================================

@@ -279,10 +279,15 @@ for (const key of shuffledKeys) {
       acc + Number(v.statistics?.viewCount || 0), 0
     );
 
-    const avgViews = totalViews / items.length;
+    const avgViews =
+  totalViews /
+  Math.max(items.length, 1);
 
     const top = Number(items[0]?.statistics?.viewCount || 0);
-    const median = Number(items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0);
+const median =
+  Number(
+    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
+  );
 
     const volume = Math.min(100,
       Math.round(
@@ -553,8 +558,80 @@ const rankedTags =
       )
 
     }));
+// =========================
+// 📊 EXTRA METRICS
+// =========================
 
+const averageViews =
+  Math.round(avgViews);
 
+const averageLikes =
+  Math.round(
+
+    items.reduce(
+
+      (acc,v)=>
+
+        acc +
+
+        Number(
+          v.statistics?.likeCount || 0
+        ),
+
+      0
+
+    )
+
+    /
+
+    Math.max(items.length,1)
+
+  );
+
+const averageComments =
+  Math.round(
+
+    items.reduce(
+
+      (acc,v)=>
+
+        acc +
+
+        Number(
+          v.statistics?.commentCount || 0
+        ),
+
+      0
+
+    )
+
+    /
+
+    Math.max(items.length,1)
+
+  );
+
+const maxViews =
+items.length
+? Math.max(
+    ...items.map(v =>
+      Number(
+        v.statistics?.viewCount || 0
+      )
+    )
+  )
+: 0;
+
+const minViews =
+items.length
+? Math.min(
+    ...items.map(v =>
+      Number(
+        v.statistics?.viewCount || 0
+      )
+    )
+  )
+: 0;
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -569,7 +646,23 @@ const responseData = {
 
   competition,
 
-  tags: rankedTags
+  tags: rankedTags,
+
+  metrics:{
+
+    averageViews,
+
+    averageLikes,
+
+    averageComments,
+
+    maxViews,
+
+    minViews,
+
+    medianViews: median
+
+  }
 
 };
 

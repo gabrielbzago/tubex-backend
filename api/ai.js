@@ -1383,7 +1383,8 @@ if (!finalPrompt) {
 
 }
 
-   // ======================================================
+
+// ======================================================
 // ⚡ CACHE (PROFISSIONAL)
 // ======================================================
 
@@ -1397,15 +1398,22 @@ const stableKey = parsedVideos
 // 🧠 inicializa cache global
 global.__tubexCache = global.__tubexCache || new Map();
 
-// 🔑 chave única (multiusuário + canal + tipo)
+// 🔑 keyword normalizada
+const normalizedKeyword = String(body.keyword || prompt || "")
+  .toLowerCase()
+  .trim()
+  .replace(/\s+/g, " ");
+
+// 🔑 chave única do cache
 const cacheKey = [
-  "v4",
+  "v5",
   userId,
   channelId,
   tipo,
+  normalizedKeyword,
   stableKey,
   context.subscribers || 0,
-avgViews || 0
+  avgViews || 0
 ].join("|");
 
 // 📦 busca cache
@@ -1413,36 +1421,25 @@ const cached = global.__tubexCache.get(cacheKey);
 
 // ⏱ TTL inteligente por tipo
 const TTL = {
+  diagnosis: 6,
+  strategy: 12,
+  niche: 24,
+  ideas: 24,
 
- diagnosis:6,
- strategy:12,
- niche:24,
- ideas:24,
- seo_workspace:12,
- thumbnail_prompt:24,
- viral_content:24,
- channel_analysis:12
+  // SEO Workspace sem cache
+  seo_workspace: 0,
 
+  thumbnail_prompt: 24,
+  viral_content: 24,
+  channel_analysis: 12
 };
 
-const ttl = (TTL[tipo] || 6) * 60 * 60 * 1000;
+const ttlHours = TTL[tipo];
 
-// ======================================================
-// ⚡ CACHE HIT
-// ======================================================
-if (cached && (Date.now() - cached.timestamp) < ttl) {
-
-  // ==========================================
-  // SEO WORKSPACE
-  // ==========================================
-  if (tipo === "seo_workspace") {
-
-    return res.status(200).json({
-      success: true,
-      ...(cached.text || {})
-    });
-
-  }
+const ttl =
+  ttlHours === 0
+    ? 0
+    : ttlHours * 60 * 60 * 1000;
 
   // ==========================================
   // NICHE

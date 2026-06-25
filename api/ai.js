@@ -1029,10 +1029,30 @@ Formato obrigatório:
 
 {
   "viralScore":0,
+
+  "viralLevel":"",
+
+  "viralProbability":0,
+
   "emotionScore":0,
+
   "curiosityScore":0,
+
   "shareScore":0,
 
+  "ctrPrediction":"",
+
+  "retentionPrediction":"",
+
+  "algorithmRecommendation":"",
+
+  "bestAudience":"",
+
+  "difficulty":0,
+
+  "competition":0,
+
+  "confidence":0,
   "viralTitle":"",
 
   "viralTitles":[
@@ -1113,6 +1133,46 @@ REGRAS:
 - Analise padrão de views
 
 Retorne SOMENTE JSON.
+
+REGRAS
+
+viralScore
+0-20 = Muito Fraco
+21-40 = Fraco
+41-60 = Médio
+61-80 = Forte
+81-100 = Explosivo
+
+viralProbability
+
+probabilidade REAL de viralização
+0 até 100
+
+emotionScore
+
+quanto desperta emoção
+
+curiosityScore
+
+quanto desperta curiosidade
+
+shareScore
+
+potencial de compartilhamento
+
+difficulty
+
+dificuldade para viralizar
+
+competition
+
+competição do assunto
+
+confidence
+
+confiança da IA na análise
+
+Nunca deixe nenhum campo vazio.
 
 IMPORTANTE:
 

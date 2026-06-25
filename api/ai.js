@@ -108,7 +108,7 @@ const context = body?.context || {};
 const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
-
+const youtube = body?.youtube || {};
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -823,11 +823,10 @@ Formato obrigatório:
 // ======================================================
 // 🔍 SEO WORKSPACE
 // ======================================================
-const youtube = body.youtube || {};
 else if (tipo === "seo_workspace") {
 
 finalPrompt = `
-finalPrompt = `
+
 Você é um especialista mundial em SEO para YouTube.
 
 Utilize EXCLUSIVAMENTE os dados reais enviados pela API do YouTube.
@@ -1199,7 +1198,14 @@ const response = await fetch(
       "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
     },
 
-    body: JSON.stringify({
+   body: JSON.stringify({
+  tipo: "seo_workspace",
+  keyword: keyword.trim(),
+  prompt: keyword.trim(),
+  youtube: ytData,
+  userId: "workspace",
+  channelId: "workspace"
+})
 
       model: "gpt-4o-mini",
 

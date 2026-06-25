@@ -823,123 +823,58 @@ Formato obrigatório:
 // ======================================================
 // 🔍 SEO WORKSPACE
 // ======================================================
-
+const youtube = body.youtube || {};
 else if (tipo === "seo_workspace") {
 
 finalPrompt = `
-Você é um especialista mundial em SEO para YouTube e YouTube Search.
+finalPrompt = `
+Você é um especialista mundial em SEO para YouTube.
 
-Seu objetivo principal é gerar dados com máxima probabilidade de ranqueamento orgânico.
+Utilize EXCLUSIVAMENTE os dados reais enviados pela API do YouTube.
 
-Analise profundamente a palavra-chave abaixo.
+NUNCA invente métricas.
 
 Palavra-chave:
 
-"${prompt}"
+${body.keyword}
 
-REGRAS IMPORTANTES:
+-----------------------------------
 
-optimizedTitle:
+VOLUME REAL:
 
-focado em SEO puro
-palavra-chave principal obrigatoriamente no início
-máximo 70 caracteres
-otimizado para YouTube Search
-otimizado para Google Search
-alta chance de ranqueamento
+${youtube.volume}
 
-description:
+CONCORRÊNCIA REAL:
 
-mínimo 2000 caracteres
-máximo 4000 caracteres
-iniciar repetindo exatamente o optimizedTitle
-utilizar naturalmente a palavra-chave principal várias vezes
-utilizar relatedKeywords naturalmente
-utilizar longTail naturalmente
-otimizada para YouTube Search
-otimizada para Google Search
-criar múltiplos parágrafos
-incluir benefícios
-incluir dúvidas comuns
-finalizar com CTA
+${youtube.competition}
 
-tags:
+-----------------------------------
 
-mínimo 30 tags
-incluir keyword principal
-incluir variações
-incluir termos relacionados
-incluir termos de baixa concorrência
-evitar duplicadas
+TOP VÍDEOS:
 
-hashtags:
+${JSON.stringify(youtube.items)}
 
-mínimo 15 hashtags
+-----------------------------------
 
-longTail:
+TAGS MAIS USADAS:
 
-mínimo 25 palavras-chave long tail
+${JSON.stringify(youtube.tags)}
 
-relatedKeywords:
+-----------------------------------
 
-mínimo 25 palavras-chave relacionadas
+Baseado nesses dados gere:
 
-recommendations:
-
-mínimo 10 recomendações práticas
+- score SEO
+- título otimizado
+- descrição
+- tags
+- hashtags
+- palavras relacionadas
+- long tails
+- recomendações
 
 Retorne SOMENTE JSON.
-
-Formato:
-
-{
-"score":0,
-
-"volume":{
-"nivel":"",
-"score":0,
-"explicacao":""
-},
-
-"competition":{
-"nivel":"",
-"score":0,
-"explicacao":""
-},
-
-"difficulty":0,
-
-"keywordIntent":"",
-
-"searchIntent":"",
-
-"chanceRanking":"",
-
-"ctrPrediction":"",
-
-"optimizedTitle":"",
-
-"description":"",
-
-"tags":[],
-
-"hashtags":[],
-
-"longTail":[],
-
-"relatedKeywords":[],
-
-"recommendations":[]
-
-}
-
-Nunca responda texto.
-
-Nunca utilize markdown.
-
-Somente JSON.
 `;
-
 }
 
 else if (tipo === "viral_content") {

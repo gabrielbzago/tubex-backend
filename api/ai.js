@@ -1783,6 +1783,10 @@ console.dir(data,{depth:null});
 console.log("================================");
 
    const text = data?.choices?.[0]?.message?.content?.trim();
+console.log("================================");
+console.log("NICHE RAW");
+console.log(text);
+console.log("================================");
 if (tipo === "seo_workspace") {
 
   try {

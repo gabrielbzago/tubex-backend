@@ -177,14 +177,56 @@ global.__rateLimit[userKey].push(now);
       : [];
 
    const parsedVideos = videos.map(v => ({
-  title: v?.snippet?.title || "",
-  description: v?.snippet?.description || "",
-  tags: v?.snippet?.tags || [],
-  publishedAt: v?.snippet?.publishedAt || "",
-  channelTitle: v?.snippet?.channelTitle || "",
-  views: Number(v?.statistics?.viewCount || 0),
-  likes: Number(v?.statistics?.likeCount || 0),
-  comments: Number(v?.statistics?.commentCount || 0)
+
+  title:
+      v?.title ||
+      v?.snippet?.title ||
+      v?.videoTitle ||
+      v?.name ||
+      "",
+
+  description:
+      v?.description ||
+      v?.snippet?.description ||
+      "",
+
+  tags:
+      v?.tags ||
+      v?.snippet?.tags ||
+      [],
+
+  publishedAt:
+      v?.publishedAt ||
+      v?.snippet?.publishedAt ||
+      "",
+
+  channelTitle:
+      v?.channelTitle ||
+      v?.snippet?.channelTitle ||
+      "",
+
+  views:
+      Number(
+          v?.views ??
+          v?.viewCount ??
+          v?.statistics?.viewCount ??
+          0
+      ),
+
+  likes:
+      Number(
+          v?.likes ??
+          v?.statistics?.likeCount ??
+          0
+      ),
+
+  comments:
+      Number(
+          v?.comments ??
+          v?.statistics?.commentCount ??
+          0
+      )
+
 }));
 
 console.log(

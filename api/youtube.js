@@ -247,6 +247,7 @@ for (const key of shuffledKeys) {
         competition: 0
       });
     }
+
 // =========================
 // 🎬 VIDEO DATA
 // =========================
@@ -256,76 +257,217 @@ if (mode === "video_ai") {
   if (!videoId) {
 
     return res.status(400).json({
-
       success: false,
-
       error: "videoId_required"
-
     });
 
   }
 
-  const url =
+  // ======================================
+  // VIDEO
+  // ======================================
 
+  const videoUrl =
     `https://www.googleapis.com/youtube/v3/videos` +
+    `?part=snippet,statistics,contentDetails,status` +
+    `&id=${videoId}` +
+    `&key=${activeKey}`;
 
-    `?part=snippet,statistics,contentDetails,status&id=${videoId}&key=${activeKey}`;
+  const videoRes = await fetch(videoUrl);
 
-  const resYT = await fetch(url);
+  const videoJson = await videoRes.json();
 
-  const json = await resYT.json();
-
-  const video = json.items?.[0];
+  const video = videoJson.items?.[0];
 
   if (!video) {
 
     return res.status(404).json({
-
       success: false,
-
       error: "video_not_found"
-
     });
 
   }
 
   const snippet =
-
     video.snippet || {};
 
   const stats =
-
     video.statistics || {};
 
   const details =
-
     video.contentDetails || {};
 
   const status =
-
     video.status || {};
 
   const published =
-
     new Date(
-
       snippet.publishedAt
-
     ).getTime();
 
   const ageDays = Math.max(
-
     1,
+    Math.round(
+      (Date.now() - published) /
+      86400000
+    )
+  );
 
+  // ======================================
+  // CHANNEL
+  // ======================================
+
+  const channelUrl =
+    `https://www.googleapis.com/youtube/v3/channels` +
+    `?part=snippet,statistics` +
+    `&id=${snippet.channelId}` +
+    `&key=${activeKey}`;
+
+  const channelRes =
+    await fetch(channelUrl);
+
+  const channelJson =
+    await channelRes.json();
+
+  const channel =
+    channelJson.items?.[0] || {};
+
+  const channelSnippet =
+    channel.snippet || {};
+
+  const channelStats =
+    channel.statistics || {};
+
+  // ======================================
+  // LAST VIDEOS
+  // ======================================
+
+  const latestSearchUrl =
+    `https://www.googleapis.com/youtube/v3/search` +
+    `?part=snippet` +
+    `&channelId=${snippet.channelId}` +
+    `&order=date` +
+    `&type=video` +
+    `&maxResults=12` +
+    `&key=${activeKey}`;
+
+  const latestSearchRes =
+    await fetch(latestSearchUrl);
+
+  const latestSearchJson =
+    await latestSearchRes.json();
+
+  const latestIds =
+    (latestSearchJson.items || [])
+      .map(v => v.id?.videoId)
+      .filter(Boolean);
+
+  let latestVideos = [];
+
+  if (latestIds.length) {
+
+    const latestStatsUrl =
+      `https://www.googleapis.com/youtube/v3/videos` +
+      `?part=snippet,statistics` +
+      `&id=${latestIds.join(",")}` +
+      `&key=${activeKey}`;
+
+    const latestStatsRes =
+      await fetch(latestStatsUrl);
+
+    const latestStatsJson =
+      await latestStatsRes.json();
+
+    latestVideos =
+      latestStatsJson.items || [];
+
+  }
+
+  // ======================================
+  // CHANNEL AVERAGES
+  // ======================================
+
+  const averageViews =
     Math.round(
 
-      (Date.now() - published)
+      latestVideos.reduce(
 
-      / 86400000
+        (acc, v) =>
 
-    )
+          acc +
 
-  );
+          Number(
+            v.statistics?.viewCount || 0
+          ),
+
+        0
+
+      )
+
+      /
+
+      Math.max(
+        latestVideos.length,
+        1
+      )
+
+    );
+
+  const averageLikes =
+    Math.round(
+
+      latestVideos.reduce(
+
+        (acc, v) =>
+
+          acc +
+
+          Number(
+            v.statistics?.likeCount || 0
+          ),
+
+        0
+
+      )
+
+      /
+
+      Math.max(
+        latestVideos.length,
+        1
+      )
+
+    );
+
+  const averageComments =
+    Math.round(
+
+      latestVideos.reduce(
+
+        (acc, v) =>
+
+          acc +
+
+          Number(
+            v.statistics?.commentCount || 0
+          ),
+
+        0
+
+      )
+
+      /
+
+      Math.max(
+        latestVideos.length,
+        1
+      )
+
+    );
+
+  // ======================================
+  // RESPONSE
+  // ======================================
 
   return res.status(200).json({
 
@@ -333,31 +475,35 @@ if (mode === "video_ai") {
 
     data: {
 
+      // ======================================
+      // VIDEO
+      // ======================================
+
       id: video.id,
 
       title:
         snippet.title || "",
 
-titleLength:
-    (snippet.title || "").length,
+      titleLength:
+        (snippet.title || "").length,
 
       description:
         snippet.description || "",
 
-descriptionLength:
-    (snippet.description || "").length,
+      descriptionLength:
+        (snippet.description || "").length,
 
-hasDescription:
-    (snippet.description || "").trim().length > 0,
+      hasDescription:
+        (snippet.description || "").trim().length > 0,
 
       tags:
         snippet.tags || [],
 
-tagCount:
-    snippet.tags?.length || 0,
+      tagCount:
+        snippet.tags?.length || 0,
 
-hasTags:
-    (snippet.tags?.length || 0) > 0,
+      hasTags:
+        (snippet.tags?.length || 0) > 0,
 
       categoryId:
         snippet.categoryId || "",
@@ -374,24 +520,25 @@ hasTags:
       publishedAt:
         snippet.publishedAt || "",
 
-publishedYear:
-    new Date(snippet.publishedAt).getFullYear(),
+      publishedYear:
+        new Date(
+          snippet.publishedAt
+        ).getFullYear(),
 
-thumbnail:
+      thumbnail:
 
-    snippet.thumbnails?.maxres?.url ||
+        snippet.thumbnails?.maxres?.url ||
 
-    snippet.thumbnails?.standard?.url ||
+        snippet.thumbnails?.standard?.url ||
 
-    snippet.thumbnails?.high?.url ||
+        snippet.thumbnails?.high?.url ||
 
-    snippet.thumbnails?.medium?.url ||
+        snippet.thumbnails?.medium?.url ||
 
-    "",
+        "",
 
-hasThumbnail:
-
-    !!snippet.thumbnails?.high,
+      hasThumbnail:
+        !!snippet.thumbnails?.high,
 
       duration:
         details.duration || "",
@@ -436,38 +583,220 @@ hasThumbnail:
 
       viewsPerDay:
 
-    Math.round(
+        Math.round(
 
-        Number(
+          Number(
             stats.viewCount || 0
-        )
+          )
 
-        /
+          /
 
-        ageDays
+          ageDays
 
-    ),
+        ),
 
-seo: {
+      seo: {
 
-    titleLength:
-        (snippet.title || "").length,
+        titleLength:
+          (snippet.title || "").length,
 
-    descriptionLength:
-        (snippet.description || "").length,
+        descriptionLength:
+          (snippet.description || "").length,
 
-    tagCount:
-        snippet.tags?.length || 0,
+        tagCount:
+          snippet.tags?.length || 0,
 
-    keywordDensity: null
+        keywordDensity: null
 
-}
+      },
+
+      // ======================================
+      // CHANNEL
+      // ======================================
+
+      channel: {
+
+        id:
+          snippet.channelId,
+
+        title:
+          channelSnippet.title || "",
+
+        description:
+          channelSnippet.description || "",
+
+        customUrl:
+          channelSnippet.customUrl || "",
+
+        country:
+          channelSnippet.country || "",
+
+        publishedAt:
+          channelSnippet.publishedAt || "",
+
+        subscribers:
+
+          Number(
+            channelStats.subscriberCount || 0
+          ),
+
+        totalViews:
+
+          Number(
+            channelStats.viewCount || 0
+          ),
+
+        totalVideos:
+
+          Number(
+            channelStats.videoCount || 0
+          ),
+
+        averageViews,
+
+        averageLikes,
+
+        averageComments
+
+      },
+
+      // ======================================
+      // LAST VIDEOS
+      // ======================================
+
+      latestVideos:
+
+        latestVideos.map(video=>({
+
+          id:
+            video.id,
+
+          title:
+            video.snippet?.title || "",
+
+          views:
+
+            Number(
+              video.statistics?.viewCount || 0
+            ),
+
+          likes:
+
+            Number(
+              video.statistics?.likeCount || 0
+            ),
+
+          comments:
+
+            Number(
+              video.statistics?.commentCount || 0
+            ),
+
+          publishedAt:
+            video.snippet?.publishedAt || ""
+
+        })),
+
+      // ======================================
+      // PERFORMANCE
+      // ======================================
+
+      performance: {
+
+        isAboveChannelAverage:
+
+          Number(
+            stats.viewCount || 0
+          ) > averageViews,
+
+        channelAverageViews:
+          averageViews,
+
+        differenceFromAverage:
+
+          Number(
+            stats.viewCount || 0
+          ) - averageViews,
+
+        percentageOfAverage:
+
+          averageViews > 0
+
+            ? Math.round(
+
+                (
+                  Number(
+                    stats.viewCount || 0
+                  )
+
+                  /
+
+                  averageViews
+
+                ) * 100
+
+              )
+
+            : 0
+
+      },
+
+      // ======================================
+      // FLAGS
+      // ======================================
+
+      flags: {
+
+        hasDescription:
+
+          (snippet.description || "")
+          .trim()
+          .length > 0,
+
+        hasTags:
+
+          (snippet.tags?.length || 0) > 0,
+
+        hasThumbnail:
+
+          !!snippet.thumbnails?.high,
+
+        isPublic:
+
+          status.privacyStatus === "public",
+
+        isEmbeddable:
+
+          !!status.embeddable,
+
+        madeForKids:
+
+          !!status.madeForKids
+
+      },
+
+      // ======================================
+      // RAW
+      // ======================================
+
+      raw: {
+
+        snippet,
+
+        statistics: stats,
+
+        contentDetails: details,
+
+        status
+
+      }
 
     }
 
   });
 
 }
+
     // =========================
     // 📊 SUMMARY MODE
     // =========================

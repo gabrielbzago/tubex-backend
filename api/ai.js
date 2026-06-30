@@ -124,14 +124,21 @@ const requiresPrompt = [
   "seo_workspace",
   "viral_content",
   "thumbnail_prompt",
+"video_analysis",
   "channel_analysis"
 ];
 
 if (
-  !prompt &&
-  tipo !== "channel_analysis" &&
-  requiresPrompt.includes(tipo)
-) {
+
+    !prompt &&
+
+    tipo !== "channel_analysis" &&
+
+    tipo !== "video_analysis" &&
+
+    requiresPrompt.includes(tipo)
+
+){
 
   return res.status(400).json({
     success:false,
@@ -1452,6 +1459,133 @@ Formato:
 `;
 
 }
+// ======================================================
+// 🎬 VIDEO ANALYSIS
+// ======================================================
+
+else if (tipo === "video_analysis") {
+
+finalPrompt = `
+Você é um consultor especialista em otimização de vídeos do YouTube.
+
+Você irá analisar UM ÚNICO vídeo.
+
+Todas as recomendações devem ser baseadas exclusivamente nos dados recebidos.
+
+Nunca faça recomendações genéricas.
+
+======================================
+DADOS DO VÍDEO
+======================================
+
+Título:
+${youtube.title}
+
+Descrição:
+${youtube.description}
+
+Tags:
+${Array.isArray(youtube.tags) ? youtube.tags.join(", ") : ""}
+
+Views:
+${youtube.views}
+
+Likes:
+${youtube.likes}
+
+Comentários:
+${youtube.comments}
+
+CTR:
+${youtube.ctr ?? "Não informado"}
+
+Impressões:
+${youtube.impressions ?? "Não informado"}
+
+Retenção:
+${youtube.retention ?? "Não informado"}
+
+Tempo médio:
+${youtube.averageViewDuration ?? "Não informado"}
+
+Título possui:
+${youtube.titleLength} caracteres
+
+Descrição possui:
+${youtube.descriptionLength} caracteres
+
+Quantidade de Tags:
+${youtube.tagCount}
+
+Views por dia:
+${youtube.viewsPerDay}
+
+Publicado em:
+${youtube.publishedAt}
+
+======================================
+
+Analise:
+
+• potencial de viralização
+
+• qualidade do título
+
+• qualidade da thumbnail
+
+• CTR
+
+• retenção
+
+• SEO
+
+• descrição
+
+• tags
+
+• gargalo principal
+
+• maior oportunidade
+
+• prioridade número 1
+
+Nunca invente métricas.
+
+======================================
+
+Retorne SOMENTE JSON.
+
+Nunca markdown.
+
+Nunca texto.
+
+Formato:
+
+{
+
+"optimizationScore":0,
+
+"viralChance":0,
+
+"bottleneck":"",
+
+"comparison":"",
+
+"prediction":"",
+
+"thumbDecision":"",
+
+"titleDecision":"",
+
+"descriptionDecision":"",
+
+"priority":""
+
+}
+
+`;
+
+}
 
 // ======================================================
 // 🏷 ADVANCED TAGS
@@ -1621,6 +1755,7 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
+video_analysis:12,
   niche: 24,
   ideas: 24,
 
@@ -1669,22 +1804,41 @@ if (
 
   }
 
-  if (tipo === "channel_analysis") {
+ if (tipo === "channel_analysis") {
 
     return res.status(200).json({
-      success: true,
-      ...(cached.text || {})
+
+        success:true,
+
+        ...(cached.text || {})
+
     });
 
-  }
+}
 
-  return res.status(200).json({
-    success: true,
-    tipo,
-    text: cached.text || ""
-  });
+if (tipo === "video_analysis") {
+
+    return res.status(200).json({
+
+        success:true,
+
+        ...(cached.text || {})
+
+    });
 
 }
+
+return res.status(200).json({
+
+    success:true,
+
+    tipo,
+
+    text:cached.text || ""
+
+});
+}
+
 // ======================================================
 // 🎛 TEMPERATURE (FORA DO CACHE)
 // ======================================================
@@ -1700,8 +1854,11 @@ if (tipo==="viral_content")
  temp=0.95;
 if (tipo==="channel_analysis")
  temp=0.6;
+if (tipo==="video_analysis")
+ temp=0.45;
 
-    // ======================================================
+
+ // ======================================================
 // 🤖 OPENAI
 // ======================================================
 
@@ -1765,6 +1922,25 @@ Nunca escreva texto fora do JSON.
 
 }
 
+if (tipo === "video_analysis") {
+
+systemPrompt = `
+
+Você é um especialista em crescimento no YouTube.
+
+Sua função é analisar um vídeo específico.
+
+Sempre responda exclusivamente JSON válido.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+
+`;
+
+}
+
+
 console.log("================================");
 console.log("TIPO:", tipo);
 console.log("PROMPT:");
@@ -1787,10 +1963,15 @@ const response = await fetch(
 
 model: "gpt-4o-mini",
 
-      ...(tipo === "seo_workspace" ||
-   tipo === "niche" ||
-   tipo === "viral_content" ||
-   tipo === "channel_analysis"
+    tipo === "seo_workspace" ||
+
+tipo === "niche" ||
+
+tipo === "viral_content" ||
+
+tipo === "channel_analysis" ||
+
+tipo === "video_analysis"
         ? {
             response_format: {
               type: "json_object"
@@ -1821,6 +2002,8 @@ model: "gpt-4o-mini",
     ? 2200
 : tipo === "channel_analysis"
     ? 2200
+: tipo === "video_analysis"
+    ? 1800
         : tipo === "strategy"
           ? 1800
         : tipo === "diagnosis"
@@ -1832,6 +2015,7 @@ model: "gpt-4o-mini",
         : tipo === "niche"
           ? 600
         : 1000
+
 
     })
 
@@ -1993,6 +2177,46 @@ if (tipo === "channel_analysis") {
     });
 
   }
+
+}
+
+if (tipo === "video_analysis") {
+
+    try {
+
+        const parsed = JSON.parse(text);
+
+        global.__tubexCache.set(cacheKey, {
+
+            text: parsed,
+
+            timestamp: Date.now()
+
+        });
+
+        return res.status(200).json({
+
+            success: true,
+
+            ...parsed
+
+        });
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success:false,
+
+            error:"invalid_json"
+
+        });
+
+    }
 
 }
 

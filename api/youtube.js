@@ -41,12 +41,45 @@ export default async function handler(req, res) {
     const mode = body?.mode || "seo";
     const videoId = body?.videoId;
 
-    if (!keyword && !videoId) {
-      return res.status(400).json({
-        success: false,
-        error: "keyword_required"
-      });
-    }
+    if (
+
+    mode === "video_ai"
+
+    &&
+
+    !videoId
+
+){
+
+    return res.status(400).json({
+
+        success:false,
+
+        error:"videoId_required"
+
+    });
+
+}
+
+if(
+
+    mode !== "video_ai"
+
+    &&
+
+    !keyword
+
+){
+
+    return res.status(400).json({
+
+        success:false,
+
+        error:"keyword_required"
+
+    });
+
+}
 
     // =========================
     // 📦 CACHE SEO
@@ -74,7 +107,7 @@ export default async function handler(req, res) {
 
     let items = [];
     let success = false;
-    let activeKey = null;
+let activeKey = keys[0] || null;
 
     // =========================
     // 🔁 MULTI KEY FETCH
@@ -214,25 +247,227 @@ for (const key of shuffledKeys) {
         competition: 0
       });
     }
+// =========================
+// 🎬 VIDEO DATA
+// =========================
 
-    // =========================
-    // 🎬 VIDEO MODE
-    // =========================
-    if (videoId) {
+if (mode === "video_ai") {
 
-      const url =
-        `https://www.googleapis.com/youtube/v3/videos` +
-        `?part=snippet&id=${videoId}&key=${activeKey}`;
+  if (!videoId) {
 
-      const resYT = await fetch(url);
-      const json = await resYT.json();
+    return res.status(400).json({
 
-      return res.status(200).json({
-        success: true,
-        data: json.items?.[0] || { snippet: { tags: [] } }
-      });
+      success: false,
+
+      error: "videoId_required"
+
+    });
+
+  }
+
+  const url =
+
+    `https://www.googleapis.com/youtube/v3/videos` +
+
+    `?part=snippet,statistics,contentDetails,status&id=${videoId}&key=${activeKey}`;
+
+  const resYT = await fetch(url);
+
+  const json = await resYT.json();
+
+  const video = json.items?.[0];
+
+  if (!video) {
+
+    return res.status(404).json({
+
+      success: false,
+
+      error: "video_not_found"
+
+    });
+
+  }
+
+  const snippet =
+
+    video.snippet || {};
+
+  const stats =
+
+    video.statistics || {};
+
+  const details =
+
+    video.contentDetails || {};
+
+  const status =
+
+    video.status || {};
+
+  const published =
+
+    new Date(
+
+      snippet.publishedAt
+
+    ).getTime();
+
+  const ageDays = Math.max(
+
+    1,
+
+    Math.round(
+
+      (Date.now() - published)
+
+      / 86400000
+
+    )
+
+  );
+
+  return res.status(200).json({
+
+    success: true,
+
+    data: {
+
+      id: video.id,
+
+      title:
+        snippet.title || "",
+
+titleLength:
+    (snippet.title || "").length,
+
+      description:
+        snippet.description || "",
+
+descriptionLength:
+    (snippet.description || "").length,
+
+hasDescription:
+    (snippet.description || "").trim().length > 0,
+
+      tags:
+        snippet.tags || [],
+
+tagCount:
+    snippet.tags?.length || 0,
+
+hasTags:
+    (snippet.tags?.length || 0) > 0,
+
+      categoryId:
+        snippet.categoryId || "",
+
+      language:
+        snippet.defaultLanguage || "",
+
+      channelId:
+        snippet.channelId || "",
+
+      channelTitle:
+        snippet.channelTitle || "",
+
+      publishedAt:
+        snippet.publishedAt || "",
+
+publishedYear:
+    new Date(snippet.publishedAt).getFullYear(),
+
+thumbnail:
+
+    snippet.thumbnails?.maxres?.url ||
+
+    snippet.thumbnails?.standard?.url ||
+
+    snippet.thumbnails?.high?.url ||
+
+    snippet.thumbnails?.medium?.url ||
+
+    "",
+
+hasThumbnail:
+
+    !!snippet.thumbnails?.high,
+
+      duration:
+        details.duration || "",
+
+      privacy:
+        status.privacyStatus || "",
+
+      licensed:
+        status.license || "",
+
+      embeddable:
+        status.embeddable,
+
+      madeForKids:
+        status.madeForKids,
+
+      views:
+
+        Number(
+          stats.viewCount || 0
+        ),
+
+      likes:
+
+        Number(
+          stats.likeCount || 0
+        ),
+
+      comments:
+
+        Number(
+          stats.commentCount || 0
+        ),
+
+      favorites:
+
+        Number(
+          stats.favoriteCount || 0
+        ),
+
+      ageDays,
+
+      viewsPerDay:
+
+    Math.round(
+
+        Number(
+            stats.viewCount || 0
+        )
+
+        /
+
+        ageDays
+
+    ),
+
+seo: {
+
+    titleLength:
+        (snippet.title || "").length,
+
+    descriptionLength:
+        (snippet.description || "").length,
+
+    tagCount:
+        snippet.tags?.length || 0,
+
+    keywordDensity: null
+
+}
+
     }
 
+  });
+
+}
     // =========================
     // 📊 SUMMARY MODE
     // =========================

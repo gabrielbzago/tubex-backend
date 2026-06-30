@@ -1958,66 +1958,60 @@ const response = await fetch(
       "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
     },
 
-   body: JSON.stringify({
+ body: JSON.stringify({
 
+    model: "gpt-4o-mini",
 
-model: "gpt-4o-mini",
+    ...((
+        tipo === "seo_workspace" ||
+        tipo === "niche" ||
+        tipo === "viral_content" ||
+        tipo === "channel_analysis" ||
+        tipo === "video_analysis"
+    ) ? {
+        response_format: {
+            type: "json_object"
+        }
+    } : {}),
 
-    tipo === "seo_workspace" ||
-
-tipo === "niche" ||
-
-tipo === "viral_content" ||
-
-tipo === "channel_analysis" ||
-
-tipo === "video_analysis"
-        ? {
-            response_format: {
-              type: "json_object"
-            }
-          }
-        : {}),
-
-      messages: [
+    messages: [
 
         {
-          role: "system",
-          content: systemPrompt
+            role: "system",
+            content: systemPrompt
         },
 
         {
-          role: "user",
-          content: finalPrompt
+            role: "user",
+            content: finalPrompt
         }
 
-      ],
+    ],
 
-      temperature: temp,
+    temperature: temp,
 
-      max_tokens:
+    max_tokens:
         tipo === "seo_workspace"
-          ? 3000
-: tipo === "viral_content"
-    ? 2200
-: tipo === "channel_analysis"
-    ? 2200
-: tipo === "video_analysis"
-    ? 1800
+            ? 3000
+        : tipo === "viral_content"
+            ? 2200
+        : tipo === "channel_analysis"
+            ? 2200
+        : tipo === "video_analysis"
+            ? 1800
         : tipo === "strategy"
-          ? 1800
+            ? 1800
         : tipo === "diagnosis"
-          ? 1600
+            ? 1600
         : tipo === "descricao"
-          ? 1200
+            ? 1200
         : tipo === "ideas"
-          ? 900
+            ? 900
         : tipo === "niche"
-          ? 600
+            ? 600
         : 1000
 
-
-    })
+})
 
   }
 );

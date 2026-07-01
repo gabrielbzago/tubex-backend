@@ -315,6 +315,7 @@ if (mode === "video_ai") {
     )
   );
 
+
 // ======================================
 // YOUTUBE ANALYTICS
 // ======================================
@@ -329,7 +330,9 @@ let analytics = {
 
     averageViewPercentage: null,
 
-    estimatedMinutesWatched: null
+    estimatedMinutesWatched: null,
+
+    views: null
 
 };
 
@@ -351,7 +354,7 @@ if (accessToken) {
 
             +
 
-            `?ids=channel==MINE`
+            "?ids=channel==MINE"
 
             +
 
@@ -363,7 +366,7 @@ if (accessToken) {
 
             +
 
-            `&dimensions=video`
+            "&dimensions=video"
 
             +
 
@@ -371,109 +374,143 @@ if (accessToken) {
 
             +
 
-            `&metrics=`
+            "&metrics="
 
             +
 
             [
+
                 "views",
+
                 "estimatedMinutesWatched",
+
                 "averageViewDuration",
+
                 "averageViewPercentage",
+
                 "impressions",
+
                 "impressionClickThroughRate"
+
             ].join(",");
 
         const analyticsRes = await fetch(
 
-    analyticsUrl,
+            analyticsUrl,
 
-    {
+            {
 
-        headers:{
+                headers: {
 
-            Authorization:
+                    Authorization:
 
-                `Bearer ${accessToken}`
+                        `Bearer ${accessToken}`
 
-        }
+                }
 
-    }
+            }
 
-);
+        );
 
-console.log(
+        console.log(
 
-    "📡 Analytics Status:",
+            "📡 Analytics Status:",
 
-    analyticsRes.status
+            analyticsRes.status
 
-);
+        );
 
-const analyticsText =
+        const analyticsText =
 
-    await analyticsRes.text();
+            await analyticsRes.text();
 
-console.log(
+        console.log(
 
-    "📡 Analytics Body:",
-
-    analyticsText
-
-);
-
-let analyticsJson = {};
-
-try{
-
-    analyticsJson =
-
-        JSON.parse(
+            "📡 Analytics Body:",
 
             analyticsText
 
         );
 
-}
+        let analyticsJson = {};
 
-catch(e){
+        try {
 
-    analyticsJson = {};
+            analyticsJson =
 
-}
+                JSON.parse(
 
-        const analyticsJson =
+                    analyticsText
 
-            await analyticsRes.json();
+                );
+
+        }
+
+        catch (e) {
+
+            console.error(
+
+                "Erro ao converter Analytics:",
+
+                e
+
+            );
+
+            analyticsJson = {};
+
+        }
 
         console.log(
 
-            "📊 Analytics:",
+            "📊 Analytics JSON:",
 
             analyticsJson
 
         );
 
         const row =
-            analyticsJson.rows?.[0];
+
+            analyticsJson?.rows?.[0];
 
         if (row) {
 
             analytics = {
 
-                views: row[0],
+                views:
 
-                estimatedMinutesWatched: row[1],
+                    Number(row[0] ?? 0),
 
-                averageViewDuration: row[2],
+                estimatedMinutesWatched:
 
-                averageViewPercentage: row[3],
+                    Number(row[1] ?? 0),
 
-                impressions: row[4],
+                averageViewDuration:
 
-                ctr: row[5]
+                    Number(row[2] ?? 0),
+
+                averageViewPercentage:
+
+                    Number(row[3] ?? 0),
+
+                impressions:
+
+                    Number(row[4] ?? 0),
+
+                ctr:
+
+                    Number(row[5] ?? 0)
 
             };
+
+        }
+
+        else {
+
+            console.warn(
+
+                "⚠ Nenhuma linha retornada pela Analytics API."
+
+            );
 
         }
 

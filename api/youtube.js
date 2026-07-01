@@ -406,9 +406,7 @@ if (accessToken) {
     "views",
     "estimatedMinutesWatched",
     "averageViewDuration",
-    "averageViewPercentage",
-    "impressions",
-    "impressionsCtr"
+    "averageViewPercentage"
 ].join(",");
 
      const analyticsRes = await fetch(

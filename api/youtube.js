@@ -384,25 +384,63 @@ if (accessToken) {
                 "impressionClickThroughRate"
             ].join(",");
 
-        const analyticsRes =
+        const analyticsRes = await fetch(
 
-            await fetch(
+    analyticsUrl,
 
-                analyticsUrl,
+    {
 
-                {
+        headers:{
 
-                    headers: {
+            Authorization:
 
-                        Authorization:
+                `Bearer ${accessToken}`
 
-                            `Bearer ${accessToken}`
+        }
 
-                    }
+    }
 
-                }
+);
 
-            );
+console.log(
+
+    "📡 Analytics Status:",
+
+    analyticsRes.status
+
+);
+
+const analyticsText =
+
+    await analyticsRes.text();
+
+console.log(
+
+    "📡 Analytics Body:",
+
+    analyticsText
+
+);
+
+let analyticsJson = {};
+
+try{
+
+    analyticsJson =
+
+        JSON.parse(
+
+            analyticsText
+
+        );
+
+}
+
+catch(e){
+
+    analyticsJson = {};
+
+}
 
         const analyticsJson =
 

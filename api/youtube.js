@@ -398,11 +398,14 @@ if (accessToken) {
 
             +
 
-            "&metrics="
-
-            +
-
             [
+    "views",
+    "estimatedMinutesWatched",
+    "averageViewDuration",
+    "averageViewPercentage",
+    "impressions",
+    "impressionsCtr"
+].join(",");
 
                 "views",
 

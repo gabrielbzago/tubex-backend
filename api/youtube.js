@@ -394,31 +394,22 @@ if (accessToken) {
 
             ].join(",");
 
-        const analyticsRes = await fetch(
+     const analyticsRes = await fetch(
+    analyticsUrl,
+    {
+        headers:{
+            Authorization:`Bearer ${accessToken}`
+        }
+    }
+);
 
-            analyticsUrl,
+console.log("STATUS:", analyticsRes.status);
+console.log("OK:", analyticsRes.ok);
 
-            {
-
-                headers: {
-
-                    Authorization:
-
-                        `Bearer ${accessToken}`
-
-                }
-
-            }
-
-        );
-
-        console.log(
-
-            "📡 Analytics Status:",
-
-            analyticsRes.status
-
-        );
+console.log(
+    "📡 Analytics Status:",
+    analyticsRes.status
+);
 
         const analyticsText =
 
@@ -468,9 +459,16 @@ if (accessToken) {
 
         );
 
-        const row =
+      const row = analyticsJson?.rows?.[0];
 
-            analyticsJson?.rows?.[0];
+if (!row) {
+
+    console.log("================================");
+    console.log("ANALYTICS COMPLETO");
+    console.dir(analyticsJson, { depth: null });
+    console.log("================================");
+
+}
 
         if (row) {
 

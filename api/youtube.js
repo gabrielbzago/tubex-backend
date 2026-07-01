@@ -403,13 +403,14 @@ if (accessToken) {
             +
 
 [
-    "views"
-    
+    "views",
+    "estimatedMinutesWatched",
+    "averageViewDuration",
+    "averageViewPercentage",
+    "impressions",
+    "impressionsCtr"
 ].join(",");
-console.log("================================");
-console.log("ANALYTICS URL");
-console.log(analyticsUrl);
-console.log("================================");
+
      const analyticsRes = await fetch(
     analyticsUrl,
     {

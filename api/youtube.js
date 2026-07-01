@@ -398,7 +398,11 @@ if (accessToken) {
 
             +
 
-            [
+            "&metrics="
+
+            +
+
+[
     "views",
     "estimatedMinutesWatched",
     "averageViewDuration",
@@ -406,20 +410,6 @@ if (accessToken) {
     "impressions",
     "impressionsCtr"
 ].join(",");
-
-                "views",
-
-                "estimatedMinutesWatched",
-
-                "averageViewDuration",
-
-                "averageViewPercentage",
-
-                "impressions",
-
-                "impressionClickThroughRate"
-
-            ].join(",");
 
      const analyticsRes = await fetch(
     analyticsUrl,

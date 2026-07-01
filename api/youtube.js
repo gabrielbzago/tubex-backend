@@ -265,6 +265,17 @@ if (mode === "video_ai") {
 
   }
 
+console.log("================================");
+console.log("VIDEO AI");
+console.log("videoId:", videoId);
+console.log("accessToken recebido:", !!accessToken);
+console.log(
+    accessToken
+        ? accessToken.substring(0, 25) + "..."
+        : "TOKEN NULO"
+);
+console.log("================================");
+
   // ======================================
   // VIDEO
   // ======================================
@@ -336,7 +347,20 @@ let analytics = {
 
 };
 
+console.log("================================");
+console.log("ACCESS TOKEN:", !!accessToken);
+console.log(
+    accessToken
+        ? accessToken.substring(0,20) + "..."
+        : "TOKEN NULO"
+);
+console.log("================================");
+
+console.log("Entrou no bloco Analytics?", !!accessToken);
+
 if (accessToken) {
+
+    console.log(">>> CHAMANDO YOUTUBE ANALYTICS API");
 
     try {
 

@@ -36,6 +36,8 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string"
       ? JSON.parse(req.body)
       : req.body;
+const accessToken =
+    body?.accessToken || "";
 
     const keyword = body?.keyword?.trim();
     const mode = body?.mode || "seo";
@@ -312,6 +314,146 @@ if (mode === "video_ai") {
       86400000
     )
   );
+
+// ======================================
+// YOUTUBE ANALYTICS
+// ======================================
+
+let analytics = {
+
+    ctr: null,
+
+    impressions: null,
+
+    averageViewDuration: null,
+
+    averageViewPercentage: null,
+
+    estimatedMinutesWatched: null
+
+};
+
+if (accessToken) {
+
+    try {
+
+        const startDate =
+            snippet.publishedAt.slice(0, 10);
+
+        const endDate =
+            new Date()
+                .toISOString()
+                .slice(0, 10);
+
+        const analyticsUrl =
+
+            "https://youtubeanalytics.googleapis.com/v2/reports"
+
+            +
+
+            `?ids=channel==MINE`
+
+            +
+
+            `&startDate=${startDate}`
+
+            +
+
+            `&endDate=${endDate}`
+
+            +
+
+            `&dimensions=video`
+
+            +
+
+            `&filters=video==${video.id}`
+
+            +
+
+            `&metrics=`
+
+            +
+
+            [
+                "views",
+                "estimatedMinutesWatched",
+                "averageViewDuration",
+                "averageViewPercentage",
+                "impressions",
+                "impressionClickThroughRate"
+            ].join(",");
+
+        const analyticsRes =
+
+            await fetch(
+
+                analyticsUrl,
+
+                {
+
+                    headers: {
+
+                        Authorization:
+
+                            `Bearer ${accessToken}`
+
+                    }
+
+                }
+
+            );
+
+        const analyticsJson =
+
+            await analyticsRes.json();
+
+        console.log(
+
+            "📊 Analytics:",
+
+            analyticsJson
+
+        );
+
+        const row =
+            analyticsJson.rows?.[0];
+
+        if (row) {
+
+            analytics = {
+
+                views: row[0],
+
+                estimatedMinutesWatched: row[1],
+
+                averageViewDuration: row[2],
+
+                averageViewPercentage: row[3],
+
+                impressions: row[4],
+
+                ctr: row[5]
+
+            };
+
+        }
+
+    }
+
+    catch (e) {
+
+        console.error(
+
+            "Analytics API:",
+
+            e
+
+        );
+
+    }
+
+}
 
   // ======================================
   // CHANNEL
@@ -594,6 +736,25 @@ if (mode === "video_ai") {
           ageDays
 
         ),
+ctr:
+
+analytics.ctr,
+
+impressions:
+
+analytics.impressions,
+
+averageViewDuration:
+
+analytics.averageViewDuration,
+
+averageViewPercentage:
+
+analytics.averageViewPercentage,
+
+estimatedMinutesWatched:
+
+analytics.estimatedMinutesWatched,
 
       seo: {
 

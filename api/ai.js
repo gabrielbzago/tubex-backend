@@ -1466,26 +1466,24 @@ Formato:
 else if (tipo === "video_analysis") {
 
 finalPrompt = `
-Você é um consultor especialista em otimização de vídeos do YouTube.
 
-Você irá analisar UM ÚNICO vídeo.
+Você é um consultor sênior especialista em crescimento no YouTube.
 
-Todas as recomendações devem ser baseadas exclusivamente nos dados recebidos.
+Analise EXCLUSIVAMENTE este vídeo.
 
-Nunca faça recomendações genéricas.
+Nunca invente dados.
 
-======================================
+Se um dado estiver ausente diga que ele não está disponível.
+
+========================
 DADOS DO VÍDEO
-======================================
+========================
 
 Título:
 ${youtube.title}
 
 Descrição:
 ${youtube.description}
-
-Tags:
-${Array.isArray(youtube.tags) ? youtube.tags.join(", ") : ""}
 
 Views:
 ${youtube.views}
@@ -1497,16 +1495,25 @@ Comentários:
 ${youtube.comments}
 
 CTR:
-${youtube.ctr ?? "Não informado"}
+${youtube.ctr}
 
 Impressões:
-${youtube.impressions ?? "Não informado"}
+${youtube.impressions}
 
-Retenção:
-${youtube.retention ?? "Não informado"}
+Retenção Média:
+${youtube.averageViewPercentage}
 
-Tempo médio:
-${youtube.averageViewDuration ?? "Não informado"}
+Tempo Médio:
+${youtube.averageViewDuration}
+
+Dias publicado:
+${youtube.ageDays}
+
+Views por dia:
+${youtube.viewsPerDay}
+
+Quantidade de Tags:
+${youtube.tagCount}
 
 Título possui:
 ${youtube.titleLength} caracteres
@@ -1514,52 +1521,26 @@ ${youtube.titleLength} caracteres
 Descrição possui:
 ${youtube.descriptionLength} caracteres
 
-Quantidade de Tags:
-${youtube.tagCount}
+========================
+OBJETIVO
+========================
 
-Views por dia:
-${youtube.viewsPerDay}
+Decida usando SOMENTE os dados acima.
 
-Publicado em:
-${youtube.publishedAt}
+Nunca responda genericamente.
 
-======================================
+Se o CTR estiver bom, diga que está bom.
 
-Analise:
+Se estiver ruim, explique exatamente por quê.
 
-• potencial de viralização
+Se a retenção estiver boa, diga.
 
-• qualidade do título
+Se estiver ruim, diga.
 
-• qualidade da thumbnail
+Nunca peça mais dados.
 
-• CTR
-
-• retenção
-
-• SEO
-
-• descrição
-
-• tags
-
-• gargalo principal
-
-• maior oportunidade
-
-• prioridade número 1
-
-Nunca invente métricas.
-
-======================================
-
-Retorne SOMENTE JSON.
-
-Nunca markdown.
-
-Nunca texto.
-
-Formato:
+========================
+RETORNE APENAS JSON
 
 {
 
@@ -1567,24 +1548,50 @@ Formato:
 
 "viralChance":0,
 
+"priority":"",
+
 "bottleneck":"",
 
 "comparison":"",
 
 "prediction":"",
 
+"titleDecision":"",
+
+"newTitles":[
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+"",
+""
+],
+
 "thumbDecision":"",
 
-"titleDecision":"",
+"thumbnailRecommendation":"",
 
 "descriptionDecision":"",
 
-"priority":""
+"newDescription":"",
+
+"tagsDecision":"",
+
+"newTags":[
+
+],
+
+"actionPlan":[
+
+]
 
 }
 
 `;
-
 }
 
 // ======================================================
@@ -1855,7 +1862,7 @@ if (tipo==="viral_content")
 if (tipo==="channel_analysis")
  temp=0.6;
 if (tipo==="video_analysis")
- temp=0.45;
+ temp=0.25;
 
 
  // ======================================================
@@ -1998,7 +2005,7 @@ const response = await fetch(
         : tipo === "channel_analysis"
             ? 2200
         : tipo === "video_analysis"
-            ? 1800
+            ? 2600
         : tipo === "strategy"
             ? 1800
         : tipo === "diagnosis"

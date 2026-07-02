@@ -398,9 +398,7 @@ if (accessToken) {
 
             +
 
-      "&metrics="
-
-+
+"&metrics=" +
 
 [
     "views",
@@ -409,11 +407,7 @@ if (accessToken) {
 
     "averageViewDuration",
 
-    "averageViewPercentage",
-
-    "impressions",
-
-    "impressionsCtr"
+    "averageViewPercentage"
 
 ].join(",");
 
@@ -495,35 +489,21 @@ if (!row) {
 
       if (row) {
 
-    analytics = {
+analytics = {
 
-    videoId:
+    videoId: row[0],
 
-        row[0],
+    views: Number(row[1] ?? 0),
 
-    views:
+    estimatedMinutesWatched: Number(row[2] ?? 0),
 
-        Number(row[1] ?? 0),
+    averageViewDuration: Number(row[3] ?? 0),
 
-    estimatedMinutesWatched:
+    averageViewPercentage: Number(row[4] ?? 0),
 
-        Number(row[2] ?? 0),
+    impressions: null,
 
-    averageViewDuration:
-
-        Number(row[3] ?? 0),
-
-    averageViewPercentage:
-
-        Number(row[4] ?? 0),
-
-    impressions:
-
-        Number(row[5] ?? 0),
-
-    ctr:
-
-        Number(row[6] ?? 0)
+    ctr: null
 
 };
 
@@ -837,12 +817,10 @@ if (!row) {
 
         ),
 ctr:
-
-analytics.ctr,
+    analytics.ctr ?? 0,
 
 impressions:
-
-analytics.impressions,
+    analytics.impressions ?? 0,
 
 averageViewDuration:
 

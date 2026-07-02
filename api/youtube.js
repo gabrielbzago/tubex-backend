@@ -398,15 +398,23 @@ if (accessToken) {
 
             +
 
-            "&metrics="
+      "&metrics="
 
-            +
++
 
 [
     "views",
+
     "estimatedMinutesWatched",
+
     "averageViewDuration",
-    "averageViewPercentage"
+
+    "averageViewPercentage",
+
+    "impressions",
+
+    "impressionsCtr"
+
 ].join(",");
 
      const analyticsRes = await fetch(
@@ -489,32 +497,35 @@ if (!row) {
 
     analytics = {
 
-        videoId:
+    videoId:
 
-            row[0],
+        row[0],
 
-        views:
+    views:
 
-            Number(row[1] ?? 0),
+        Number(row[1] ?? 0),
 
-        estimatedMinutesWatched:
+    estimatedMinutesWatched:
 
-            Number(row[2] ?? 0),
+        Number(row[2] ?? 0),
 
-        averageViewDuration:
+    averageViewDuration:
 
-            Number(row[3] ?? 0),
+        Number(row[3] ?? 0),
 
-        averageViewPercentage:
+    averageViewPercentage:
 
-            Number(row[4] ?? 0),
+        Number(row[4] ?? 0),
 
-        // Ainda não vieram nessa consulta
-        impressions: null,
+    impressions:
 
-        ctr: null
+        Number(row[5] ?? 0),
 
-    };
+    ctr:
+
+        Number(row[6] ?? 0)
+
+};
 
 }
 

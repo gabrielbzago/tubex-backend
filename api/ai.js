@@ -1986,15 +1986,57 @@ const normalizedKeyword = String(
   .replace(/\s+/g, " ");
 
 // chave única do cache
-const cacheKey = [
-  "v6",
-  userId,
-  channelId,
-  tipo,
-  normalizedKeyword,
-  stableKey,
-  context.subscribers || 0,
-  avgViews || 0
+
+const videoCacheId =
+
+    youtube.videoId ||
+
+    youtube.id ||
+
+    youtube.video ||
+
+    "";
+
+const cacheKey =
+
+tipo === "video_analysis"
+
+? [
+
+    "video",
+
+    youtube.videoId ||
+
+    youtube.id,
+
+    youtube.views,
+
+    youtube.impressions,
+
+    youtube.ctr,
+
+    youtube.averageViewPercentage
+
+].join("|")
+
+: [
+
+    "v7",
+
+    userId,
+
+    channelId,
+
+    tipo,
+
+    normalizedKeyword,
+
+    stableKey,
+
+    context.subscribers || 0,
+
+    avgViews || 0
+
 ].join("|");
 
 // procura cache

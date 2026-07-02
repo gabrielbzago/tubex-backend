@@ -485,37 +485,38 @@ if (!row) {
 
 }
 
-        if (row) {
+      if (row) {
 
-            analytics = {
+    analytics = {
 
-                views:
+        videoId:
 
-                    Number(row[0] ?? 0),
+            row[0],
 
-                estimatedMinutesWatched:
+        views:
 
-                    Number(row[1] ?? 0),
+            Number(row[1] ?? 0),
 
-                averageViewDuration:
+        estimatedMinutesWatched:
 
-                    Number(row[2] ?? 0),
+            Number(row[2] ?? 0),
 
-                averageViewPercentage:
+        averageViewDuration:
 
-                    Number(row[3] ?? 0),
+            Number(row[3] ?? 0),
 
-                impressions:
+        averageViewPercentage:
 
-                    Number(row[4] ?? 0),
+            Number(row[4] ?? 0),
 
-                ctr:
+        // Ainda não vieram nessa consulta
+        impressions: null,
 
-                    Number(row[5] ?? 0)
+        ctr: null
 
-            };
+    };
 
-        }
+}
 
         else {
 

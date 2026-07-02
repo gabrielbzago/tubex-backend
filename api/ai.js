@@ -1665,20 +1665,50 @@ Classifique o vídeo em apenas um:
 Explique o motivo.
 
 ========================================================
-PLANO DE AÇÃO
+PLANO DE AÇÃO (OBRIGATÓRIO)
 ========================================================
 
-Crie exatamente 3 ações.
+Crie exatamente 3 ações extremamente detalhadas.
 
-Ordene da maior para menor impacto.
+Cada ação deve parecer uma consultoria profissional.
 
-Cada ação deve explicar:
+Cada ação deve conter:
 
-• motivo
+• O problema encontrado.
 
-• impacto esperado
+• Por que isso limita o crescimento.
 
-• prioridade
+• O que exatamente deve ser alterado.
+
+• Um exemplo prático.
+
+• O impacto esperado.
+
+• A prioridade.
+
+Nunca escreva apenas:
+
+"Melhorar thumbnail"
+
+"Trocar título"
+
+"Melhorar descrição"
+
+Essas respostas são proibidas.
+
+Sempre explique exatamente O QUE mudar.
+
+Exemplo:
+
+Troque o título atual "COMO MONETIZAR MAIS RÁPIDO"
+
+por
+
+"O Erro Que Está Fazendo Seu Canal Demorar Muito Para Monetizar"
+
+Esse formato desperta muito mais curiosidade e tende a aumentar a CTR.
+
+Explique sempre o motivo.
 
 ========================================================
 SCORES
@@ -1720,6 +1750,34 @@ Baseie-se em:
 
 Nunca retorne 0, exceto quando realmente não houver dados.
 
+
+========================================================
+QUALIDADE DA RESPOSTA
+========================================================
+
+Este recurso pertence ao Plano Expert do TubeX.
+
+A resposta deve parecer uma consultoria premium.
+
+Nunca responda em apenas uma linha.
+
+Cada campo textual deve possuir entre 4 e 10 linhas.
+
+Explique sempre:
+
+- por que encontrou o problema;
+
+- como isso afeta o algoritmo;
+
+- por que sua recomendação resolve o problema;
+
+- qual resultado pode ser esperado.
+
+As recomendações devem ser específicas para ESTE vídeo.
+
+Nunca escreva respostas que poderiam servir para qualquer vídeo do YouTube.
+
+Quanto mais detalhada e personalizada for a análise, melhor.
 ========================================================
 RETORNE SOMENTE JSON
 
@@ -1765,16 +1823,27 @@ RETORNE SOMENTE JSON
 
 "change":true,
 
+"currentTitle":"",
+
+"newTitle":"",
+
 "reason":"",
 
 "expectedCTR":0,
 
-"currentTitle":"",
+"strengths":[
 
-"newTitle":""
+],
+
+"problems":[
+
+],
+
+"recommendations":[
+
+]
 
 },
-
 "titleSuggestions":[
 
 "",
@@ -1791,10 +1860,19 @@ RETORNE SOMENTE JSON
 
 "change":true,
 
-"reason":""
+"reason":"",
+
+"problems":[
+
+],
+
+"recommendations":[
+
+],
+
+"expectedCTR":""
 
 },
-
 "descriptionAnalysis":{
 
 "score":0,
@@ -1821,14 +1899,49 @@ RETORNE SOMENTE JSON
 
 "actionPlan":[
 
-"",
+{
 
-"",
+"title":"",
 
-""
+"description":"",
+
+"example":"",
+
+"expectedImpact":"",
+
+"priority":"Alta"
+
+},
+
+{
+
+"title":"",
+
+"description":"",
+
+"example":"",
+
+"expectedImpact":"",
+
+"priority":"Média"
+
+},
+
+{
+
+"title":"",
+
+"description":"",
+
+"example":"",
+
+"expectedImpact":"",
+
+"priority":"Baixa"
+
+}
 
 ]
-
 }
 
 `;
@@ -1920,6 +2033,8 @@ REGRAS
 - ordene da melhor para pior
 
 =====================================
+
+
 
 Retorne SOMENTE JSON.
 

@@ -1681,13 +1681,59 @@ Cada ação deve explicar:
 • prioridade
 
 ========================================================
+SCORES
+========================================================
+
+Calcule obrigatoriamente os seguintes campos.
+
+optimizationScore
+
+Representa o quanto este vídeo está otimizado para o algoritmo do YouTube.
+
+Valor entre 0 e 100.
+
+Considere:
+
+- CTR
+- retenção média
+- qualidade do título
+- SEO da descrição
+- uso de tags
+- idade do vídeo
+- potencial de recomendação
+
+Nunca retorne 0, exceto se não existir informação suficiente.
+
+viralChance
+
+Probabilidade estimada deste vídeo ganhar distribuição.
+
+Valor entre 0 e 100.
+
+Baseie-se em:
+
+- CTR
+- retenção
+- potencial do tema
+- título
+- thumbnail (quando possível)
+
+Nunca retorne 0, exceto quando realmente não houver dados.
+
+========================================================
 RETORNE SOMENTE JSON
 
 {
 
-"optimizationScore":0,
+"optimizationScore": {
+    "score": 85,
+    "reason": ""
+},
 
-"viralChance":0,
+"viralChance": {
+    "score": 74,
+    "reason": ""
+}
 
 "diagnostic":"",
 

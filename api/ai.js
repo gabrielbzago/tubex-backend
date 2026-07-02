@@ -1467,130 +1467,96 @@ else if (tipo === "video_analysis") {
 
 finalPrompt = `
 
-Você é um consultor sênior especialista em crescimento no YouTube.
+Você é um consultor sênior do algoritmo do YouTube.
 
-Analise EXCLUSIVAMENTE este vídeo.
+Sua missão NÃO é ensinar YouTube.
 
-Nunca invente dados.
+Sua missão é descobrir exatamente qual fator está impedindo ESTE vídeo de crescer.
 
-Se um dado estiver ausente diga que ele não está disponível.
+Você deve agir como um consultor contratado para aumentar o alcance deste vídeo específico.
 
-========================
-DADOS DO VÍDEO
-========================
+Use SOMENTE os dados recebidos.
 
-Título:
-${youtube.title}
+Nunca faça recomendações genéricas.
 
-Descrição:
-${youtube.description}
+Nunca diga:
 
-Views:
-${youtube.views}
+"melhore thumbnail"
 
-Likes:
-${youtube.likes}
+"melhore retenção"
 
-Comentários:
-${youtube.comments}
+"faça SEO"
 
-CTR:
-${youtube.ctr}
+Essas recomendações só podem aparecer se forem consequência direta dos dados.
 
-Impressões:
-${youtube.impressions}
+Para cada conclusão:
 
-Retenção Média:
-${youtube.averageViewPercentage}
+explique o motivo
 
-Tempo Médio:
-${youtube.averageViewDuration}
+explique o impacto
 
-Dias publicado:
-${youtube.ageDays}
+explique a prioridade
 
-Views por dia:
-${youtube.viewsPerDay}
+explique o ganho esperado
 
-Quantidade de Tags:
-${youtube.tagCount}
+Se houver pouco histórico, diga isso.
 
-Título possui:
-${youtube.titleLength} caracteres
-
-Descrição possui:
-${youtube.descriptionLength} caracteres
-
-========================
-OBJETIVO
-========================
-
-Decida usando SOMENTE os dados acima.
-
-Nunca responda genericamente.
-
-Se o CTR estiver bom, diga que está bom.
-
-Se estiver ruim, explique exatamente por quê.
-
-Se a retenção estiver boa, diga.
-
-Se estiver ruim, diga.
-
-Nunca peça mais dados.
+Se houver dados suficientes, entregue uma estratégia extremamente específica.
 
 ========================
 RETORNE APENAS JSON
 
 {
+  "optimizationScore":0,
 
-"optimizationScore":0,
+  "viralChance":0,
 
-"viralChance":0,
+  "diagnostic":"",
 
-"priority":"",
+  "bottleneck":"",
 
-"bottleneck":"",
+  "nextAction":"",
 
-"comparison":"",
+  "opportunity":"",
 
-"prediction":"",
+  "impact":{
 
-"titleDecision":"",
+      "percent":0,
 
-"newTitles":[
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-""
-],
+      "text":""
 
-"thumbDecision":"",
+  },
 
-"thumbnailRecommendation":"",
+  "comparison":"",
 
-"descriptionDecision":"",
+  "prediction":"",
 
-"newDescription":"",
+  "priority":"",
 
-"tagsDecision":"",
+  "thumbDecision":"",
 
-"newTags":[
+  "titleDecision":"",
 
-],
+  "descriptionDecision":"",
 
-"actionPlan":[
+  "newTitle":"",
 
-]
+  "newDescription":"",
 
+  "newTags":[
+
+  ],
+
+  "actionPlan":[
+
+      "",
+
+      "",
+
+      ""
+
+  ]
 }
-
 `;
 }
 

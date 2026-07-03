@@ -2588,6 +2588,7 @@ console.log("TIPO:", tipo);
 console.log("PROMPT:");
 console.log(finalPrompt);
 console.log("================================");
+
 // ==========================================
 // MODEL
 // ==========================================
@@ -2612,6 +2613,7 @@ const model =
 
     : "gpt-4o-mini";
 
+
 // ==========================================
 // MAX COMPLETION TOKENS
 // ==========================================
@@ -2620,19 +2622,19 @@ const maxCompletionTokens =
 
     tipo === "video_analysis"
 
-        ? 8000
+        ? 6000
 
     : tipo === "strategy"
 
-        ? 8000
+        ? 5000
 
     : tipo === "diagnosis"
 
-        ? 8000
+        ? 4500
 
     : tipo === "channel_analysis"
 
-        ? 3200
+        ? 3000
 
     : tipo === "seo_workspace"
 
@@ -2682,6 +2684,27 @@ const isGPT5 = model.startsWith("gpt-5");
 
 
 // ==========================================
+// REASONING
+// ==========================================
+
+const reasoning =
+
+    tipo === "video_analysis"
+
+        ? "high"
+
+    : tipo === "strategy"
+
+        ? "medium"
+
+    : tipo === "diagnosis"
+
+        ? "medium"
+
+    : "low";
+
+
+// ==========================================
 // OPENAI
 // ==========================================
 
@@ -2704,6 +2727,16 @@ const response = await fetch(
         body: JSON.stringify({
 
             model,
+
+            ...(isGPT5 ? {
+
+                reasoning: {
+
+                    effort: reasoning
+
+                }
+
+            } : {}),
 
             ...(useJson ? {
 

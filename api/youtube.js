@@ -351,7 +351,7 @@ console.log("================================");
 console.log("ACCESS TOKEN:", !!accessToken);
 console.log(
     accessToken
-        ? accessToken.substring(0,20) + "..."
+        ? accessToken.substring(0, 20) + "..."
         : "TOKEN NULO"
 );
 console.log("================================");
@@ -398,126 +398,167 @@ if (accessToken) {
 
             +
 
-"&metrics=" +
+            "&metrics=" +
 
-[
-    "views",
+            [
 
-    "estimatedMinutesWatched",
+                "views",
 
-    "averageViewDuration",
+                "estimatedMinutesWatched",
 
-    "averageViewPercentage"
+                "averageViewDuration",
 
-].join(",");
+                "averageViewPercentage"
 
-     const analyticsRes = await fetch(
-    analyticsUrl,
-    {
-        headers:{
-            Authorization:`Bearer ${accessToken}`
-        }
-    }
-);
-
-console.log("STATUS:", analyticsRes.status);
-console.log("OK:", analyticsRes.ok);
-
-console.log(
-    "📡 Analytics Status:",
-    analyticsRes.status
-);
-
-        const analyticsText =
-
-            await analyticsRes.text();
-
-        console.log(
-
-            "📡 Analytics Body:",
-
-            analyticsText
-
-        );
+            ].join(",");
 
         let analyticsJson = {};
 
-        try {
+        let row = null;
 
-            analyticsJson =
+        // ======================================
+        // PRIMEIRA TENTATIVA
+        // ======================================
 
-                JSON.parse(
+        for (let attempt = 1; attempt <= 2; attempt++) {
 
-                    analyticsText
+            const analyticsRes = await fetch(
 
-                );
+                analyticsUrl,
 
-        }
+                {
 
-        catch (e) {
+                    headers: {
 
-            console.error(
+                        Authorization:
 
-                "Erro ao converter Analytics:",
+                            `Bearer ${accessToken}`
 
-                e
+                    }
+
+                }
 
             );
 
-            analyticsJson = {};
+            console.log(
+                "📡 Analytics Status:",
+                analyticsRes.status
+            );
 
-        }
+            const analyticsText =
+                await analyticsRes.text();
 
-        console.log(
+            console.log(
+                "📡 Analytics Body:",
+                analyticsText
+            );
 
-            "📊 Analytics JSON:",
+            try {
 
-            analyticsJson
+                analyticsJson =
+                    JSON.parse(analyticsText);
 
-        );
+            }
 
-      const row = analyticsJson?.rows?.[0];
+            catch (e) {
 
-if (!row) {
+                analyticsJson = {};
 
-    console.log("================================");
-    console.log("ANALYTICS COMPLETO");
-    console.dir(analyticsJson, { depth: null });
-    console.log("================================");
+            }
 
-}
+            console.log(
+                "📊 Analytics JSON:",
+                analyticsJson
+            );
 
-      if (row) {
+            row =
+                analyticsJson?.rows?.[0];
 
-analytics = {
+            if (row) {
 
-    videoId: row[0],
+                break;
 
-    views: Number(row[1] ?? 0),
-
-    estimatedMinutesWatched: Number(row[2] ?? 0),
-
-    averageViewDuration: Number(row[3] ?? 0),
-
-    averageViewPercentage: Number(row[4] ?? 0),
-
-    impressions: null,
-
-    ctr: null
-
-};
-
-}
-
-        else {
+            }
 
             console.warn(
 
-                "⚠ Nenhuma linha retornada pela Analytics API."
+                `⚠ Analytics vazia. Tentativa ${attempt}/2`
 
             );
 
+            if (attempt < 2) {
+
+                await new Promise(
+
+                    resolve =>
+
+                        setTimeout(
+
+                            resolve,
+
+                            2500
+
+                        )
+
+                );
+
+            }
+
         }
+
+        // ======================================
+        // SEM DADOS
+        // ======================================
+
+        if (!row) {
+
+            console.log("================================");
+
+            console.log("ANALYTICS COMPLETO");
+
+            console.dir(
+                analyticsJson,
+                { depth: null }
+            );
+
+            console.log("================================");
+
+            throw new Error(
+                "analytics_empty"
+            );
+
+        }
+
+        // ======================================
+        // PARSE
+        // ======================================
+
+        analytics = {
+
+            videoId: row[0],
+
+            views:
+                Number(row[1] ?? 0),
+
+            estimatedMinutesWatched:
+                Number(row[2] ?? 0),
+
+            averageViewDuration:
+                Number(row[3] ?? 0),
+
+            averageViewPercentage:
+                Number(row[4] ?? 0),
+
+            impressions: null,
+
+            ctr: null
+
+        };
+
+        console.log(
+            "✅ Analytics carregada:",
+            analytics
+        );
 
     }
 
@@ -525,7 +566,7 @@ analytics = {
 
         console.error(
 
-            "Analytics API:",
+            "❌ Analytics API:",
 
             e
 
@@ -828,7 +869,9 @@ analytics.averageViewDuration,
 
 averageViewPercentage:
 
-analytics.averageViewPercentage,
+Number(
+    analytics.averageViewPercentage ?? -1
+),
 
 estimatedMinutesWatched:
 

@@ -2594,17 +2594,23 @@ console.log("================================");
 
 const model =
 
-    (
-        tipo === "video_analysis" ||
-        tipo === "strategy" ||
-        tipo === "diagnosis" ||
-        tipo === "channel_analysis"
-    )
+    tipo === "video_analysis"
 
         ? "gpt-5"
 
-        : "gpt-4o-mini";
+    : tipo === "strategy"
 
+        ? "gpt-5"
+
+    : tipo === "diagnosis"
+
+        ? "gpt-5"
+
+    : tipo === "channel_analysis"
+
+        ? "gpt-5-mini"
+
+    : "gpt-4o-mini";
 
 // ==========================================
 // MAX COMPLETION TOKENS

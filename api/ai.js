@@ -2588,7 +2588,6 @@ console.log("TIPO:", tipo);
 console.log("PROMPT:");
 console.log(finalPrompt);
 console.log("================================");
-
 // ==========================================
 // MODEL
 // ==========================================
@@ -2608,28 +2607,10 @@ const model =
 
 
 // ==========================================
-// TEMPERATURE
+// MAX COMPLETION TOKENS
 // ==========================================
 
-const temperature =
-
-    (
-        tipo === "video_analysis" ||
-        tipo === "strategy" ||
-        tipo === "diagnosis" ||
-        tipo === "channel_analysis"
-    )
-
-        ? 0.4
-
-        : temp;
-
-
-// ==========================================
-// MAX TOKENS
-// ==========================================
-
-const maxTokens =
+const maxCompletionTokens =
 
     tipo === "video_analysis"
 
@@ -2671,6 +2652,30 @@ const maxTokens =
 
 
 // ==========================================
+// JSON RESPONSE
+// ==========================================
+
+const useJson =
+
+    tipo === "seo_workspace" ||
+
+    tipo === "niche" ||
+
+    tipo === "viral_content" ||
+
+    tipo === "channel_analysis" ||
+
+    tipo === "video_analysis";
+
+
+// ==========================================
+// GPT-5
+// ==========================================
+
+const isGPT5 = model.startsWith("gpt-5");
+
+
+// ==========================================
 // OPENAI
 // ==========================================
 
@@ -2680,59 +2685,47 @@ const response = await fetch(
 
     {
 
-        method:"POST",
+        method: "POST",
 
-        headers:{
+        headers: {
 
-            "Content-Type":"application/json",
+            "Content-Type": "application/json",
 
-            "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
+            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
 
         },
 
-        body:JSON.stringify({
+        body: JSON.stringify({
 
             model,
 
-            ...((
+            ...(useJson ? {
 
-                tipo === "seo_workspace" ||
+                response_format: {
 
-                tipo === "niche" ||
-
-                tipo === "viral_content" ||
-
-                tipo === "channel_analysis" ||
-
-                tipo === "video_analysis"
-
-            ) ? {
-
-                response_format:{
-
-                    type:"json_object"
+                    type: "json_object"
 
                 }
 
             } : {}),
 
-            messages:[
+            messages: [
 
                 {
 
-                    role:"system",
+                    role: "system",
 
-                    content:systemPrompt
+                    content: systemPrompt
 
                 },
 
                 {
 
-                    role:"system",
+                    role: "system",
 
-                    content:`
+                    content: `
 
-Você é um consultor profissional especializado em crescimento de canais no YouTube.
+Você é um consultor sênior especialista em crescimento de canais no YouTube.
 
 Nunca responda superficialmente.
 
@@ -2748,7 +2741,7 @@ Sempre explique:
 
 • qual impacto pode ser esperado.
 
-As respostas devem parecer uma consultoria premium.
+Sempre escreva como uma consultoria premium.
 
 `
 
@@ -2756,23 +2749,41 @@ As respostas devem parecer uma consultoria premium.
 
                 {
 
-                    role:"user",
+                    role: "user",
 
-                    content:finalPrompt
+                    content: finalPrompt
 
                 }
 
             ],
 
-            temperature,
+            ...(isGPT5
 
-            max_tokens:maxTokens
+                ? {
+
+                    max_completion_tokens:
+
+                        maxCompletionTokens
+
+                }
+
+                : {
+
+                    temperature: temp,
+
+                    max_tokens:
+
+                        maxCompletionTokens
+
+                })
 
         })
 
     }
 
 );
+
+
 if (!response.ok) {
 
     const err = await response.text();

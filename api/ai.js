@@ -2676,7 +2676,7 @@ const maxTokens =
 
 const response = await fetch(
 
-    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1/responses",
 
     {
 
@@ -2773,6 +2773,83 @@ As respostas devem parecer uma consultoria premium.
     }
 
 );
+if (!response.ok) {
+
+    const err = await response.text();
+
+    console.error("OPENAI STATUS:", response.status);
+
+    console.error(err);
+
+    return res.status(500).json({
+
+        success:false,
+
+        error:err,
+
+        text:""
+
+    });
+
+}
+    const data = await response.json();
+
+console.log("================================");
+console.log("OPENAI JSON COMPLETO");
+console.dir(data,{depth:null});
+console.log("================================");
+
+   const text = data?.choices?.[0]?.message?.content?.trim();
+console.log("================================");
+console.log("NICHE RAW");
+console.log(text);
+console.log("================================");
+if (tipo === "seo_workspace") {
+
+  try {
+
+    let clean = String(text).trim();
+
+    clean = clean.replace(/^```json/i, "");
+    clean = clean.replace(/^```/i, "");
+    clean = clean.replace(/```$/i, "");
+    clean = clean.replace(/\r/g, "").replace(/\t/g, "").trim();
+
+    const start = clean.indexOf("{");
+    const end = clean.lastIndexOf("}");
+
+    if (start !== -1 && end !== -1) {
+      clean = clean.slice(start, end + 1);
+    }
+
+const parsed = JSON.parse(clean);
+
+if (tipo !== "seo_workspace") {
+  global.__tubexCache.set(cacheKey, {
+    text: parsed,
+    timestamp: Date.now()
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  ...parsed
+});
+
+  } catch (err) {
+
+    console.error("💥 SEO WORKSPACE JSON:", err);
+    console.error(text);
+
+    return res.status(500).json({
+      success: false,
+      error: "invalid_json"
+    });
+
+  }
+
+}
+
 
 if (tipo === "viral_content") {
 

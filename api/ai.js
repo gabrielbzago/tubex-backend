@@ -2620,15 +2620,15 @@ const maxCompletionTokens =
 
     tipo === "video_analysis"
 
-        ? 4200
+        ? 8000
 
     : tipo === "strategy"
 
-        ? 3200
+        ? 8000
 
     : tipo === "diagnosis"
 
-        ? 3000
+        ? 8000
 
     : tipo === "channel_analysis"
 

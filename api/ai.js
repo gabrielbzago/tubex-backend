@@ -2816,6 +2816,11 @@ console.log("OPENAI JSON COMPLETO");
 console.dir(data,{depth:null});
 console.log("================================");
 
+console.log("================================");
+console.log("OPENAI RESPONSE");
+console.dir(data, { depth: null });
+console.log("================================");
+
    const text = data?.choices?.[0]?.message?.content?.trim();
 console.log("================================");
 console.log("NICHE RAW");

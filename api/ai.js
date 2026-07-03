@@ -2689,7 +2689,7 @@ const maxTokens =
 
     tipo === "video_analysis"
 
-        ? 4500
+        ? 3000
 
     : tipo === "strategy"
 

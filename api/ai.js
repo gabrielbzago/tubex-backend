@@ -1489,49 +1489,71 @@ DADOS DO VÍDEO
 ========================================================
 
 Título:
-${youtube.title || ""}
+${youtube.title || "Não informado"}
 
 Descrição:
-${youtube.description || ""}
+${youtube.description || "Sem descrição"}
 
 Tags:
 ${JSON.stringify(youtube.tags || [])}
 
+Canal:
+${youtube.channelTitle || "Não informado"}
+
 Publicado em:
-${youtube.publishedAt || ""}
+${youtube.publishedAt || "Não informado"}
 
 Dias publicado:
-${youtube.publishedDays || 0}
+${youtube.ageDays ?? 0}
 
 Duração:
-${youtube.duration || ""}
+${youtube.duration || "Não informado"}
 
 Visualizações:
-${youtube.views || 0}
+${youtube.views ?? 0}
 
 Impressões:
-${youtube.impressions || 0}
+${youtube.impressions ?? "Não disponível"}
 
 CTR:
-${youtube.ctr || 0}%
+${youtube.ctr ?? "Não disponível"}%
 
 Retenção Média:
-${youtube.averageViewPercentage || 0}%
+${
+    youtube.averageViewPercentage >= 0
+        ? youtube.averageViewPercentage + "%"
+        : "Não disponível"
+}
 
 Tempo Médio Assistido:
-${youtube.averageViewDuration || 0} segundos
+${
+    youtube.averageViewDuration > 0
+        ? youtube.averageViewDuration + " segundos"
+        : "Não disponível"
+}
 
-Canal:
-${youtube.channelTitle || ""}
+Tempo Total Assistido:
+${
+    youtube.estimatedMinutesWatched ?? "Não disponível"
+} minutos
 
 Categoria:
-${youtube.category || ""}
+${youtube.categoryId || "Não informado"}
 
 Idioma:
-${youtube.defaultLanguage || ""}
+${youtube.language || "Não informado"}
 
 Privacidade:
-${youtube.privacyStatus || ""}
+${youtube.privacy || "Não informado"}
+
+Quantidade de Tags:
+${youtube.tagCount ?? 0}
+
+Título possui:
+${youtube.titleLength ?? 0} caracteres
+
+Descrição possui:
+${youtube.descriptionLength ?? 0} caracteres
 
 ========================================================
 COMO ANALISAR

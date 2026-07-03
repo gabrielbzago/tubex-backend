@@ -399,302 +399,201 @@ const isNewChannel =
 
 if (tipo === "diagnosis") {
 
-finalPrompt = `
+  // ====================================================
+  // 🆕 NEW CHANNEL
+  // ====================================================
 
-Você é um consultor sênior especialista em crescimento de canais do YouTube.
+  if (isNewChannel) {
 
-Sua missão é realizar uma auditoria profissional utilizando EXCLUSIVAMENTE os dados fornecidos.
+    finalPrompt = `
+Você é um consultor profissional de crescimento no YouTube.
 
-Você NÃO é um professor.
+Este canal ainda está em fase inicial.
 
-Você NÃO é um chatbot.
+Seu trabalho é criar um diagnóstico estratégico inteligente,
+sem parecer genérico.
 
-Você está entregando uma consultoria premium.
+---
 
-Nunca invente informações.
+📊 DADOS DO CANAL:
+- Inscritos: ${context.subscribers || 0}
+- Vídeos publicados: ${parsedVideos.length}
 
-Nunca faça recomendações genéricas.
+---
 
-========================================================
-DADOS DO CANAL
-========================================================
+REGRAS:
 
-Inscritos:
-${context.subscribers || 0}
+- NÃO diga que faltam dados
+- NÃO seja genérico
+- NÃO escreva respostas vagas
+- Seja estratégico e objetivo
+- Foque em crescimento inicial
+- Use linguagem de consultoria premium
 
-Vídeos publicados:
-${parsedVideos.length}
+---
 
-Média de Views:
-${avgViews}
+FORMATO OBRIGATÓRIO:
 
-Taxa Views/Inscritos:
-${
-context.subscribers
-? Math.round((avgViews / context.subscribers) * 100)
-: 0
-}%
+📊 Pontuação do Canal: X/10
 
-Uploads últimos 7 dias:
-${uploads7}
+# Diagnóstico
 
-Melhor vídeo:
-${topVideo.title}
-${topVideo.views} views
+🔎 Nicho
+- analise se o nicho parece claro
+- explique como fortalecer posicionamento
 
-Pior vídeo:
-${worstVideo.title}
-${worstVideo.views} views
+📈 Performance
+- explique o momento atual do canal
+- analise potencial inicial
 
-Últimos vídeos:
+📅 Consistência
+- sugira frequência ideal
+- explique impacto da consistência
 
-${videoSummary}
+🎯 Algoritmo
+- explique como o YouTube interpreta canais novos
+- diga como acelerar aprendizado do algoritmo
 
-========================================================
-COMO ANALISAR
-========================================================
+---
 
-Antes de responder descubra:
+# Pontos Fortes
 
-• quais assuntos aparecem repetidamente;
+- cite os principais pontos positivos
+- explique por que ajudam o crescimento
 
-• quais assuntos possuem melhor desempenho;
+---
 
-• quais assuntos possuem pior desempenho;
+# Problemas Críticos
 
-• quais padrões existem nos títulos;
+- explique o principal gargalo atual
+- diga o impacto no crescimento
 
-• quais formatos parecem funcionar;
+---
 
-• quais formatos parecem falhar;
+# Plano de Ação
 
-• quais oportunidades ainda não foram exploradas;
+- entregue ações práticas imediatas
+- priorize o que gera mais impacto
+- explique o próximo passo ideal
 
-• quais erros continuam sendo repetidos.
+---
 
-Caso existam poucos vídeos ou poucos inscritos, adapte a análise.
+REGRAS IMPORTANTES:
 
-NUNCA diga:
-
-"Não há dados suficientes."
-
-Mesmo em canais novos sempre entregue um diagnóstico estratégico baseado nas informações disponíveis.
-
-Todas as conclusões devem nascer SOMENTE dos dados enviados.
-
-========================================================
-REGRAS
-========================================================
-
-Cada insight deve obrigatoriamente conter:
-
-• Evidência encontrada
-
-• Interpretação
-
-• Impacto
-
-• Recomendação
-
-As recomendações devem nascer da evidência.
-
-Nunca escreva:
-
-"Poderia melhorar."
-
-"Talvez."
-
-"Nenhum insight encontrado."
-
-Sempre entregue uma conclusão útil.
-
-Quando existir pouca evidência, explique por que sua confiança é menor, mas ainda apresente uma estratégia.
-
-========================================================
-RETORNE SOMENTE JSON
-========================================================
-
-{
-
-"score":0,
-
-"summary":"",
-
-"confidence":0,
-
-"diagnostic":{
-
-"niche":"",
-
-"performance":"",
-
-"consistency":"",
-
-"algorithm":""
-
-},
-
-"strengths":[
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-}
-
-],
-
-"problems":[
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-}
-
-],
-
-"opportunities":[
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-},
-
-{
-
-"title":"",
-
-"description":""
-
-}
-
-],
-
-"actionPlan":[
-
-{
-
-"title":"",
-
-"description":"",
-
-"priority":"Alta"
-
-},
-
-{
-
-"title":"",
-
-"description":"",
-
-"priority":"Média"
-
-},
-
-{
-
-"title":"",
-
-"description":"",
-
-"priority":"Baixa"
-
-}
-
-],
-
-"nextAction":""
-
-}
-
-========================================================
-REGRAS FINAIS
-========================================================
-
-Nunca deixe arrays vazios.
-
-Sempre gere exatamente:
-
-• 3 pontos fortes;
-
-• 3 problemas;
-
-• 3 oportunidades;
-
-• 3 ações.
-
-Cada descrição deve possuir entre 80 e 180 palavras.
-
-A pontuação (score) deve ficar entre 0 e 100.
-
-confidence representa a confiança da IA na análise:
-
-100 = muitos dados consistentes
-
-70 = dados suficientes
-
-40 = poucos dados
-
-20 = canal muito novo
-
-Nunca utilize markdown.
-
-Nunca escreva texto fora do JSON.
-
-Retorne SOMENTE JSON.
-
+- Nunca escreva apenas títulos
+- Cada seção deve ter explicação real
+- Use insights acionáveis
+- Máximo 750 palavras
 `;
 
+  }
+
+  // ====================================================
+  // 📊 NORMAL CHANNEL
+  // ====================================================
+
+  else {
+
+    finalPrompt = `
+Você é um analista profissional de canais do YouTube.
+
+Seu trabalho é gerar uma análise estratégica baseada em dados reais.
+
+Você NÃO pode dar respostas genéricas.
+
+---
+
+📊 DADOS DO CANAL:
+- Inscritos: ${context.subscribers || 0}
+- Média de views: ${avgViews}
+- Taxa views/inscritos:
+${context.subscribers
+  ? Math.round((avgViews / context.subscribers) * 100)
+  : 0
+}%
+- Uploads últimos 7 dias: ${uploads7}
+
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
+
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
+
+📺 Últimos vídeos:
+${videoSummary}
+
+---
+
+REGRAS:
+
+- NÃO invente dados
+- NÃO use frases vagas
+- SEMPRE use números quando possível
+- Seja direto e estratégico
+- Use linguagem de consultoria premium
+- Analise padrões reais
+
+---
+
+FORMATO OBRIGATÓRIO:
+
+📊 Pontuação do Canal: X/10
+
+# Diagnóstico
+
+🔎 Nicho
+- diga se o nicho parece claro ou confuso
+- explique impacto disso no algoritmo
+
+📈 Performance
+- compare views vs inscritos
+- explique padrão de performance
+
+📅 Consistência
+- analise frequência recente
+- explique impacto no crescimento
+
+🎯 Algoritmo
+- diga se o YouTube parece entender o canal
+- explique sinais positivos ou negativos
+
+---
+
+# Pontos Fortes
+
+- cite os pontos mais fortes do canal
+- explique por que ajudam no crescimento
+
+---
+
+# Problemas Críticos
+
+- explique os principais gargalos atuais
+- diga o impacto desses problemas
+
+---
+
+# Plano de Ação
+
+- entregue ações práticas imediatas
+- priorize mudanças de maior impacto
+- explique o próximo passo ideal
+
+---
+
+REGRAS IMPORTANTES:
+
+- Nunca escreva apenas títulos
+- Cada seção deve conter insights completos
+- Cada insight deve ter explicação prática
+- Evite frases genéricas
+- Máximo 350 palavras
+`;
+
+  }
+
 }
+
 // ======================================================
 // 🚀 STRATEGY
 // ======================================================
@@ -2731,33 +2630,6 @@ console.log("PROMPT:");
 console.log(finalPrompt);
 console.log("================================");
 
-// ==========================================
-// JSON PARSER
-// ==========================================
-
-function parseOpenAIJson(text) {
-
-    let clean = String(text || "").trim();
-
-    clean = clean.replace(/^```json/i, "");
-    clean = clean.replace(/^```/i, "");
-    clean = clean.replace(/```$/i, "");
-
-    clean = clean
-        .replace(/\r/g, "")
-        .replace(/\t/g, "")
-        .trim();
-
-    const start = clean.indexOf("{");
-    const end = clean.lastIndexOf("}");
-
-    if (start !== -1 && end !== -1) {
-        clean = clean.slice(start, end + 1);
-    }
-
-    return JSON.parse(clean);
-
-}
 
 // ==========================================
 // MODEL
@@ -2792,19 +2664,19 @@ const temperature =
 
     tipo === "video_analysis"
 
-        ? 0.20
+        ? 0.4
 
     : tipo === "strategy"
 
-        ? 0.30
+        ? 0.3
 
     : tipo === "diagnosis"
 
-        ? 0.15
+        ? 0.2
 
     : tipo === "channel_analysis"
 
-        ? 0.30
+        ? 0.4
 
     : temp;
 
@@ -2817,19 +2689,19 @@ const maxTokens =
 
     tipo === "video_analysis"
 
-        ? 4200
+        ? 4500
 
     : tipo === "strategy"
 
-        ? 4200
+        ? 3200
 
     : tipo === "diagnosis"
 
-        ? 5000
+        ? 3000
 
     : tipo === "channel_analysis"
 
-        ? 3500
+        ? 3000
 
     : tipo === "seo_workspace"
 
@@ -2868,9 +2740,8 @@ const useJson =
 
     tipo === "channel_analysis" ||
 
-    tipo === "video_analysis" ||
+    tipo === "video_analysis";
 
-    tipo === "diagnosis";
 
 // ==========================================
 // OPENAI
@@ -3019,7 +2890,7 @@ if (tipo === "seo_workspace") {
       clean = clean.slice(start, end + 1);
     }
 
-const parsed = parseOpenAIJson(clean);
+const parsed = JSON.parse(clean);
 
 if (tipo !== "seo_workspace") {
   global.__tubexCache.set(cacheKey, {
@@ -3052,7 +2923,7 @@ if (tipo === "viral_content") {
 
   try {
 
-    const parsed = parseOpenAIJson(text);
+    const parsed = JSON.parse(text);
 
     global.__tubexCache.set(cacheKey,{
       text: parsed,
@@ -3094,7 +2965,7 @@ if (tipo === "channel_analysis") {
 
   try {
 
-  const parsed = parseOpenAIJson(text);
+    const parsed = JSON.parse(text);
 
     parsed.subscribers =
       Number(
@@ -3132,47 +3003,7 @@ if (tipo === "video_analysis") {
 
     try {
 
-        const parsed = parseOpenAIJson(text);
-
-        global.__tubexCache.set(cacheKey, {
-
-            text: parsed,
-
-            timestamp: Date.now()
-
-        });
-
-        return res.status(200).json({
-
-            success: true,
-
-            ...parsed
-
-        });
-
-    }
-
-    catch(err){
-
-        console.error(err);
-
-        return res.status(500).json({
-
-            success:false,
-
-            error:"invalid_json"
-
-        });
-
-    }
-
-}
-
-if (tipo === "diagnosis") {
-
-    try {
-
-        const parsed = parseOpenAIJson(text);
+        const parsed = JSON.parse(text);
 
         global.__tubexCache.set(cacheKey, {
 
@@ -3212,7 +3043,7 @@ if (tipo === "advanced_tags") {
 
     try{
 
-       const parsed = parseOpenAIJson(text);
+        const parsed = JSON.parse(text);
 
         global.__tubexCache.set(cacheKey,{
             text:parsed,
@@ -3277,7 +3108,7 @@ let parsed;
 
 try {
 
-parsed = parseOpenAIJson(clean);
+    parsed = JSON.parse(clean);
 if (
     typeof parsed.niche !== "string" ||
     !parsed.niche.trim()

@@ -494,100 +494,247 @@ REGRAS IMPORTANTES:
 
   else {
 
-    finalPrompt = `
-Você é um analista profissional de canais do YouTube.
+  finalPrompt = `
+Você é um consultor sênior especialista em crescimento de canais do YouTube.
 
-Seu trabalho é gerar uma análise estratégica baseada em dados reais.
+Sua missão é encontrar padrões exclusivos deste canal utilizando SOMENTE os dados fornecidos.
 
-Você NÃO pode dar respostas genéricas.
+Você NÃO está escrevendo dicas de YouTube.
 
----
+Você está realizando uma auditoria profissional.
 
-📊 DADOS DO CANAL:
-- Inscritos: ${context.subscribers || 0}
-- Média de views: ${avgViews}
-- Taxa views/inscritos:
-${context.subscribers
-  ? Math.round((avgViews / context.subscribers) * 100)
-  : 0
+Nunca invente informações.
+
+Nunca faça recomendações genéricas.
+
+Nunca escreva respostas que poderiam servir para qualquer canal.
+
+========================================================
+DADOS DO CANAL
+========================================================
+
+Inscritos:
+${context.subscribers || 0}
+
+Média de Views:
+${avgViews}
+
+Taxa Views/Inscritos:
+${
+context.subscribers
+? Math.round((avgViews / context.subscribers) * 100)
+: 0
 }%
-- Uploads últimos 7 dias: ${uploads7}
 
-🔥 Melhor vídeo:
-${topVideo.title} (${topVideo.views} views)
+Uploads últimos 7 dias:
+${uploads7}
 
-⚠️ Pior vídeo:
-${worstVideo.title} (${worstVideo.views} views)
+Melhor vídeo:
+${topVideo.title}
+${topVideo.views} views
 
-📺 Últimos vídeos:
+Pior vídeo:
+${worstVideo.title}
+${worstVideo.views} views
+
+Últimos vídeos:
+
 ${videoSummary}
 
----
+========================================================
+COMO ANALISAR
+========================================================
 
-REGRAS:
+Antes de responder descubra:
 
-- NÃO invente dados
-- NÃO use frases vagas
-- SEMPRE use números quando possível
-- Seja direto e estratégico
-- Use linguagem de consultoria premium
-- Analise padrões reais
+• quais assuntos aparecem repetidamente;
 
----
+• quais assuntos performam acima da média;
 
-FORMATO OBRIGATÓRIO:
+• quais assuntos performam abaixo da média;
 
-📊 Pontuação do Canal: X/10
+• quais formatos de título mais funcionam;
 
-# Diagnóstico
+• quais formatos parecem falhar;
 
-🔎 Nicho
-- diga se o nicho parece claro ou confuso
-- explique impacto disso no algoritmo
+• quais vídeos quebram o padrão do canal;
 
-📈 Performance
-- compare views vs inscritos
-- explique padrão de performance
+• quais oportunidades ainda não foram exploradas;
 
-📅 Consistência
-- analise frequência recente
-- explique impacto no crescimento
+• quais erros continuam sendo repetidos.
 
-🎯 Algoritmo
-- diga se o YouTube parece entender o canal
-- explique sinais positivos ou negativos
+Todas as conclusões devem nascer SOMENTE dos dados acima.
 
----
+========================================================
+REGRAS
+========================================================
 
-# Pontos Fortes
+Nunca diga:
 
-- cite os pontos mais fortes do canal
-- explique por que ajudam no crescimento
+"Não há dados suficientes."
 
----
+"Nenhum insight encontrado."
 
-# Problemas Críticos
+"Poderia melhorar."
 
-- explique os principais gargalos atuais
-- diga o impacto desses problemas
+"Talvez."
 
----
+Sempre entregue uma conclusão.
 
-# Plano de Ação
+Quando não existir evidência suficiente, explique exatamente por que.
 
-- entregue ações práticas imediatas
-- priorize mudanças de maior impacto
-- explique o próximo passo ideal
+Cada insight deve conter:
 
----
+• Evidência encontrada
 
-REGRAS IMPORTANTES:
+• Interpretação
 
-- Nunca escreva apenas títulos
-- Cada seção deve conter insights completos
-- Cada insight deve ter explicação prática
-- Evite frases genéricas
-- Máximo 350 palavras
+• Impacto
+
+• Recomendação
+
+========================================================
+RETORNE SOMENTE JSON
+========================================================
+
+{
+
+"score":0,
+
+"summary":"",
+
+"diagnostic":{
+
+"niche":"",
+
+"performance":"",
+
+"consistency":"",
+
+"algorithm":""
+
+},
+
+"strengths":[
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+}
+
+],
+
+"problems":[
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+}
+
+],
+
+"opportunities":[
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+},
+
+{
+"title":"",
+"description":""
+}
+
+],
+
+"actionPlan":[
+
+{
+
+"title":"",
+
+"description":"",
+
+"priority":"Alta"
+
+},
+
+{
+
+"title":"",
+
+"description":"",
+
+"priority":"Média"
+
+},
+
+{
+
+"title":"",
+
+"description":"",
+
+"priority":"Baixa"
+
+}
+
+],
+
+"nextAction":""
+
+}
+
+========================================================
+REGRAS FINAIS
+========================================================
+
+Nunca deixe arrays vazios.
+
+Sempre gere exatamente:
+
+• 3 pontos fortes;
+
+• 3 problemas;
+
+• 3 oportunidades;
+
+• 3 ações.
+
+Cada descrição deve possuir entre 40 e 100 palavras.
+
+As recomendações devem ser específicas para ESTE canal.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+
+Retorne SOMENTE JSON.
 `;
 
   }

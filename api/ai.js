@@ -2589,6 +2589,7 @@ console.log("PROMPT:");
 console.log(finalPrompt);
 console.log("================================");
 
+
 // ==========================================
 // MODEL
 // ==========================================
@@ -2597,40 +2598,65 @@ const model =
 
     tipo === "video_analysis"
 
-        ? "gpt-5"
+        ? "gpt-4.1"
 
     : tipo === "strategy"
 
-        ? "gpt-5"
+        ? "gpt-4.1"
 
     : tipo === "diagnosis"
 
-        ? "gpt-5"
+        ? "gpt-4.1"
 
     : tipo === "channel_analysis"
 
-        ? "gpt-5-mini"
+        ? "gpt-4.1-mini"
 
     : "gpt-4o-mini";
 
 
 // ==========================================
-// MAX COMPLETION TOKENS
+// TEMPERATURE
 // ==========================================
 
-const maxCompletionTokens =
+const temperature =
 
     tipo === "video_analysis"
 
-        ? 6000
+        ? 0.4
 
     : tipo === "strategy"
 
-        ? 5000
+        ? 0.4
 
     : tipo === "diagnosis"
 
-        ? 4500
+        ? 0.4
+
+    : tipo === "channel_analysis"
+
+        ? 0.4
+
+    : temp;
+
+
+// ==========================================
+// MAX TOKENS
+// ==========================================
+
+const maxTokens =
+
+    tipo === "video_analysis"
+
+        ? 4200
+
+    : tipo === "strategy"
+
+        ? 3200
+
+    : tipo === "diagnosis"
+
+        ? 3000
 
     : tipo === "channel_analysis"
 
@@ -2677,34 +2703,6 @@ const useJson =
 
 
 // ==========================================
-// GPT-5
-// ==========================================
-
-const isGPT5 = model.startsWith("gpt-5");
-
-
-// ==========================================
-// REASONING
-// ==========================================
-
-const reasoning =
-
-    tipo === "video_analysis"
-
-        ? "high"
-
-    : tipo === "strategy"
-
-        ? "medium"
-
-    : tipo === "diagnosis"
-
-        ? "medium"
-
-    : "low";
-
-
-// ==========================================
 // OPENAI
 // ==========================================
 
@@ -2727,16 +2725,6 @@ const response = await fetch(
         body: JSON.stringify({
 
             model,
-
-            ...(isGPT5 ? {
-
-                reasoning: {
-
-                    effort: reasoning
-
-                }
-
-            } : {}),
 
             ...(useJson ? {
 
@@ -2796,25 +2784,9 @@ Sempre escreva como uma consultoria premium.
 
             ],
 
-            ...(isGPT5
+            temperature,
 
-                ? {
-
-                    max_completion_tokens:
-
-                        maxCompletionTokens
-
-                }
-
-                : {
-
-                    temperature: temp,
-
-                    max_tokens:
-
-                        maxCompletionTokens
-
-                })
+            max_tokens: maxTokens
 
         })
 

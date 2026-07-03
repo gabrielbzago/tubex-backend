@@ -2589,152 +2589,190 @@ console.log("PROMPT:");
 console.log(finalPrompt);
 console.log("================================");
 
+// ==========================================
+// MODEL
+// ==========================================
+
+const model =
+
+    (
+        tipo === "video_analysis" ||
+        tipo === "strategy" ||
+        tipo === "diagnosis" ||
+        tipo === "channel_analysis"
+    )
+
+        ? "gpt-5"
+
+        : "gpt-4o-mini";
+
+
+// ==========================================
+// TEMPERATURE
+// ==========================================
+
+const temperature =
+
+    (
+        tipo === "video_analysis" ||
+        tipo === "strategy" ||
+        tipo === "diagnosis" ||
+        tipo === "channel_analysis"
+    )
+
+        ? 0.4
+
+        : temp;
+
+
+// ==========================================
+// MAX TOKENS
+// ==========================================
+
+const maxTokens =
+
+    tipo === "video_analysis"
+
+        ? 4200
+
+    : tipo === "strategy"
+
+        ? 3200
+
+    : tipo === "diagnosis"
+
+        ? 3000
+
+    : tipo === "channel_analysis"
+
+        ? 3200
+
+    : tipo === "seo_workspace"
+
+        ? 3200
+
+    : tipo === "viral_content"
+
+        ? 2400
+
+    : tipo === "descricao"
+
+        ? 1500
+
+    : tipo === "ideas"
+
+        ? 1200
+
+    : tipo === "niche"
+
+        ? 800
+
+    : 1200;
+
+
+// ==========================================
+// OPENAI
+// ==========================================
+
 const response = await fetch(
 
-  "https://api.openai.com/v1/chat/completions",
-  {
-    method: "POST",
+    "https://api.openai.com/v1/chat/completions",
 
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-    },
+    {
 
- body: JSON.stringify({
+        method:"POST",
 
-    model: "gpt-4o-mini",
+        headers:{
 
-    ...((
-        tipo === "seo_workspace" ||
-        tipo === "niche" ||
-        tipo === "viral_content" ||
-        tipo === "channel_analysis" ||
-        tipo === "video_analysis"
-    ) ? {
-        response_format: {
-            type: "json_object"
-        }
-    } : {}),
+            "Content-Type":"application/json",
 
-    messages: [
+            "Authorization":`Bearer ${process.env.OPENAI_API_KEY}`
 
-        {
-            role: "system",
-            content: systemPrompt
         },
 
-        {
-            role: "user",
-            content: finalPrompt
-        }
+        body:JSON.stringify({
 
-    ],
+            model,
 
-    temperature: temp,
+            ...((
 
-    max_tokens:
-        tipo === "seo_workspace"
-            ? 3000
-        : tipo === "viral_content"
-            ? 2200
-        : tipo === "channel_analysis"
-            ? 2200
-        : tipo === "video_analysis"
-            ? 2600
-        : tipo === "strategy"
-            ? 1800
-        : tipo === "diagnosis"
-            ? 1600
-        : tipo === "descricao"
-            ? 1200
-        : tipo === "ideas"
-            ? 900
-        : tipo === "niche"
-            ? 600
-        : 1000
+                tipo === "seo_workspace" ||
 
-})
+                tipo === "niche" ||
 
-  }
-);
+                tipo === "viral_content" ||
 
-if (!response.ok) {
+                tipo === "channel_analysis" ||
 
-    const err = await response.text();
+                tipo === "video_analysis"
 
-    console.error("OPENAI STATUS:", response.status);
+            ) ? {
 
-    console.error(err);
+                response_format:{
 
-    return res.status(500).json({
+                    type:"json_object"
 
-        success:false,
+                }
 
-        error:err,
+            } : {}),
 
-        text:""
+            messages:[
 
-    });
+                {
 
-}
-    const data = await response.json();
+                    role:"system",
 
-console.log("================================");
-console.log("OPENAI JSON COMPLETO");
-console.dir(data,{depth:null});
-console.log("================================");
+                    content:systemPrompt
 
-   const text = data?.choices?.[0]?.message?.content?.trim();
-console.log("================================");
-console.log("NICHE RAW");
-console.log(text);
-console.log("================================");
-if (tipo === "seo_workspace") {
+                },
 
-  try {
+                {
 
-    let clean = String(text).trim();
+                    role:"system",
 
-    clean = clean.replace(/^```json/i, "");
-    clean = clean.replace(/^```/i, "");
-    clean = clean.replace(/```$/i, "");
-    clean = clean.replace(/\r/g, "").replace(/\t/g, "").trim();
+                    content:`
 
-    const start = clean.indexOf("{");
-    const end = clean.lastIndexOf("}");
+Você é um consultor profissional especializado em crescimento de canais no YouTube.
 
-    if (start !== -1 && end !== -1) {
-      clean = clean.slice(start, end + 1);
+Nunca responda superficialmente.
+
+Sempre explique:
+
+• por que encontrou o problema;
+
+• como o algoritmo interpreta esse cenário;
+
+• exatamente o que deve ser alterado;
+
+• um exemplo prático;
+
+• qual impacto pode ser esperado.
+
+As respostas devem parecer uma consultoria premium.
+
+`
+
+                },
+
+                {
+
+                    role:"user",
+
+                    content:finalPrompt
+
+                }
+
+            ],
+
+            temperature,
+
+            max_tokens:maxTokens
+
+        })
+
     }
 
-const parsed = JSON.parse(clean);
-
-if (tipo !== "seo_workspace") {
-  global.__tubexCache.set(cacheKey, {
-    text: parsed,
-    timestamp: Date.now()
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  ...parsed
-});
-
-  } catch (err) {
-
-    console.error("💥 SEO WORKSPACE JSON:", err);
-    console.error(text);
-
-    return res.status(500).json({
-      success: false,
-      error: "invalid_json"
-    });
-
-  }
-
-}
-
+);
 
 if (tipo === "viral_content") {
 

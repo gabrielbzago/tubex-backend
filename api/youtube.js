@@ -367,10 +367,16 @@ if (accessToken) {
         const startDate =
             snippet.publishedAt.slice(0, 10);
 
-        const endDate =
-            new Date()
-                .toISOString()
-                .slice(0, 10);
+        const yesterday = new Date();
+
+yesterday.setDate(
+    yesterday.getDate() - 1
+);
+
+const endDate =
+    yesterday
+        .toISOString()
+        .slice(0, 10);
 
         const analyticsUrl =
 
@@ -510,57 +516,45 @@ if (accessToken) {
         // SEM DADOS
         // ======================================
 
-        if (!row) {
+if (!row) {
 
-            console.log("================================");
+    console.warn(
+        "⚠ Analytics ainda não disponível para este vídeo."
+    );
 
-            console.log("ANALYTICS COMPLETO");
+}
+else {
 
-            console.dir(
-                analyticsJson,
-                { depth: null }
-            );
+    analytics = {
 
-            console.log("================================");
+        videoId: row[0],
 
-            throw new Error(
-                "analytics_empty"
-            );
+        views:
+            Number(row[1] ?? 0),
 
-        }
+        estimatedMinutesWatched:
+            Number(row[2] ?? 0),
 
-        // ======================================
-        // PARSE
-        // ======================================
+        averageViewDuration:
+            Number(row[3] ?? 0),
 
-        analytics = {
+        averageViewPercentage:
+            Number(row[4] ?? -1),
 
-            videoId: row[0],
+        impressions: null,
 
-            views:
-                Number(row[1] ?? 0),
+        ctr: null
 
-            estimatedMinutesWatched:
-                Number(row[2] ?? 0),
+    };
 
-            averageViewDuration:
-                Number(row[3] ?? 0),
+    console.log(
+        "✅ Analytics carregada:",
+        analytics
+    );
 
-            averageViewPercentage:
-                Number(row[4] ?? 0),
+}
 
-            impressions: null,
-
-            ctr: null
-
-        };
-
-        console.log(
-            "✅ Analytics carregada:",
-            analytics
-        );
-
-    }
+       }
 
     catch (e) {
 

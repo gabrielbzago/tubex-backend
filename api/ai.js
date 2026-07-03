@@ -1520,17 +1520,18 @@ ${youtube.ctr ?? "Não disponível"}%
 
 Retenção Média:
 ${
-    youtube.averageViewPercentage >= 0
-        ? youtube.averageViewPercentage + "%"
-        : "Não disponível"
+youtube.averageViewPercentage >= 0
+? youtube.averageViewPercentage + "%"
+: "Ainda não disponível"
 }
 
 Tempo Médio Assistido:
 ${
-    youtube.averageViewDuration > 0
-        ? youtube.averageViewDuration + " segundos"
-        : "Não disponível"
+youtube.averageViewDuration > 0
+? youtube.averageViewDuration + " segundos"
+: "Ainda não disponível"
 }
+
 
 Tempo Total Assistido:
 ${

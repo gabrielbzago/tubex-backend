@@ -2676,7 +2676,7 @@ const maxTokens =
 
 const response = await fetch(
 
-    "https://api.openai.com/v1/responses",
+    "https://api.openai.com/v1/chat/completions",
 
     {
 

@@ -2800,7 +2800,7 @@ const temperature =
 
     : tipo === "diagnosis"
 
-        ? 0.25
+        ? 0.15
 
     : tipo === "channel_analysis"
 
@@ -2825,7 +2825,7 @@ const maxTokens =
 
     : tipo === "diagnosis"
 
-        ? 4200
+        ? 5000
 
     : tipo === "channel_analysis"
 

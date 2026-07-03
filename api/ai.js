@@ -1555,6 +1555,24 @@ ${youtube.titleLength ?? 0} caracteres
 Descrição possui:
 ${youtube.descriptionLength ?? 0} caracteres
 
+likes:
+${youtube.likes ?? 0}
+
+comentários:
+${youtube.comments ?? 0}
+
+views por dia:
+${youtube.viewsPerDay ?? 0}
+
+média de views do canal:
+${youtube.channel?.averageViews ?? 0}
+
+inscritos do canal:
+${youtube.channel?.subscribers ?? 0}
+
+vídeos do canal:
+${youtube.channel?.totalVideos ?? 0}
+
 ========================================================
 COMO ANALISAR
 ========================================================

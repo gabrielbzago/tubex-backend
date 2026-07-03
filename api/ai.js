@@ -2668,11 +2668,11 @@ const temperature =
 
     : tipo === "strategy"
 
-        ? 0.3
+        ? 0.4
 
     : tipo === "diagnosis"
 
-        ? 0.2
+        ? 0.4
 
     : tipo === "channel_analysis"
 
@@ -2689,7 +2689,7 @@ const maxTokens =
 
     tipo === "video_analysis"
 
-        ? 3000
+        ? 4200
 
     : tipo === "strategy"
 

@@ -109,6 +109,10 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
+const title = body?.title || "";
+const goal = body?.goal || "";
+const duration = body?.duration || "";
+const style = body?.style || "";
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -125,6 +129,7 @@ const requiresPrompt = [
   "viral_content",
   "thumbnail_prompt",
 "video_analysis",
+"script_generator",
   "channel_analysis"
 ];
 
@@ -2226,6 +2231,236 @@ RETORNE SOMENTE JSON
 }
 
 
+else if (tipo === "script_generator") {
+
+    finalPrompt = `
+
+Você é um roteirista profissional especializado em vídeos virais do YouTube.
+
+Seu trabalho NÃO é escrever um texto.
+
+Seu trabalho é construir um roteiro completo pensado para:
+
+• aumentar CTR
+
+• aumentar retenção
+
+• aumentar satisfação
+
+• aumentar tempo médio assistido
+
+• aumentar distribuição pelo algoritmo
+
+Você conhece profundamente:
+
+- documentação oficial do YouTube
+
+- psicologia da atenção
+
+- storytelling
+
+- copywriting
+
+- ritmo de edição
+
+- comportamento da audiência
+
+- SEO
+
+- narrativa audiovisual
+
+========================
+
+DADOS
+
+========================
+
+Título:
+
+${title}
+
+Objetivo:
+
+${goal}
+
+Duração:
+
+${duration}
+
+Estilo:
+
+${style}
+
+========================
+
+REGRAS
+
+========================
+
+Nunca escreva respostas genéricas.
+
+Nunca escreva textos superficiais.
+
+O roteiro deve parecer escrito por um consultor profissional.
+
+Cada bloco deve manter curiosidade.
+
+Sempre terminar um bloco abrindo expectativa para o próximo.
+
+Utilize:
+
+• Open loops
+
+• Curiosity gap
+
+• Pattern interrupt
+
+• Storytelling
+
+• Cliffhanger
+
+• Micro recompensas
+
+• Reengajamento
+
+• CTA natural
+
+O Hook precisa ser extremamente forte.
+
+Nos primeiros 15 segundos o espectador não pode querer sair.
+
+Sempre gere frases naturais.
+
+Nunca escreva frases robóticas.
+
+Retorne SOMENTE JSON.
+
+{
+
+"title":"",
+
+"estimatedDuration":"",
+
+"retentionScore":92,
+
+"fullScript":"",
+
+"hook":{
+
+"text":"",
+
+"why":""
+
+},
+
+"intro":"",
+
+"sections":[
+
+{
+
+"title":"",
+
+"content":""
+
+}
+
+],
+
+"cta":"",
+
+"ending":"",
+
+"thumbnailIdeas":[
+"",
+"",
+""
+],
+
+"bRoll":[],
+
+"editingTips":[],
+
+"editingSequence":[],
+
+"keywords":[],
+
+"timeline":[
+{
+"time":"00:00",
+"title":"Hook",
+"action":"..."
+}
+],
+
+"audienceProfile":"",
+
+"searchIntent":"",
+
+"algorithmRecommendation":0,
+
+"searchPotential":0,
+
+"emotionTimeline":[],
+
+"psychologicalTriggers":[],
+
+"recordingChecklist":[],
+
+"performanceForecast":{
+
+"ctr":0,
+
+"retention":0,
+
+"recommendation":0,
+
+"confidence":0
+
+},
+
+"directorTimeline":[],
+
+"cameraShots":[],
+
+"audioDesign":[],
+
+"engagementMoments":[],
+
+"presentationCoach":[],
+
+"speechMistakes":[],
+
+"recordingEnvironment":[],
+
+"creatorTips":[],
+
+"finalChecklist":[],
+
+"stats":{
+
+"words":0,
+
+"characters":0,
+
+"readingTime":"",
+
+"speakingTime":"",
+
+"seoScore":0,
+
+"keywordDensity":""
+
+}
+
+}
+
+`;
+
+}
+
+
+
 // ======================================================
 // 🏷 ADVANCED TAGS
 // ======================================================
@@ -2377,6 +2612,23 @@ const normalizedKeyword = String(
   .trim()
   .replace(/\s+/g, " ");
 
+// roteiro normalizado
+const normalizedScript = [
+
+    title,
+
+    goal,
+
+    duration,
+
+    style
+
+]
+.join("|")
+.toLowerCase()
+.trim();
+
+
 // chave única do cache
 
 const videoCacheId =
@@ -2411,6 +2663,16 @@ tipo === "video_analysis"
 
 ].join("|")
 
+: tipo === "script_generator"
+
+? [
+
+    "script",
+
+    normalizedScript
+
+].join("|")
+
 : [
 
     "v7",
@@ -2438,6 +2700,7 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
+script_generator:12,
 video_analysis:12,
   niche: 24,
   ideas: 24,
@@ -2477,6 +2740,18 @@ if (
     });
 
   }
+
+if (tipo === "script_generator") {
+
+    return res.status(200).json({
+
+        success:true,
+
+        ...(cached.text || {})
+
+    });
+
+}
 
   if (tipo === "viral_content") {
 
@@ -2522,6 +2797,8 @@ return res.status(200).json({
 });
 }
 
+
+
 // ======================================================
 // 🎛 TEMPERATURE (FORA DO CACHE)
 // ======================================================
@@ -2565,6 +2842,22 @@ Sempre responda exclusivamente JSON válido.
 Nunca utilize markdown.
 
 Nunca escreva texto fora do JSON.
+`;
+
+}
+
+if (tipo === "script_generator") {
+
+systemPrompt = `
+Você é um roteirista profissional especializado em vídeos do YouTube.
+
+Sempre responda exclusivamente JSON válido.
+
+Nunca utilize markdown.
+
+Nunca escreva texto fora do JSON.
+
+Todo roteiro deve utilizar técnicas modernas de retenção, storytelling e SEO.
 `;
 
 }
@@ -2624,6 +2917,8 @@ Nunca escreva texto fora do JSON.
 }
 
 
+
+
 console.log("================================");
 console.log("TIPO:", tipo);
 console.log("PROMPT:");
@@ -2638,23 +2933,21 @@ console.log("================================");
 const model =
 
     tipo === "video_analysis"
-
         ? "gpt-4.1"
 
     : tipo === "strategy"
-
         ? "gpt-4.1"
 
     : tipo === "diagnosis"
+        ? "gpt-4.1"
 
+    : tipo === "script_generator"
         ? "gpt-4.1"
 
     : tipo === "channel_analysis"
-
         ? "gpt-4.1-mini"
 
     : "gpt-4o-mini";
-
 
 // ==========================================
 // TEMPERATURE
@@ -2673,6 +2966,10 @@ const temperature =
     : tipo === "diagnosis"
 
         ? 0.4
+
+: tipo === "script_generator"
+
+? 0.7
 
     : tipo === "channel_analysis"
 
@@ -2718,6 +3015,9 @@ const maxTokens =
     : tipo === "ideas"
 
         ? 1200
+: tipo === "script_generator"
+
+? 6000
 
     : tipo === "niche"
 
@@ -2739,6 +3039,8 @@ const useJson =
     tipo === "viral_content" ||
 
     tipo === "channel_analysis" ||
+
+    tipo === "script_generator" ||
 
     tipo === "video_analysis";
 
@@ -3038,6 +3340,36 @@ if (tipo === "video_analysis") {
     }
 
 }
+
+if (tipo === "script_generator") {
+
+    try {
+
+        const parsed = JSON.parse(text);
+
+        global.__tubexCache.set(cacheKey,{
+            text: parsed,
+            timestamp: Date.now()
+        });
+
+        return res.status(200).json({
+            success:true,
+            ...parsed
+        });
+
+    } catch(err){
+
+        console.error(err);
+
+        return res.status(500).json({
+            success:false,
+            error:"invalid_json"
+        });
+
+    }
+
+}
+
 
 if (tipo === "advanced_tags") {
 

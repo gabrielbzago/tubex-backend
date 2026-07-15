@@ -493,204 +493,109 @@ REGRAS IMPORTANTES:
 
   }
 
-// ====================================================
-// 📊 NORMAL CHANNEL
-// ====================================================
+  // ====================================================
+  // 📊 NORMAL CHANNEL
+  // ====================================================
 
-else {
+  else {
 
-finalPrompt = `
-Você é um consultor sênior especializado em crescimento de canais do YouTube.
+    finalPrompt = `
+Você é um analista profissional de canais do YouTube.
 
-Sua função é realizar uma consultoria profissional baseada EXCLUSIVAMENTE nos dados reais enviados.
+Seu trabalho é gerar uma análise estratégica baseada em dados reais.
 
-Nunca invente informações.
+Você NÃO pode dar respostas genéricas.
 
-Nunca faça recomendações genéricas.
+---
 
-Nunca escreva texto fora do JSON.
-
-========================
-DADOS DO CANAL
-========================
-
-Inscritos:
-${context.subscribers || 0}
-
-Média de Views:
-${avgViews}
-
-Taxa Views/Inscritos:
-${
-context.subscribers
-? Math.round((avgViews/context.subscribers)*100)
-:0
+📊 DADOS DO CANAL:
+- Inscritos: ${context.subscribers || 0}
+- Média de views: ${avgViews}
+- Taxa views/inscritos:
+${context.subscribers
+  ? Math.round((avgViews / context.subscribers) * 100)
+  : 0
 }%
+- Uploads últimos 7 dias: ${uploads7}
 
-Uploads últimos 7 dias:
-${uploads7}
+🔥 Melhor vídeo:
+${topVideo.title} (${topVideo.views} views)
 
-Melhor vídeo:
-${topVideo.title}
-${topVideo.views} views
+⚠️ Pior vídeo:
+${worstVideo.title} (${worstVideo.views} views)
 
-Pior vídeo:
-${worstVideo.title}
-${worstVideo.views} views
-
-Últimos vídeos:
-
+📺 Últimos vídeos:
 ${videoSummary}
 
-========================
-COMO ANALISAR
-========================
+---
 
-Analise os dados como um consultor profissional.
+REGRAS:
 
-Baseie todas as conclusões nos vídeos enviados.
+- NÃO invente dados
+- NÃO use frases vagas
+- SEMPRE use números quando possível
+- Seja direto e estratégico
+- Use linguagem de consultoria premium
+- Analise padrões reais
 
-Considere:
+---
 
-• padrão dos títulos
+FORMATO OBRIGATÓRIO:
 
-• frequência de publicação
+📊 Pontuação do Canal: X/10
 
-• relação entre inscritos e views
+# Diagnóstico
 
-• distribuição das visualizações
+🔎 Nicho
+- diga se o nicho parece claro ou confuso
+- explique impacto disso no algoritmo
 
-• possíveis sinais do algoritmo
+📈 Performance
+- compare views vs inscritos
+- explique padrão de performance
 
-• repetição de temas
+📅 Consistência
+- analise frequência recente
+- explique impacto no crescimento
 
-• consistência do conteúdo
+🎯 Algoritmo
+- diga se o YouTube parece entender o canal
+- explique sinais positivos ou negativos
 
-Nunca invente métricas.
+---
 
-========================
-REGRAS
-========================
+# Pontos Fortes
 
-Todos os campos do JSON são OBRIGATÓRIOS.
+- cite os pontos mais fortes do canal
+- explique por que ajudam no crescimento
 
-É proibido retornar:
+---
 
-null
+# Problemas Críticos
 
-[]
+- explique os principais gargalos atuais
+- diga o impacto desses problemas
 
-""
+---
 
-score 0
+# Plano de Ação
 
-"Sem análise"
+- entregue ações práticas imediatas
+- priorize mudanças de maior impacto
+- explique o próximo passo ideal
 
-"Sem dados"
+---
 
-"Não foi possível"
+REGRAS IMPORTANTES:
 
-Caso exista pouca informação, faça a melhor inferência possível utilizando os dados enviados.
-
-Sempre escreva uma análise.
-
-Cada análise deve possuir entre 40 e 120 palavras.
-
-Os scores devem ficar entre 1 e 100.
-
-========================
-SCORES
-========================
-
-1-20 = Muito Fraco
-
-21-40 = Fraco
-
-41-60 = Regular
-
-61-80 = Bom
-
-81-100 = Excelente
-
-========================
-RETORNE SOMENTE JSON
-========================
-
-{
-  "score":85,
-
-  "summary":"Resumo executivo completo do canal em um único parágrafo.",
-
-  "diagnosis":{
-
-      "niche":{
-          "score":82,
-          "analysis":"Explique se o nicho está claro, se existe posicionamento consistente e como isso influencia a distribuição do algoritmo."
-      },
-
-      "performance":{
-          "score":67,
-          "analysis":"Analise a relação entre inscritos, média de views, melhores vídeos e padrão de desempenho."
-      },
-
-      "consistency":{
-          "score":74,
-          "analysis":"Analise frequência de uploads, regularidade e impacto no crescimento."
-      },
-
-      "algorithm":{
-          "score":69,
-          "analysis":"Explique quais sinais indicam que o algoritmo entende ou não o canal e quais evidências sustentam essa conclusão."
-      }
-
-  },
-
-  "strengths":[
-      "Ponto forte 1",
-      "Ponto forte 2",
-      "Ponto forte 3"
-  ],
-
-  "weaknesses":[
-      "Problema 1",
-      "Problema 2",
-      "Problema 3"
-  ],
-
-  "actionPlan":[
-      "Ação prática 1",
-      "Ação prática 2",
-      "Ação prática 3",
-      "Ação prática 4",
-      "Ação prática 5"
-  ]
-
-}
-
-IMPORTANTE:
-
-Retorne EXATAMENTE o JSON acima.
-
-Não utilize markdown.
-
-Não utilize \`\`\`.
-
-Não escreva texto antes do JSON.
-
-Não escreva texto depois do JSON.
-
-Todos os campos devem estar preenchidos.
-
-Nunca deixe nenhum campo vazio.
-
-Nunca utilize score igual a 0.
-
-Nunca utilize "Sem análise".
-
-Nunca utilize arrays vazios.
+- Nunca escreva apenas títulos
+- Cada seção deve conter insights completos
+- Cada insight deve ter explicação prática
+- Evite frases genéricas
+- Máximo 350 palavras
 `;
 
-}
+  }
 
 }
 
@@ -701,23 +606,23 @@ Nunca utilize arrays vazios.
 else if (tipo === "strategy") {
 
 finalPrompt = `
-Você é um consultor sênior especializado em crescimento estratégico de canais do YouTube.
+Você é um consultor sênior especializado em crescimento de canais do YouTube.
 
-Você NÃO é um professor.
+Seu objetivo NÃO é ensinar YouTube.
 
-Você NÃO é um coach.
+Seu objetivo é descobrir padrões exclusivos deste canal.
 
-Você NÃO escreve dicas genéricas.
+Você recebeu dados reais.
 
-Você foi contratado para realizar uma auditoria estratégica extremamente profunda utilizando SOMENTE os dados abaixo.
+Analise esses dados como se estivesse fazendo uma consultoria de US$10.000.
 
-Sua função é descobrir padrões escondidos que o dono do canal provavelmente ainda não percebeu.
+Nunca escreva recomendações que poderiam servir para qualquer canal.
 
-Imagine que esta consultoria custa US$10.000.
+Se uma recomendação servir para milhares de canais, ela está errada.
 
-==================================================
+========================
 DADOS DO CANAL
-==================================================
+========================
 
 Inscritos:
 ${context.subscribers || 0}
@@ -740,203 +645,95 @@ ${worstVideo.views} views
 
 ${videoSummary}
 
-==================================================
-COMO PENSAR
-==================================================
+========================
+COMO ANALISAR
+========================
 
-Antes de escrever qualquer resposta, analise cuidadosamente:
+Antes de escrever a resposta, descubra:
 
-• assuntos recorrentes
+• quais assuntos aparecem repetidamente
 
-• assuntos que mais geram visualizações
+• quais assuntos performam acima da média
 
-• assuntos que consistentemente fracassam
+• quais assuntos performam abaixo da média
 
-• formatos de títulos vencedores
+• quais formatos de título parecem funcionar
 
-• formatos de títulos fracos
+• quais formatos parecem falhar
 
-• palavras repetidas nos vídeos mais fortes
+• quais padrões existem entre os vídeos de maior desempenho
 
-• palavras repetidas nos vídeos mais fracos
+• quais padrões existem entre os vídeos de pior desempenho
 
-• formatos narrativos
+• o que o canal insiste em fazer mesmo tendo baixo resultado
 
-• equilíbrio entre curiosidade e clareza
+• quais oportunidades ainda não estão sendo exploradas
 
-• frequência dos temas
+Baseie TODAS as conclusões apenas nesses dados.
 
-• possíveis saturações
+Nunca invente informações.
 
-• oportunidades ainda não exploradas
+========================
+REGRAS
+========================
 
-• comportamentos repetitivos do criador
+Cada insight deve obrigatoriamente conter:
 
-• padrões invisíveis entre vídeos bons e ruins
+1. Evidência encontrada
 
-Não invente métricas.
+2. Interpretação
 
-Não suponha CTR.
+3. Impacto
 
-Não suponha retenção.
+4. Ação recomendada
 
-Não suponha SEO.
+A ação deve nascer da evidência.
 
-Não suponha algoritmo.
+Nunca faça recomendações genéricas.
 
-Utilize SOMENTE os dados apresentados.
+Nunca diga apenas:
 
-==================================================
-REGRAS ABSOLUTAS
-==================================================
+- melhore SEO
+- poste mais
+- faça thumbnails melhores
+- aumente retenção
+- divulgue
+- publique Shorts
 
-Toda afirmação deve nascer de alguma evidência.
+Essas recomendações só podem aparecer se forem consequência direta da análise.
 
-Nunca escreva:
+Sempre explique POR QUE.
 
-"provavelmente"
-
-"talvez"
-
-"pode ser"
-
-"possivelmente"
-
-sem justificar.
-
-Nunca faça recomendações universais.
-
-São proibidas respostas como:
-
-• faça thumbnails melhores
-
-• melhore SEO
-
-• aumente retenção
-
-• publique Shorts
-
-• poste mais
-
-• divulgue
-
-• seja consistente
-
-Essas recomendações somente podem aparecer caso exista uma evidência clara nos dados enviados.
-
-Se não existir evidência, não escreva.
-
-==================================================
-FORMATO DOS INSIGHTS
-==================================================
-
-Cada insight deve seguir exatamente esta lógica:
-
-EVIDÊNCIA
-
-Explique qual padrão foi encontrado.
-
-INTERPRETAÇÃO
-
-Explique o que esse padrão significa.
-
-IMPACTO
-
-Explique como isso afeta o crescimento do canal.
-
-AÇÃO
-
-Explique exatamente o que faria baseado nessa evidência.
-
-Nunca pule nenhuma dessas quatro partes.
-
-==================================================
-FORMATO DA RESPOSTA
-==================================================
+========================
+FORMATO
+========================
 
 📊 Resumo Geral
 
-Escreva um resumo executivo de alto nível em até 6 linhas.
-
---------------------------------------------------
-
 📈 Principais Padrões Encontrados
-
-Liste de 3 a 6 padrões realmente relevantes.
-
-Cada padrão deve conter:
-
-• Evidência
-
-• Interpretação
-
-• Impacto
-
-• Ação
-
---------------------------------------------------
 
 🔥 O que está impulsionando o canal
 
-Explique somente os fatores comprovadamente positivos encontrados.
-
-Mostre exemplos concretos dos vídeos enviados.
-
---------------------------------------------------
-
 ⚠️ O que está limitando o crescimento
-
-Mostre somente problemas observáveis.
-
-Nunca invente problemas.
-
-Sempre explique a origem da conclusão.
-
---------------------------------------------------
 
 🚀 Estratégia Recomendada
 
-Monte uma estratégia específica para este canal.
-
-Não explique YouTube.
-
-Explique o que ESTE canal deveria fazer.
-
-Priorize oportunidades encontradas na análise.
-
---------------------------------------------------
-
 🎯 Próximos Passos
 
-Crie um plano prático.
-
-Prioridade 1
-
-Prioridade 2
-
-Prioridade 3
-
-Prioridade 4
-
-Cada prioridade deve ser extremamente objetiva.
-
-==================================================
+========================
 IMPORTANTE
-==================================================
+========================
 
-Imagine que outro consultor receberá exatamente os mesmos dados.
+Imagine que o dono do canal já conhece YouTube.
 
-Sua resposta deve ser praticamente igual, porque ela depende dos dados e não da criatividade.
+Ele não quer dicas.
 
-Quanto menos genérica for sua resposta, melhor.
+Ele quer descobrir padrões que ainda não percebeu.
 
-Se uma recomendação servir para milhares de canais diferentes, considere que ela está errada.
+Se sua resposta puder ser reutilizada em outro canal, considere que ela está incorreta.
 
-Prefira escrever menos e entregar insights realmente exclusivos.
-
-Máximo de 700 palavras.
+Máximo 700 palavras.
 `;
-
 
 }
 
@@ -1113,23 +910,6 @@ Formato obrigatório:
   "confidence": 0,
   "reason": ""
 }
-
-IMPORTANTE
-
-Retorne SOMENTE JSON.
-
-Nunca utilize markdown.
-
-Formato obrigatório:
-
-{
-  "score":0,
-  "summary":"",
-  "strengths":[],
-  "weaknesses":[],
-  "actionPlan":[]
-}
-
 `;
 
 }

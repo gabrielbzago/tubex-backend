@@ -701,15 +701,17 @@ Nunca utilize arrays vazios.
 else if (tipo === "strategy") {
 
 finalPrompt = `
-Você é um consultor sênior especializado em crescimento de canais do YouTube.
+Você é um consultor sênior especializado em crescimento estratégico de canais do YouTube.
 
-Sua missão é realizar uma auditoria estratégica baseada EXCLUSIVAMENTE nos dados enviados.
+Você foi contratado para realizar uma auditoria profissional utilizando SOMENTE os dados enviados.
 
-Nunca invente informações.
+Você NÃO é um professor.
 
-Nunca utilize conhecimento externo.
+Você NÃO escreve dicas genéricas.
 
-Todas as conclusões devem ser sustentadas pelas evidências encontradas nos vídeos enviados.
+Você NÃO inventa métricas.
+
+Todas as conclusões devem nascer exclusivamente das evidências encontradas.
 
 ==================================================
 DADOS DO CANAL
@@ -737,44 +739,38 @@ ${worstVideo.views} views
 ${videoSummary}
 
 ==================================================
-COMO ANALISAR
+ANÁLISE
 ==================================================
 
-Antes de responder procure identificar:
+Procure identificar:
 
 • temas recorrentes
 
-• temas que performam acima da média
+• assuntos que performam acima da média
 
-• temas que performam abaixo da média
+• assuntos que performam abaixo da média
 
 • padrões de títulos
 
 • padrões de linguagem
 
-• repetição de palavras
+• repetições
 
-• oportunidades ainda não exploradas
+• oportunidades não exploradas
+
+• formatos que parecem funcionar
+
+• formatos que parecem falhar
 
 • sinais de posicionamento
 
-• padrões entre vídeos fortes
+Nunca invente CTR.
 
-• padrões entre vídeos fracos
+Nunca invente retenção.
 
-Nunca suponha:
+Nunca invente SEO.
 
-CTR
-
-Retenção
-
-SEO
-
-Taxa de clique
-
-Watch Time
-
-Algoritmo interno
+Nunca invente dados.
 
 Caso uma conclusão não possa ser comprovada pelos dados enviados, não escreva essa conclusão.
 
@@ -784,50 +780,36 @@ REGRAS
 
 Cada padrão encontrado deve conter obrigatoriamente:
 
-priority
+Título
 
-confidence
+Evidência
 
-title
+Interpretação
 
-evidence
+Impacto
 
-interpretation
-
-impact
-
-action
-
-priority
-
-Número entre 1 e 100 representando o impacto esperado daquela oportunidade.
-
-confidence
-
-Número entre 1 e 100 representando o quanto essa conclusão é suportada pelos dados.
-
-Ordene os patterns do maior priority para o menor.
+Ação recomendada
 
 Toda ação deve nascer da evidência.
 
-Nunca escreva recomendações genéricas.
+Nunca escreva ações genéricas.
 
 Nunca escreva:
 
-• Melhore SEO
-
 • Faça thumbnails melhores
+
+• Melhore SEO
 
 • Poste mais
 
 • Faça Shorts
 
-• Melhore retenção
+• Aumente retenção
 
-Essas recomendações só podem aparecer caso sejam consequência direta da análise.
+Essas recomendações somente podem aparecer caso sejam consequência direta da análise.
 
 ==================================================
-RETORNO
+JSON
 ==================================================
 
 Retorne SOMENTE um JSON válido.
@@ -836,11 +818,13 @@ Nunca utilize markdown.
 
 Nunca utilize \`\`\`.
 
-Nunca escreva texto antes.
+Nunca escreva texto antes do JSON.
 
-Nunca escreva texto depois.
+Nunca escreva texto depois do JSON.
 
-Nunca utilize:
+Todos os campos são obrigatórios.
+
+Nunca retorne:
 
 null
 
@@ -848,11 +832,29 @@ null
 
 ""
 
-"Sem dados"
-
 "Sem análise"
 
-Todos os campos são obrigatórios.
+"Sem dados"
+
+Caso exista pouca informação, faça a melhor inferência possível utilizando apenas os dados enviados.
+
+==================================================
+PRIORIDADE
+==================================================
+
+priority deve ser um número entre 1 e 100.
+
+100 = oportunidade extremamente importante.
+
+80 = muito importante.
+
+60 = importante.
+
+40 = secundária.
+
+20 = baixa prioridade.
+
+Ordene obrigatoriamente os patterns do MAIOR priority para o MENOR.
 
 ==================================================
 FORMATO OBRIGATÓRIO
@@ -867,8 +869,7 @@ FORMATO OBRIGATÓRIO
     {
 
       "priority":95,
-
-      "confidence":90,
+  "confidence":91,
 
       "title":"",
 
@@ -883,6 +884,8 @@ FORMATO OBRIGATÓRIO
     }
 
   ],
+
+
 
   "growthDrivers":[
 
@@ -911,43 +914,92 @@ FORMATO OBRIGATÓRIO
 }
 
 ==================================================
-REGRAS DOS CAMPOS
+REGRAS FINAIS
 ==================================================
 
 summary
 
-Resumo executivo entre 80 e 150 palavras.
+• Entre 80 e 150 palavras.
+
+• Deve resumir toda a situação do canal.
 
 patterns
 
-Retorne entre 3 e 6 padrões.
+• Retorne entre 3 e 6 padrões.
 
-Nunca deixe nenhum campo vazio.
+• Cada padrão deve possuir TODOS os campos preenchidos.
+
+• Nunca repita padrões semelhantes.
+
+• priority deve refletir o impacto esperado no crescimento.
 
 growthDrivers
 
-Retorne entre 3 e 6 fatores positivos encontrados.
+• Entre 3 e 6 fatores que realmente impulsionam o canal.
 
 limitations
 
-Retorne entre 3 e 6 limitações comprovadas.
+• Entre 3 e 6 limitações comprovadas pelos dados.
 
 strategy
 
-Retorne entre 3 e 6 recomendações específicas para ESTE canal.
+• Entre 3 e 6 recomendações específicas.
+
+• Cada recomendação deve nascer de alguma evidência encontrada.
 
 nextSteps
 
-Retorne entre 3 e 6 ações práticas ordenadas da maior prioridade para a menor.
+• Entre 3 e 6 ações práticas.
+
+• Ordene da maior prioridade para a menor.
 
 IMPORTANTE
 
-Se algum campo estiver vazio considere sua resposta incorreta.
+Se qualquer campo ficar vazio considere que sua resposta está incorreta.
 
 Retorne SOMENTE o JSON.
+
+==================================================
+IMPORTANTE
+==================================================
+
+summary:
+Resumo executivo em até 120 palavras.
+
+patterns:
+Retorne entre 3 e 6 padrões realmente importantes.
+
+growthDrivers:
+Liste apenas fatores comprovadamente positivos encontrados.
+
+limitations:
+Liste apenas limitações comprovadas pelos dados.
+
+strategy:
+Liste entre 3 e 6 recomendações específicas para ESTE canal.
+
+nextSteps:
+Liste entre 3 e 6 ações priorizadas em ordem de importância.
+
+Nunca retorne arrays vazios.
+
+Nunca retorne strings vazias.
+
+Nunca utilize null.
+
+Nunca escreva "Sem dados".
+
+Nunca escreva "Sem análise".
+
+Nunca escreva explicações fora do JSON.
+
+Retorne SOMENTE JSON.
 `;
 
 }
+
+}
+
 
 else if (tipo === "niche") {
 
@@ -3146,6 +3198,7 @@ Nunca escreva texto fora do JSON.
 
 
 
+
 console.log("================================");
 console.log("TIPO:", tipo);
 console.log("PROMPT:");
@@ -3269,11 +3322,7 @@ const useJson =
 
     tipo === "script_generator" ||
 
-    tipo === "video_analysis" ||
-
-    tipo === "diagnosis" ||
-
-    tipo === "strategy";
+    tipo === "video_analysis";
 
 
 // ==========================================
@@ -3631,51 +3680,6 @@ if (tipo === "advanced_tags") {
 
             error:"invalid_json"
 
-        });
-
-    }
-
-}
-
-if (tipo === "diagnosis" || tipo === "strategy") {
-
-    try {
-
-        let clean = String(text).trim();
-
-        clean = clean.replace(/^```json/i, "");
-        clean = clean.replace(/^```/i, "");
-        clean = clean.replace(/```$/i, "");
-        clean = clean.replace(/\r/g, "").replace(/\t/g, "").trim();
-
-        const start = clean.indexOf("{");
-        const end = clean.lastIndexOf("}");
-
-        if (start !== -1 && end !== -1) {
-            clean = clean.slice(start, end + 1);
-        }
-
-        const parsed = JSON.parse(clean);
-
-        global.__tubexCache.set(cacheKey, {
-            text: parsed,
-            timestamp: Date.now()
-        });
-
-        return res.status(200).json({
-            success: true,
-            diagnosisJson: tipo === "diagnosis" ? parsed : undefined,
-            strategyJson: tipo === "strategy" ? parsed : undefined
-        });
-
-    } catch (err) {
-
-        console.error("💥 JSON:", err);
-        console.error(text);
-
-        return res.status(500).json({
-            success: false,
-            error: "invalid_json"
         });
 
     }

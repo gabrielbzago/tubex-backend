@@ -701,17 +701,15 @@ Nunca utilize arrays vazios.
 else if (tipo === "strategy") {
 
 finalPrompt = `
-Você é um consultor sênior especializado em crescimento estratégico de canais do YouTube.
+Você é um consultor sênior especializado em crescimento de canais do YouTube.
 
-Você foi contratado para realizar uma auditoria profissional utilizando SOMENTE os dados enviados.
+Sua missão é realizar uma auditoria estratégica baseada EXCLUSIVAMENTE nos dados enviados.
 
-Você NÃO é um professor.
+Nunca invente informações.
 
-Você NÃO escreve dicas genéricas.
+Nunca utilize conhecimento externo.
 
-Você NÃO inventa métricas.
-
-Todas as conclusões devem nascer exclusivamente das evidências encontradas.
+Todas as conclusões devem ser sustentadas pelas evidências encontradas nos vídeos enviados.
 
 ==================================================
 DADOS DO CANAL
@@ -739,38 +737,44 @@ ${worstVideo.views} views
 ${videoSummary}
 
 ==================================================
-ANÁLISE
+COMO ANALISAR
 ==================================================
 
-Procure identificar:
+Antes de responder procure identificar:
 
 • temas recorrentes
 
-• assuntos que performam acima da média
+• temas que performam acima da média
 
-• assuntos que performam abaixo da média
+• temas que performam abaixo da média
 
 • padrões de títulos
 
 • padrões de linguagem
 
-• repetições
+• repetição de palavras
 
-• oportunidades não exploradas
-
-• formatos que parecem funcionar
-
-• formatos que parecem falhar
+• oportunidades ainda não exploradas
 
 • sinais de posicionamento
 
-Nunca invente CTR.
+• padrões entre vídeos fortes
 
-Nunca invente retenção.
+• padrões entre vídeos fracos
 
-Nunca invente SEO.
+Nunca suponha:
 
-Nunca invente dados.
+CTR
+
+Retenção
+
+SEO
+
+Taxa de clique
+
+Watch Time
+
+Algoritmo interno
 
 Caso uma conclusão não possa ser comprovada pelos dados enviados, não escreva essa conclusão.
 
@@ -780,36 +784,50 @@ REGRAS
 
 Cada padrão encontrado deve conter obrigatoriamente:
 
-Título
+priority
 
-Evidência
+confidence
 
-Interpretação
+title
 
-Impacto
+evidence
 
-Ação recomendada
+interpretation
+
+impact
+
+action
+
+priority
+
+Número entre 1 e 100 representando o impacto esperado daquela oportunidade.
+
+confidence
+
+Número entre 1 e 100 representando o quanto essa conclusão é suportada pelos dados.
+
+Ordene os patterns do maior priority para o menor.
 
 Toda ação deve nascer da evidência.
 
-Nunca escreva ações genéricas.
+Nunca escreva recomendações genéricas.
 
 Nunca escreva:
 
-• Faça thumbnails melhores
-
 • Melhore SEO
+
+• Faça thumbnails melhores
 
 • Poste mais
 
 • Faça Shorts
 
-• Aumente retenção
+• Melhore retenção
 
-Essas recomendações somente podem aparecer caso sejam consequência direta da análise.
+Essas recomendações só podem aparecer caso sejam consequência direta da análise.
 
 ==================================================
-JSON
+RETORNO
 ==================================================
 
 Retorne SOMENTE um JSON válido.
@@ -818,13 +836,11 @@ Nunca utilize markdown.
 
 Nunca utilize \`\`\`.
 
-Nunca escreva texto antes do JSON.
+Nunca escreva texto antes.
 
-Nunca escreva texto depois do JSON.
+Nunca escreva texto depois.
 
-Todos os campos são obrigatórios.
-
-Nunca retorne:
+Nunca utilize:
 
 null
 
@@ -832,29 +848,11 @@ null
 
 ""
 
-"Sem análise"
-
 "Sem dados"
 
-Caso exista pouca informação, faça a melhor inferência possível utilizando apenas os dados enviados.
+"Sem análise"
 
-==================================================
-PRIORIDADE
-==================================================
-
-priority deve ser um número entre 1 e 100.
-
-100 = oportunidade extremamente importante.
-
-80 = muito importante.
-
-60 = importante.
-
-40 = secundária.
-
-20 = baixa prioridade.
-
-Ordene obrigatoriamente os patterns do MAIOR priority para o MENOR.
+Todos os campos são obrigatórios.
 
 ==================================================
 FORMATO OBRIGATÓRIO
@@ -869,7 +867,8 @@ FORMATO OBRIGATÓRIO
     {
 
       "priority":95,
-  "confidence":91,
+
+      "confidence":90,
 
       "title":"",
 
@@ -884,8 +883,6 @@ FORMATO OBRIGATÓRIO
     }
 
   ],
-
-
 
   "growthDrivers":[
 
@@ -914,92 +911,43 @@ FORMATO OBRIGATÓRIO
 }
 
 ==================================================
-REGRAS FINAIS
+REGRAS DOS CAMPOS
 ==================================================
 
 summary
 
-• Entre 80 e 150 palavras.
-
-• Deve resumir toda a situação do canal.
+Resumo executivo entre 80 e 150 palavras.
 
 patterns
 
-• Retorne entre 3 e 6 padrões.
+Retorne entre 3 e 6 padrões.
 
-• Cada padrão deve possuir TODOS os campos preenchidos.
-
-• Nunca repita padrões semelhantes.
-
-• priority deve refletir o impacto esperado no crescimento.
+Nunca deixe nenhum campo vazio.
 
 growthDrivers
 
-• Entre 3 e 6 fatores que realmente impulsionam o canal.
+Retorne entre 3 e 6 fatores positivos encontrados.
 
 limitations
 
-• Entre 3 e 6 limitações comprovadas pelos dados.
+Retorne entre 3 e 6 limitações comprovadas.
 
 strategy
 
-• Entre 3 e 6 recomendações específicas.
-
-• Cada recomendação deve nascer de alguma evidência encontrada.
+Retorne entre 3 e 6 recomendações específicas para ESTE canal.
 
 nextSteps
 
-• Entre 3 e 6 ações práticas.
-
-• Ordene da maior prioridade para a menor.
+Retorne entre 3 e 6 ações práticas ordenadas da maior prioridade para a menor.
 
 IMPORTANTE
 
-Se qualquer campo ficar vazio considere que sua resposta está incorreta.
+Se algum campo estiver vazio considere sua resposta incorreta.
 
 Retorne SOMENTE o JSON.
-
-==================================================
-IMPORTANTE
-==================================================
-
-summary:
-Resumo executivo em até 120 palavras.
-
-patterns:
-Retorne entre 3 e 6 padrões realmente importantes.
-
-growthDrivers:
-Liste apenas fatores comprovadamente positivos encontrados.
-
-limitations:
-Liste apenas limitações comprovadas pelos dados.
-
-strategy:
-Liste entre 3 e 6 recomendações específicas para ESTE canal.
-
-nextSteps:
-Liste entre 3 e 6 ações priorizadas em ordem de importância.
-
-Nunca retorne arrays vazios.
-
-Nunca retorne strings vazias.
-
-Nunca utilize null.
-
-Nunca escreva "Sem dados".
-
-Nunca escreva "Sem análise".
-
-Nunca escreva explicações fora do JSON.
-
-Retorne SOMENTE JSON.
 `;
 
 }
-
-}
-
 
 else if (tipo === "niche") {
 

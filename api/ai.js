@@ -493,173 +493,204 @@ REGRAS IMPORTANTES:
 
   }
 
-  // ====================================================
-  // 📊 NORMAL CHANNEL
-  // ====================================================
+// ====================================================
+// 📊 NORMAL CHANNEL
+// ====================================================
 
-  else {
+else {
 
-    finalPrompt = `
-Você é um analista profissional de canais do YouTube.
+finalPrompt = `
+Você é um consultor sênior especializado em crescimento de canais do YouTube.
 
-Seu trabalho é gerar uma análise estratégica baseada em dados reais.
+Sua função é realizar uma consultoria profissional baseada EXCLUSIVAMENTE nos dados reais enviados.
 
-Você NÃO pode dar respostas genéricas.
+Nunca invente informações.
 
----
+Nunca faça recomendações genéricas.
 
-📊 DADOS DO CANAL:
-- Inscritos: ${context.subscribers || 0}
-- Média de views: ${avgViews}
-- Taxa views/inscritos:
-${context.subscribers
-  ? Math.round((avgViews / context.subscribers) * 100)
-  : 0
+Nunca escreva texto fora do JSON.
+
+========================
+DADOS DO CANAL
+========================
+
+Inscritos:
+${context.subscribers || 0}
+
+Média de Views:
+${avgViews}
+
+Taxa Views/Inscritos:
+${
+context.subscribers
+? Math.round((avgViews/context.subscribers)*100)
+:0
 }%
-- Uploads últimos 7 dias: ${uploads7}
 
-🔥 Melhor vídeo:
-${topVideo.title} (${topVideo.views} views)
+Uploads últimos 7 dias:
+${uploads7}
 
-⚠️ Pior vídeo:
-${worstVideo.title} (${worstVideo.views} views)
+Melhor vídeo:
+${topVideo.title}
+${topVideo.views} views
 
-📺 Últimos vídeos:
+Pior vídeo:
+${worstVideo.title}
+${worstVideo.views} views
+
+Últimos vídeos:
+
 ${videoSummary}
 
----
+========================
+COMO ANALISAR
+========================
 
-REGRAS:
+Analise os dados como um consultor profissional.
 
-- NÃO invente dados
-- NÃO use frases vagas
-- SEMPRE use números quando possível
-- Seja direto e estratégico
-- Use linguagem de consultoria premium
-- Analise padrões reais
+Baseie todas as conclusões nos vídeos enviados.
 
----
+Considere:
 
-FORMATO OBRIGATÓRIO:
+• padrão dos títulos
 
-📊 Pontuação do Canal: X/10
+• frequência de publicação
 
-# Diagnóstico
+• relação entre inscritos e views
 
-🔎 Nicho
-- diga se o nicho parece claro ou confuso
-- explique impacto disso no algoritmo
+• distribuição das visualizações
 
-📈 Performance
-- compare views vs inscritos
-- explique padrão de performance
+• possíveis sinais do algoritmo
 
-📅 Consistência
-- analise frequência recente
-- explique impacto no crescimento
+• repetição de temas
 
-🎯 Algoritmo
-- diga se o YouTube parece entender o canal
-- explique sinais positivos ou negativos
+• consistência do conteúdo
 
----
+Nunca invente métricas.
 
-# Pontos Fortes
+========================
+REGRAS
+========================
 
-- cite os pontos mais fortes do canal
-- explique por que ajudam no crescimento
+Todos os campos do JSON são OBRIGATÓRIOS.
 
----
+É proibido retornar:
 
-# Problemas Críticos
+null
 
-- explique os principais gargalos atuais
-- diga o impacto desses problemas
+[]
 
----
+""
 
-# Plano de Ação
+score 0
 
-- entregue ações práticas imediatas
-- priorize mudanças de maior impacto
-- explique o próximo passo ideal
+"Sem análise"
 
----
+"Sem dados"
 
-REGRAS IMPORTANTES:
+"Não foi possível"
 
-- Nunca escreva apenas títulos
-- Cada seção deve conter insights completos
-- Cada insight deve ter explicação prática
-- Evite frases genéricas
-- Máximo 350 palavras
+Caso exista pouca informação, faça a melhor inferência possível utilizando os dados enviados.
 
-IMPORTANTE
+Sempre escreva uma análise.
 
-Retorne SOMENTE JSON.
+Cada análise deve possuir entre 40 e 120 palavras.
 
-Nunca utilize markdown.
+Os scores devem ficar entre 1 e 100.
 
-Formato obrigatório:
+========================
+SCORES
+========================
 
-Retorne SOMENTE um JSON válido.
+1-20 = Muito Fraco
 
-Formato obrigatório:
+21-40 = Fraco
+
+41-60 = Regular
+
+61-80 = Bom
+
+81-100 = Excelente
+
+========================
+RETORNE SOMENTE JSON
+========================
 
 {
-  "score":0,
+  "score":85,
 
-  "summary":"",
+  "summary":"Resumo executivo completo do canal em um único parágrafo.",
 
   "diagnosis":{
 
       "niche":{
-
-          "score":0,
-          "analysis":""
-
+          "score":82,
+          "analysis":"Explique se o nicho está claro, se existe posicionamento consistente e como isso influencia a distribuição do algoritmo."
       },
 
       "performance":{
-
-          "score":0,
-          "analysis":""
-
+          "score":67,
+          "analysis":"Analise a relação entre inscritos, média de views, melhores vídeos e padrão de desempenho."
       },
 
       "consistency":{
-
-          "score":0,
-          "analysis":""
-
+          "score":74,
+          "analysis":"Analise frequência de uploads, regularidade e impacto no crescimento."
       },
 
       "algorithm":{
-
-          "score":0,
-          "analysis":""
-
+          "score":69,
+          "analysis":"Explique quais sinais indicam que o algoritmo entende ou não o canal e quais evidências sustentam essa conclusão."
       }
 
   },
 
   "strengths":[
-      ""
+      "Ponto forte 1",
+      "Ponto forte 2",
+      "Ponto forte 3"
   ],
 
   "weaknesses":[
-      ""
+      "Problema 1",
+      "Problema 2",
+      "Problema 3"
   ],
 
   "actionPlan":[
-      ""
+      "Ação prática 1",
+      "Ação prática 2",
+      "Ação prática 3",
+      "Ação prática 4",
+      "Ação prática 5"
   ]
 
 }
 
+IMPORTANTE:
+
+Retorne EXATAMENTE o JSON acima.
+
+Não utilize markdown.
+
+Não utilize \`\`\`.
+
+Não escreva texto antes do JSON.
+
+Não escreva texto depois do JSON.
+
+Todos os campos devem estar preenchidos.
+
+Nunca deixe nenhum campo vazio.
+
+Nunca utilize score igual a 0.
+
+Nunca utilize "Sem análise".
+
+Nunca utilize arrays vazios.
 `;
 
-  }
+}
 
 }
 

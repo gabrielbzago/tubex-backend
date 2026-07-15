@@ -3144,24 +3144,6 @@ Nunca escreva texto fora do JSON.
 
 }
 
-if (tipo === "diagnosis" || tipo === "strategy") {
-
-    const parsed = JSON.parse(text);
-
-    global.__tubexCache.set(cacheKey,{
-        text: parsed,
-        timestamp: Date.now()
-    });
-
-    return res.status(200).json({
-        success: true,
-        diagnosisJson: tipo === "diagnosis" ? parsed : undefined,
-        strategyJson: tipo === "strategy" ? parsed : undefined,
-        diagnosis: tipo === "diagnosis" ? JSON.stringify(parsed) : undefined,
-        strategy: tipo === "strategy" ? JSON.stringify(parsed) : undefined
-    });
-
-}
 
 
 console.log("================================");
@@ -3649,6 +3631,51 @@ if (tipo === "advanced_tags") {
 
             error:"invalid_json"
 
+        });
+
+    }
+
+}
+
+if (tipo === "diagnosis" || tipo === "strategy") {
+
+    try {
+
+        let clean = String(text).trim();
+
+        clean = clean.replace(/^```json/i, "");
+        clean = clean.replace(/^```/i, "");
+        clean = clean.replace(/```$/i, "");
+        clean = clean.replace(/\r/g, "").replace(/\t/g, "").trim();
+
+        const start = clean.indexOf("{");
+        const end = clean.lastIndexOf("}");
+
+        if (start !== -1 && end !== -1) {
+            clean = clean.slice(start, end + 1);
+        }
+
+        const parsed = JSON.parse(clean);
+
+        global.__tubexCache.set(cacheKey, {
+            text: parsed,
+            timestamp: Date.now()
+        });
+
+        return res.status(200).json({
+            success: true,
+            diagnosisJson: tipo === "diagnosis" ? parsed : undefined,
+            strategyJson: tipo === "strategy" ? parsed : undefined
+        });
+
+    } catch (err) {
+
+        console.error("💥 JSON:", err);
+        console.error(text);
+
+        return res.status(500).json({
+            success: false,
+            error: "invalid_json"
         });
 
     }

@@ -602,12 +602,59 @@ Nunca utilize markdown.
 
 Formato obrigatório:
 
+Retorne SOMENTE um JSON válido.
+
+Formato obrigatório:
+
 {
   "score":0,
+
   "summary":"",
-  "strengths":[],
-  "weaknesses":[],
-  "actionPlan":[]
+
+  "diagnosis":{
+
+      "niche":{
+
+          "score":0,
+          "analysis":""
+
+      },
+
+      "performance":{
+
+          "score":0,
+          "analysis":""
+
+      },
+
+      "consistency":{
+
+          "score":0,
+          "analysis":""
+
+      },
+
+      "algorithm":{
+
+          "score":0,
+          "analysis":""
+
+      }
+
+  },
+
+  "strengths":[
+      ""
+  ],
+
+  "weaknesses":[
+      ""
+  ],
+
+  "actionPlan":[
+      ""
+  ]
+
 }
 
 `;

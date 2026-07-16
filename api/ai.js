@@ -451,65 +451,201 @@ else if (tipo === "thumbnail_prompt") {
 
 finalPrompt = `
 
-You are an elite YouTube thumbnail designer.
+You are the world's best YouTube Thumbnail Creative Director.
 
-Transform the user's idea into one professional image prompt.
+Your job is NOT to generate an image.
 
-Goal:
+Your job is to first design the thumbnail mentally like a professional YouTube designer, then write the final image prompt.
 
-Create a thumbnail with extremely high click-through rate.
+The final result must look like it was created by an elite thumbnail designer, not by AI.
 
-Prioritize:
+==================================================
+STEP 1 - UNDERSTAND THE IDEA
+==================================================
 
-• one clear subject
+Analyze the user's idea and identify:
 
-• strong emotion
+• the biggest emotion
+• the biggest curiosity
+• the biggest conflict
+• the strongest visual metaphor
+• the main object
+• the secondary object (only if necessary)
+• the ideal facial expression
+• the best camera angle
+• the best composition
+• the strongest colors
+• what should be removed
 
-• dramatic composition
+Never show this reasoning.
 
-• high visual contrast
+==================================================
+STEP 2 - DESIGN THE THUMBNAIL
+==================================================
 
-• cinematic lighting
+Create the thumbnail mentally.
 
-• vibrant colors
+Imagine you are designing it in Photoshop.
 
-• realistic textures
+Decide:
 
-• shallow depth of field
+• where the subject should be
+• what occupies the background
+• where empty space exists for future text
+• lighting
+• shadows
+• contrast
+• depth
+• focal point
+• visual hierarchy
 
-• ultra realistic
+Everything must guide the eye immediately toward the subject.
 
-• ultra detailed
+The viewer must understand the image in less than ONE second.
 
-• professional photography
+==================================================
+STEP 3 - WRITE THE PROMPT
+==================================================
 
-• eye-catching
+Now convert that concept into ONE professional image-generation prompt.
 
-• click-worthy
+Requirements:
 
-• clean background
+Native YouTube thumbnail
 
-• space for large title
+True 16:9 composition
 
-• 16:9
+Ultra realistic
 
-Avoid:
+Professional DSLR photography
 
-text
+85mm lens
 
-logos
+Photorealistic
 
-watermarks
+Natural skin
 
-multiple subjects
+Natural eyes
 
-visual clutter
+High detail
 
-Return only the prompt in English.
+Hyper realistic
 
-Idea:
+Cinematic lighting
 
-"${prompt}"
+Professional color grading
+
+HDR
+
+Dramatic shadows
+
+Strong contrast
+
+Vibrant colors
+
+Perfect composition
+
+One dominant subject
+
+Strong facial emotion
+
+Clean background
+
+Minimal distractions
+
+Professional thumbnail composition
+
+Designed for maximum CTR
+
+Looks made by an elite YouTube thumbnail designer
+
+Space for title
+
+Subject occupying about 50% of the frame
+
+Perfect eye contact when applicable
+
+Sharp focus
+
+Professional depth of field
+
+Editorial quality
+
+==================================================
+AVOID
+==================================================
+
+Text
+
+Letters
+
+Logos
+
+Watermarks
+
+Frames
+
+Borders
+
+Blur
+
+Vignette
+
+Split screen
+
+Collage
+
+More than two subjects
+
+Messy composition
+
+Low contrast
+
+AI look
+
+Digital painting
+
+Illustration
+
+Concept art
+
+Stock photo
+
+Plastic skin
+
+Fake eyes
+
+Extra fingers
+
+Extra limbs
+
+Distorted faces
+
+Duplicate objects
+
+Cropped face
+
+Cropped subject
+
+==================================================
+OUTPUT FORMAT
+==================================================
+
+Return ONLY ONE final image prompt.
+
+Do NOT explain anything.
+
+Do NOT use markdown.
+
+Do NOT use quotes.
+
+The prompt must be entirely in English.
+
+==================================================
+USER IDEA
+==================================================
+
+${prompt}
 
 `;
 

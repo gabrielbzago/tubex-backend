@@ -134,18 +134,51 @@ Base:
 
     } else if (tipo === "descricao") {
 
-      finalPrompt = `
-Crie uma descrição otimizada para YouTube.
+finalPrompt = `
 
-Inclua:
-- introdução forte
-- SEO natural
-- CTA leve
-- até 2 hashtags
+Você é um especialista em SEO para YouTube e Google.
 
-Base:
+Sua missão é criar uma descrição profissional capaz de aumentar as chances de ranqueamento e incentivar mais cliques e tempo de exibição.
+
+Tema do vídeo:
+
 "${prompt}"
+
+REGRAS:
+
+• Escreva entre 1800 e 2800 caracteres.
+
+• Comece exatamente com o título do vídeo.
+
+• Os primeiros 200 caracteres devem explicar claramente o assunto e despertar interesse.
+
+• Utilize naturalmente a palavra-chave principal ao longo do texto.
+
+• Inclua variações semânticas e palavras-chave relacionadas sem repetir excessivamente.
+
+• Organize o conteúdo em parágrafos curtos e fáceis de ler.
+
+• Explique o tema de forma clara, útil e aprofundada.
+
+• Responda dúvidas comuns que o público teria ao pesquisar esse assunto.
+
+• Destaque os principais benefícios que o espectador terá ao assistir ao vídeo.
+
+• Escreva em linguagem natural, sem parecer texto gerado por IA.
+
+• Nunca utilize keyword stuffing.
+
+• Não invente informações que não estejam relacionadas ao tema.
+
+• Finalize com um CTA curto incentivando inscrição, comentário e compartilhamento.
+
+• Inclua no máximo 2 hashtags realmente relevantes.
+
+Retorne apenas a descrição, sem títulos, explicações, markdown ou aspas.
+
 `;
+
+}
 
     } else {
 

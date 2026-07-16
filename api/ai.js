@@ -271,124 +271,173 @@ console.log(
   )
   .join("\n");
 
-    // ======================================================
-    // 🧠 PROMPTS (INALTERADO)
-    // ======================================================
-    let finalPrompt = "";
+// ======================================================
+// 🧠 TITLE AI
+// ======================================================
 
-    if (tipo === "tituloSEO" || tipo === "tituloImpactante" || tipo === "tituloEmocional") {
-      finalPrompt = `
-Crie 4 títulos curtos e altamente clicáveis.
-Máx 70 caracteres.
-
-Base:
-"${prompt}"
-`;
-    }
-
-    else if (tipo === "descricao") {
-      finalPrompt = `
-Crie uma descrição extremamente otimizada para SEO do YouTube.
-
-REGRAS OBRIGATÓRIAS:
-
-- mínimo de 1500 caracteres
-- máximo de 3500 caracteres
-- começar repetindo EXATAMENTE o título otimizado
-- repetir naturalmente a palavra-chave principal diversas vezes ao longo do texto
-- incluir palavras-chave relacionadas
-- incluir palavras-chave long tail
-- escrever para ranqueamento na busca do YouTube
-- escrever para ranqueamento no Google
-- linguagem natural
-- evitar keyword stuffing
-- criar vários parágrafos
-- explicar o tema em profundidade
-- incluir benefícios do conteúdo
-- incluir dúvidas comuns dos usuários
-- incluir variações da keyword principal
-- finalizar com CTA para inscrição
-
-A descrição deve ser muito mais completa do que descrições normais de YouTube.
-
-Base:
-"${prompt}"
-`;
-    }
-
-else if (tipo === "thumbnail_prompt") {
+if (
+    tipo === "tituloSEO" ||
+    tipo === "tituloImpactante" ||
+    tipo === "tituloEmocional"
+) {
 
 finalPrompt = `
-Você é o melhor especialista do mundo em criação de prompts para IA de geração de imagens.
 
-Seu trabalho é transformar qualquer ideia em um prompt profissional para criar thumbnails extremamente chamativas para YouTube.
+Você é um dos maiores especialistas do mundo em crescimento de canais no YouTube.
 
-Objetivo:
+Sua missão NÃO é apenas criar títulos.
 
-Gerar imagens com CTR muito alto.
+Sua missão é criar títulos capazes de gerar o maior CTR possível.
 
-Sempre inclua naturalmente:
+Antes de responder, pense como um criador que vive exclusivamente de milhões de visualizações.
 
-- cinematic lighting
-- dramatic shadows
-- vibrant colors
-- high contrast
-- ultra realistic
-- ultra detailed
-- expressive face (quando fizer sentido)
-- dynamic composition
-- shallow depth of field
-- professional photography
-- click-worthy
-- eye-catching
-- viral YouTube thumbnail
-- room for large title
-- 16:9 composition
+Analise profundamente o tema abaixo.
 
-Nunca explique.
+Tema:
+"${prompt}"
 
-Nunca utilize markdown.
+--------------------------------------------------
 
-Nunca escreva listas.
+OBJETIVO
 
-Nunca escreva aspas.
+Gerar apenas títulos que façam o usuário sentir necessidade de clicar.
 
-Retorne SOMENTE o prompt em inglês.
+Nunca escreva títulos comuns.
 
-Ideia do usuário:
+Nunca escreva títulos genéricos.
 
-"${prompt}"`;
+Nunca escreva títulos parecidos entre si.
 
-}
+--------------------------------------------------
 
-else if (tipo === "ideas") {
-  finalPrompt = `
-Baseado nesses vídeos:
+REGRAS
 
-${videoSummary}
+• Crie EXATAMENTE 4 títulos.
 
-Crie 5 ideias novas.
+• Cada título deve usar um gatilho psicológico diferente.
 
-REGRAS:
-- NÃO escreva introdução
-- NÃO diga "Claro"
-- NÃO explique nada
-- NÃO use markdown (**)
-- NÃO use aspas
-- NÃO numere com texto extra
+Exemplos de gatilhos:
 
-FORMATO EXATO (OBRIGATÓRIO):
-Uma ideia por linha
+- curiosidade
+- surpresa
+- choque
+- medo de perder
+- descoberta
+- benefício
+- autoridade
+- segredo
+- erro
+- comparação
+- mito
+- verdade escondida
+- conflito
+- urgência
 
-EXEMPLO:
-Titulo 1
-Titulo 2
-Titulo 3
-Titulo 4
-Titulo 5
+Nunca repita o mesmo gatilho.
+
+--------------------------------------------------
+
+SEO
+
+Sempre que possível:
+
+• coloque a palavra-chave principal no início
+
+• mantenha entre 45 e 68 caracteres
+
+• escreva de forma natural
+
+• evite clickbait mentiroso
+
+• priorize CTR sem perder SEO
+
+--------------------------------------------------
+
+PENSE COMO O ALGORITMO
+
+Antes de responder imagine:
+
+"Se existirem 20 vídeos iguais na busca...
+
+qual título faria você clicar imediatamente?"
+
+--------------------------------------------------
+
+PROCESSO INTERNO
+
+Antes de responder:
+
+1. Crie mentalmente 20 títulos.
+
+2. Dê uma nota de CTR para cada um.
+
+3. Escolha apenas os 4 melhores.
+
+4. Ordene do MELHOR para o PIOR.
+
+Nunca mostre esse processo.
+
+--------------------------------------------------
+
+FORMATO
+
+Retorne somente os títulos.
+
+Um por linha.
+
+Sem números.
+
+Sem aspas.
+
+Sem markdown.
+
+Sem explicações.
+
 `;
+
 }
 
+   else if (tipo === "descricao") {
+
+finalPrompt = `
+
+Você é um especialista em SEO para YouTube.
+
+Escreva uma descrição capaz de aumentar as chances de ranqueamento no YouTube e no Google.
+
+Tema:
+
+"${prompt}"
+
+Regras:
+
+• Entre 1800 e 2800 caracteres.
+
+• Comece exatamente com o título otimizado.
+
+• Nos primeiros 200 caracteres explique claramente sobre o que é o vídeo.
+
+• Inclua naturalmente a palavra-chave principal ao longo do texto.
+
+• Utilize palavras-chave relacionadas e variações sem repetir excessivamente.
+
+• Organize em parágrafos curtos.
+
+• Responda às principais dúvidas que uma pessoa pesquisando esse assunto teria.
+
+• Explique os benefícios de assistir ao vídeo.
+
+• Escreva de forma natural, como um especialista falando com outra pessoa.
+
+• Nunca faça keyword stuffing.
+
+• Finalize com um CTA curto incentivando inscrição e comentários.
+
+Retorne apenas a descrição.
+
+`;
+
+}
 
 // ======================================================
 // 🧠 DETECÇÃO CANAL NOVO

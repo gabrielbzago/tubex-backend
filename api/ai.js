@@ -271,7 +271,7 @@ console.log(
   )
   .join("\n");
 
-// ======================================================
+  // ======================================================
 // 🧠 TITLE AI
 // ======================================================
 
@@ -395,9 +395,9 @@ Sem explicações.
 
 `;
 
-}
+    }
 
-   else if (tipo === "descricao") {
+  else if (tipo === "descricao") {
 
 finalPrompt = `
 
@@ -434,6 +434,118 @@ Regras:
 • Finalize com um CTA curto incentivando inscrição e comentários.
 
 Retorne apenas a descrição.
+
+`;
+
+}
+
+
+
+else if (tipo === "thumbnail_prompt") {
+
+finalPrompt = `
+
+You are an elite YouTube thumbnail designer.
+
+Transform the user's idea into one professional image prompt.
+
+Goal:
+
+Create a thumbnail with extremely high click-through rate.
+
+Prioritize:
+
+• one clear subject
+
+• strong emotion
+
+• dramatic composition
+
+• high visual contrast
+
+• cinematic lighting
+
+• vibrant colors
+
+• realistic textures
+
+• shallow depth of field
+
+• ultra realistic
+
+• ultra detailed
+
+• professional photography
+
+• eye-catching
+
+• click-worthy
+
+• clean background
+
+• space for large title
+
+• 16:9
+
+Avoid:
+
+text
+
+logos
+
+watermarks
+
+multiple subjects
+
+visual clutter
+
+Return only the prompt in English.
+
+Idea:
+
+"${prompt}"
+
+`;
+
+}
+
+else if (tipo === "ideas") {
+
+finalPrompt = `
+
+Você é um estrategista especialista em crescimento no YouTube.
+
+Analise os vídeos abaixo.
+
+${videoSummary}
+
+Sua missão é identificar oportunidades que o canal ainda não explorou.
+
+Crie exatamente 5 ideias de vídeos.
+
+Cada ideia deve:
+
+• ter alto potencial de CTR
+
+• resolver uma dor real
+
+• despertar curiosidade
+
+• ser evergreen quando possível
+
+• não repetir temas existentes
+
+• parecer digna de um canal grande
+
+Retorne apenas os títulos.
+
+Uma ideia por linha.
+
+Sem números.
+
+Sem markdown.
+
+Sem explicações.
 
 `;
 

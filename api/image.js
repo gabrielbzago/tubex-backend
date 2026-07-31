@@ -119,9 +119,58 @@ if (global.__tubexPending[key]) {
     // 🎯 PROMPT ENGINE
     // ======================================================
 const enhancedPrompt = `
-YouTube thumbnail, high CTR, bold text, cinematic lighting, clean composition.
+Create a PROFESSIONAL YouTube thumbnail.
+
+Landscape composition.
+
+16:9 framing.
+
+High CTR.
+
+Ultra realistic.
+
+Cinematic lighting.
+
+Main subject centered.
+
+Keep all important elements inside the safe area.
+
+Leave margins on the left and right.
+
+Do NOT crop faces.
+
+Do NOT crop text.
+
+Do NOT place important objects near image borders.
+
+Strong facial expression.
+
+Bold composition.
+
+Vibrant colors.
+
+Clean background.
+
+Designed specifically for YouTube thumbnails.
 
 IDEA:
+
+Important:
+
+Keep every important object inside the central 80% of the frame.
+
+Do not place faces near image borders.
+
+Do not crop hands.
+
+Do not crop heads.
+
+Leave at least 8% margin on every side.
+
+Design for YouTube desktop and mobile.
+
+The final image must already look perfect in 1280x720.
+
 ${safePrompt}
 `;
 
@@ -148,7 +197,7 @@ try {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        prompt: enhancedPrompt,
+prompt: enhancedPrompt,
         output_format: "png",
         aspect_ratio: "16:9",
         samples: quantidade // 🔥 1 request gera tudo
@@ -202,12 +251,12 @@ try {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
           },
-          body: JSON.stringify({
-            model: "gpt-image-1",
-            prompt: enhancedPrompt,
-            size: "1024x1024",
-            n: quantidade
-          })
+         body: JSON.stringify({
+  model: "gpt-image-1",
+  prompt: enhancedPrompt,
+  size: "1024x1024",
+  n: quantidade
+})
         });
 
         const data = await r.json();

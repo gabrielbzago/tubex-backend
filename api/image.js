@@ -378,7 +378,7 @@ prompt: enhancedPrompt,
          body: JSON.stringify({
   model: "gpt-image-1",
   prompt: enhancedPrompt,
-  size: "1024x1024",
+  size: "1536x1024",
   n: quantidade
 })
         });

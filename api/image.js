@@ -87,9 +87,8 @@ if (typeof n === "number" && n > 1 && n <= 3) {
 
 const p = safePrompt.toLowerCase();
 
-let camera = "wide cinematic shot";
-let framing = "subject occupies about 60% of the frame";
-
+let camera = "Automatically choose the best camera angle.";
+let framing = "Automatically choose the best framing while keeping every important subject fully visible.";
 if (
     /(ovni|ufo|nave|spaceship|castelo|cidade|avião|airplane|trex|t-rex|tiranossauro|spinossauro|dinossauro|megalodon|mosasaurus|navio|ship|montanha|mountain|prédio|building)/i.test(p)
 ) {
@@ -100,8 +99,8 @@ if (
 if (
     /(rosto|face|homem|mulher|person|man|woman|selfie)/i.test(p)
 ) {
-    camera = "close-up portrait";
-    framing = "face occupies about 70% of the frame";
+camera = "portrait medium shot";
+framing = "person fully visible with generous margins";
 }
 
      // ======================================================
@@ -138,166 +137,158 @@ if (global.__tubexPending[key]) {
   });
 }
 
-    
 // ======================================================
-// 🎯 PROMPT ENGINE
+// 🎯 TUBEX UNIVERSAL PROMPT ENGINE v3 (FINAL)
 // ======================================================
 
 const enhancedPrompt = `
-You are a professional image generation engine specialized in YouTube thumbnails.
+ROLE
+
+You are TubeX AI, an elite image generation system specialized in understanding natural language and creating high-quality images.
 
 MISSION
 
-Your ONLY mission is to render exactly what the user requests.
+Understand the user's request exactly as written and generate the best possible image.
 
-The user's request is absolute and must never be changed.
+The user's request is the highest priority.
 
-STRICT RULES
+Never change its meaning.
 
-- Never invent people.
-- Never invent faces.
-- Never invent animals.
-- Never invent objects.
-- Never invent buildings.
-- Never invent vehicles.
-- Never invent text.
-- Never invent titles.
-- Never invent captions.
-- Never invent logos.
-- Never invent watermarks.
-- Never invent icons.
-- Never replace one object with another.
-- Never change the scene.
-- Never change the subject.
-- Never add elements that were not requested.
-- Never remove elements requested by the user.
+Never reinterpret it.
 
-If the prompt says UFO, generate a UFO.
+Never replace the requested subject.
 
-If the prompt says dinosaur, generate a dinosaur.
+Never simplify the requested scene.
 
-If the prompt says desert, generate a desert.
+INTELLIGENCE
 
-If the prompt does not mention humans, generate ZERO humans.
+Before generating the image, automatically determine:
 
-If the prompt does not mention text, generate ZERO text.
+• Primary subject
+• Secondary subjects
+• Environment
+• Action
+• Camera angle
+• Camera distance
+• Composition
+• Visual style
+• Lighting
+• Perspective
+• Materials
+• Mood
 
-IMAGE STYLE
+Infer all of these naturally from the user's request.
 
-Improve ONLY:
+VISUAL STYLE
 
-- lighting
-- realism
-- shadows
-- textures
-- composition
-- color grading
-- cinematic quality
-- sharpness
+Automatically choose the rendering style that best matches the user's request.
 
-WITHOUT changing the requested scene.
+Examples include but are not limited to:
 
-THUMBNAIL REQUIREMENTS
+• photograph
+• cinematic photography
+• wildlife photography
+• macro photography
+• digital art
+• concept art
+• realistic illustration
+• anime
+• watercolor
+• oil painting
+• pencil drawing
+• comic
+• 3D render
+• logo
+• software interface
+• analytics dashboard
+• isometric illustration
+• pixel art
+• blueprint
+• infographic
 
-- 16:9 landscape
-- professional YouTube thumbnail
-- safe composition
-- keep every important element visible
-- no cropped subject
-- no cropped face
-- no cropped hands
-- leave safe margins
-- optimized for 1280x720
+If the user specifies a style, follow it exactly.
 
-CAMERA
+If no style is specified, infer the most appropriate professional style.
 
-${camera}
+FIDELITY
 
-FRAMING
+The user's prompt is the specification.
 
-${framing}
+Every requested element must appear.
 
-The camera must NEVER crop the main subject.
+Do not omit requested elements.
 
-Every important object must be completely visible.
+Do not add unrelated elements.
 
-Keep at least 10% empty space around the main subject.
+Do not replace requested elements.
 
-Use a wider camera if necessary to fit the entire scene.
+Do not invent people unless requested.
 
-Avoid close-up shots unless explicitly requested by the user.
+Do not invent text unless requested.
 
-The image must already look like a finished YouTube thumbnail.
+Do not invent logos unless requested.
 
-OUTPUT
+Do not invent interface elements unless requested.
 
-Generate ONLY the requested scene.
+Respect the semantic meaning of every word in the user's request.
 
-CAMERA DISTANCE
+QUALITY
 
-Prefer a wide shot instead of a close-up.
+Improve only the technical quality of the image:
 
-The entire scene must be visible.
+• lighting
+• composition
+• perspective
+• realism when appropriate
+• materials
+• textures
+• shadows
+• reflections
+• depth
+• sharpness
+• color grading
+• visual clarity
 
-The entire subject must be visible.
-
-Nothing important may touch the image borders.
-
-The image must look already cropped for YouTube.
-
-Never zoom into the subject unless explicitly requested.
-
-Always leave empty space around the main subject.
-
-The generated image should require ZERO additional cropping.
-
-SCENE DESCRIPTION
-
-${safePrompt}
-
-Render exactly this scene.
-
-Do not reinterpret the request.
-
-Do not change the requested subject.
-
-Do not add extra elements.
-
-Do not zoom into the subject.
-
-Use the camera instructions above.
-
-`;
-
-// ======================================================
-// 🎯 PROMPT OPTIMIZER
-// ======================================================
-
-const optimizedPrompt = `
-CAMERA
-
-${camera}
-
-FRAMING
-
-${framing}
+Never change the content.
 
 COMPOSITION
 
-Professional YouTube thumbnail.
+Camera:
 
-16:9 landscape.
+${camera}
 
-Entire main subject visible.
+Framing:
 
-No cropped subject.
+${framing}
 
-Leave safe margins.
+Automatically choose the most appropriate framing.
 
-Use a wider camera angle if necessary.
+Keep all important subjects completely visible.
 
-Avoid close-up unless requested.
-`;
+Never crop the primary subject.
+
+Leave safe margins around important elements.
+
+Avoid unnecessary close-up shots.
+
+Avoid important elements touching image borders.
+
+If the request is intended for YouTube, automatically compose the image as a professional 16:9 thumbnail with safe margins and room for optional text.
+
+Otherwise, compose the image according to the requested content.
+
+OUTPUT
+
+Produce a single polished, production-quality image.
+
+The image must look like it was created by an experienced professional designer.
+
+USER REQUEST
+
+${safePrompt}
+`.trim();
+
+
    // ======================================================
     // 🔁 PIPELINE (Stability → OpenAI)
     // ======================================================
@@ -321,7 +312,7 @@ try {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-prompt: enhancedPrompt,
+prompt: enhancedPrompt.trim(),
         output_format: "png",
         aspect_ratio: "16:9",
         samples: quantidade // 🔥 1 request gera tudo
@@ -377,7 +368,7 @@ prompt: enhancedPrompt,
           },
          body: JSON.stringify({
   model: "gpt-image-1",
-  prompt: enhancedPrompt,
+  prompt: enhancedPrompt.trim(),
   size: "1536x1024",
   n: quantidade
 })

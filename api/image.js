@@ -81,6 +81,29 @@ if (typeof n === "number" && n > 1 && n <= 3) {
     // ======================================================
     const safePrompt = prompt.trim().replace(/\s+/g, " ").slice(0, 400);
 
+// ======================================================
+// 🎯 DETECTOR DE CENA
+// ======================================================
+
+const p = safePrompt.toLowerCase();
+
+let camera = "wide cinematic shot";
+let framing = "subject occupies about 60% of the frame";
+
+if (
+    /(ovni|ufo|nave|spaceship|castelo|cidade|avião|airplane|trex|t-rex|tiranossauro|spinossauro|dinossauro|megalodon|mosasaurus|navio|ship|montanha|mountain|prédio|building)/i.test(p)
+) {
+    camera = "wide angle shot";
+    framing = "entire subject visible with generous margins";
+}
+
+if (
+    /(rosto|face|homem|mulher|person|man|woman|selfie)/i.test(p)
+) {
+    camera = "close-up portrait";
+    framing = "face occupies about 70% of the frame";
+}
+
      // ======================================================
     // 🧠 Key
     // ======================================================
@@ -186,13 +209,94 @@ THUMBNAIL REQUIREMENTS
 - leave safe margins
 - optimized for 1280x720
 
+CAMERA
+
+${camera}
+
+FRAMING
+
+${framing}
+
+The camera must NEVER crop the main subject.
+
+Every important object must be completely visible.
+
+Keep at least 10% empty space around the main subject.
+
+Use a wider camera if necessary to fit the entire scene.
+
+Avoid close-up shots unless explicitly requested by the user.
+
+The image must already look like a finished YouTube thumbnail.
+
 OUTPUT
 
 Generate ONLY the requested scene.
 
-USER PROMPT
+CAMERA DISTANCE
+
+Prefer a wide shot instead of a close-up.
+
+The entire scene must be visible.
+
+The entire subject must be visible.
+
+Nothing important may touch the image borders.
+
+The image must look already cropped for YouTube.
+
+Never zoom into the subject unless explicitly requested.
+
+Always leave empty space around the main subject.
+
+The generated image should require ZERO additional cropping.
+
+SCENE DESCRIPTION
 
 ${safePrompt}
+
+Render exactly this scene.
+
+Do not reinterpret the request.
+
+Do not change the requested subject.
+
+Do not add extra elements.
+
+Do not zoom into the subject.
+
+Use the camera instructions above.
+
+`;
+
+// ======================================================
+// 🎯 PROMPT OPTIMIZER
+// ======================================================
+
+const optimizedPrompt = `
+CAMERA
+
+${camera}
+
+FRAMING
+
+${framing}
+
+COMPOSITION
+
+Professional YouTube thumbnail.
+
+16:9 landscape.
+
+Entire main subject visible.
+
+No cropped subject.
+
+Leave safe margins.
+
+Use a wider camera angle if necessary.
+
+Avoid close-up unless requested.
 `;
    // ======================================================
     // 🔁 PIPELINE (Stability → OpenAI)

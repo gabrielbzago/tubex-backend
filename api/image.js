@@ -115,65 +115,85 @@ if (global.__tubexPending[key]) {
   });
 }
 
-    // ======================================================
-    // 🎯 PROMPT ENGINE
-    // ======================================================
+    
+// ======================================================
+// 🎯 PROMPT ENGINE
+// ======================================================
+
 const enhancedPrompt = `
-Create a PROFESSIONAL YouTube thumbnail.
+You are a professional image generation engine specialized in YouTube thumbnails.
 
-Landscape composition.
+MISSION
 
-16:9 framing.
+Your ONLY mission is to render exactly what the user requests.
 
-High CTR.
+The user's request is absolute and must never be changed.
 
-Ultra realistic.
+STRICT RULES
 
-Cinematic lighting.
+- Never invent people.
+- Never invent faces.
+- Never invent animals.
+- Never invent objects.
+- Never invent buildings.
+- Never invent vehicles.
+- Never invent text.
+- Never invent titles.
+- Never invent captions.
+- Never invent logos.
+- Never invent watermarks.
+- Never invent icons.
+- Never replace one object with another.
+- Never change the scene.
+- Never change the subject.
+- Never add elements that were not requested.
+- Never remove elements requested by the user.
 
-Main subject centered.
+If the prompt says UFO, generate a UFO.
 
-Keep all important elements inside the safe area.
+If the prompt says dinosaur, generate a dinosaur.
 
-Leave margins on the left and right.
+If the prompt says desert, generate a desert.
 
-Do NOT crop faces.
+If the prompt does not mention humans, generate ZERO humans.
 
-Do NOT crop text.
+If the prompt does not mention text, generate ZERO text.
 
-Do NOT place important objects near image borders.
+IMAGE STYLE
 
-Strong facial expression.
+Improve ONLY:
 
-Bold composition.
+- lighting
+- realism
+- shadows
+- textures
+- composition
+- color grading
+- cinematic quality
+- sharpness
 
-Vibrant colors.
+WITHOUT changing the requested scene.
 
-Clean background.
+THUMBNAIL REQUIREMENTS
 
-Designed specifically for YouTube thumbnails.
+- 16:9 landscape
+- professional YouTube thumbnail
+- safe composition
+- keep every important element visible
+- no cropped subject
+- no cropped face
+- no cropped hands
+- leave safe margins
+- optimized for 1280x720
 
-IDEA:
+OUTPUT
 
-Important:
+Generate ONLY the requested scene.
 
-Keep every important object inside the central 80% of the frame.
-
-Do not place faces near image borders.
-
-Do not crop hands.
-
-Do not crop heads.
-
-Leave at least 8% margin on every side.
-
-Design for YouTube desktop and mobile.
-
-The final image must already look perfect in 1280x720.
+USER PROMPT
 
 ${safePrompt}
 `;
-
    // ======================================================
     // 🔁 PIPELINE (Stability → OpenAI)
     // ======================================================

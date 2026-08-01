@@ -2884,61 +2884,111 @@ else if (tipo === "title_score") {
 
 finalPrompt = `
 
-Você é um especialista mundial em SEO para YouTube.
+You are one of the world's leading YouTube SEO experts.
 
-Analise o título abaixo como um consultor profissional.
+Analyze the following YouTube title exactly as a professional YouTube strategist would.
 
-Título:
+TITLE
 
 "${prompt}"
 
-Critérios obrigatórios:
+YOUR TASK
 
-- SEO
-- CTR
-- Tendência de busca
+Evaluate this title considering ONLY YouTube performance.
+
+Analyze:
+
+- Search SEO
+- Click Through Rate (CTR)
+- Search Intent
+- Keyword Quality
 - Curiosity Gap
-- Clareza
-- Palavra-chave
-- Intenção de pesquisa
-- Comprimento
-- Potencial de recomendação
-- Potencial de viralização
+- Emotional Impact
+- Clarity
+- Readability
+- Title Length
+- Viral Potential
+- Recommendation Potential
+- Current search trends (based on your knowledge)
 
-Nunca invente informações.
+SCORING RULES
 
-Se não for possível medir tendências reais,
-utilize seu conhecimento estatístico sobre
-YouTube e comportamento de busca.
+IMPORTANT:
 
-Retorne SOMENTE JSON.
+Every score MUST be an INTEGER from 0 to 100.
+
+Never use a 0-10 scale.
+
+Examples:
+
+30 = Very poor
+
+50 = Average
+
+70 = Good
+
+85 = Excellent
+
+95 = Outstanding
+
+100 = Nearly perfect
+
+The "overall" score must represent the final quality of the title.
+
+The "seo" score represents search optimization.
+
+The "ctr" score represents expected click potential.
+
+The "trend" score represents how well this topic aligns with current YouTube search interest based on your knowledge.
+
+KEYWORD
+
+Return the most important keyword or keyword phrase contained in the title.
+
+STRENGTHS
+
+List 2–5 strengths.
+
+WEAKNESSES
+
+List 2–5 weaknesses.
+
+SUGGESTIONS
+
+List 2–5 practical improvements that would increase SEO and CTR.
+
+REASON
+
+Briefly explain the overall score in one sentence.
+
+RESPONSE RULES
+
+Return ONLY valid JSON.
+
+Do NOT use Markdown.
+
+Do NOT wrap the JSON in code fences.
+
+Do NOT write any explanation.
+
+Return exactly this structure:
 
 {
-
-"overall":0,
-
-"seo":0,
-
-"ctr":0,
-
-"trend":0,
-
-"keyword":"",
-
-"strengths":[
-
-],
-
-"weaknesses":[
-
-],
-
-"suggestions":[
-
-],
-
-"reason":""
-
+  "overall": 92,
+  "seo": 95,
+  "ctr": 91,
+  "trend": 88,
+  "keyword": "youtube seo",
+  "strengths": [
+    "..."
+  ],
+  "weaknesses": [
+    "..."
+  ],
+  "suggestions": [
+    "..."
+  ],
+  "reason": "..."
 }
 
 `;
@@ -3551,10 +3601,14 @@ console.dir(data, { depth: null });
 console.log("================================");
 
    const text = data?.choices?.[0]?.message?.content?.trim();
+
+
 console.log("================================");
 console.log("NICHE RAW");
 console.log(text);
 console.log("================================");
+
+
 if (tipo === "seo_workspace") {
 
   try {

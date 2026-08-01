@@ -121,6 +121,7 @@ const userKey = userId !== "guest" ? userId : ip;
 // ======================================================
 const requiresPrompt = [
   "tituloSEO",
+"title_score",
   "tituloImpactante",
   "tituloEmocional",
   "descricao",
@@ -2879,6 +2880,71 @@ Formato:
 
 }
 
+else if (tipo === "title_score") {
+
+finalPrompt = `
+
+Você é um especialista mundial em SEO para YouTube.
+
+Analise o título abaixo como um consultor profissional.
+
+Título:
+
+"${prompt}"
+
+Critérios obrigatórios:
+
+- SEO
+- CTR
+- Tendência de busca
+- Curiosity Gap
+- Clareza
+- Palavra-chave
+- Intenção de pesquisa
+- Comprimento
+- Potencial de recomendação
+- Potencial de viralização
+
+Nunca invente informações.
+
+Se não for possível medir tendências reais,
+utilize seu conhecimento estatístico sobre
+YouTube e comportamento de busca.
+
+Retorne SOMENTE JSON.
+
+{
+
+"overall":0,
+
+"seo":0,
+
+"ctr":0,
+
+"trend":0,
+
+"keyword":"",
+
+"strengths":[
+
+],
+
+"weaknesses":[
+
+],
+
+"suggestions":[
+
+],
+
+"reason":""
+
+}
+
+`;
+
+}
+
 // ======================================================
 // ❌ INVALID TYPE
 // ======================================================
@@ -3247,6 +3313,9 @@ const model =
     : tipo === "script_generator"
         ? "gpt-4.1"
 
+	: tipo === "title_score"
+	? "gpt-4o-mini"
+
     : tipo === "channel_analysis"
         ? "gpt-4.1-mini"
 
@@ -3265,6 +3334,9 @@ const temperature =
     : tipo === "strategy"
 
         ? 0.4
+
+: tipo === "title_score"
+? 0.2
 
     : tipo === "diagnosis"
 
@@ -3298,6 +3370,10 @@ const maxTokens =
     : tipo === "diagnosis"
 
         ? 3000
+
+
+: tipo === "title_score"
+? 600
 
     : tipo === "channel_analysis"
 
@@ -3335,17 +3411,19 @@ const maxTokens =
 
 const useJson =
 
-    tipo === "seo_workspace" ||
+tipo === "seo_workspace" ||
 
-    tipo === "niche" ||
+tipo === "niche" ||
 
-    tipo === "viral_content" ||
+tipo === "viral_content" ||
 
-    tipo === "channel_analysis" ||
+tipo === "channel_analysis" ||
 
-    tipo === "script_generator" ||
+tipo === "script_generator" ||
 
-    tipo === "video_analysis";
+tipo === "video_analysis" ||
+
+tipo === "title_score";
 
 
 // ==========================================
@@ -3709,6 +3787,42 @@ if (tipo === "advanced_tags") {
 
 }
 
+
+
+if (tipo === "title_score") {
+
+    try{
+
+        const parsed = JSON.parse(text);
+
+        global.__tubexCache.set(cacheKey,{
+            text:parsed,
+            timestamp:Date.now()
+        });
+
+        return res.status(200).json({
+
+            success:true,
+
+            ...parsed
+
+        });
+
+    }catch(err){
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success:false,
+
+            error:"invalid_json"
+
+        });
+
+    }
+
+}
 
 // ======================================================
 // 🧠 NICHE JSON PARSER

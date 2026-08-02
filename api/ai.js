@@ -294,11 +294,11 @@ Você é um dos maiores especialistas do mundo em crescimento de canais no YouTu
 
 Sua missão NÃO é apenas criar títulos.
 
-Sua missão é criar títulos capazes de gerar o maior CTR possível.
+Sua missão é criar títulos capazes de gerar o maior CTR possível sem sacrificar o SEO.
 
-Antes de responder, pense como um criador que vive exclusivamente de milhões de visualizações.
+Pense como um criador que vive exclusivamente de milhões de visualizações.
 
-Analise profundamente o tema abaixo.
+Seu trabalho é competir contra os melhores títulos do YouTube.
 
 Tema:
 "${prompt}"
@@ -307,7 +307,9 @@ Tema:
 
 OBJETIVO
 
-Gerar apenas títulos que façam o usuário sentir necessidade de clicar.
+Gerar títulos que façam o usuário sentir necessidade imediata de clicar.
+
+Os títulos devem parecer escritos por grandes criadores, nunca por uma IA.
 
 Nunca escreva títulos comuns.
 
@@ -315,15 +317,59 @@ Nunca escreva títulos genéricos.
 
 Nunca escreva títulos parecidos entre si.
 
+Nunca reutilize a mesma estrutura.
+
 --------------------------------------------------
 
 REGRAS
 
 • Crie EXATAMENTE 4 títulos.
 
-• Cada título deve usar um gatilho psicológico diferente.
+• Cada título deve utilizar um gatilho psicológico diferente.
 
-Exemplos de gatilhos:
+• Cada título deve utilizar uma estrutura completamente diferente.
+
+Varie entre formatos como:
+
+- Pergunta
+- Erro
+- Descoberta
+- Comparação
+- Tutorial
+- Alerta
+- Mito
+- Verdade inesperada
+- Opinião forte
+- Mudança recente
+- Lista
+- Caso real
+- Antes e Depois
+- Resultado inesperado
+
+Nunca repita a mesma abertura.
+
+Exemplos de aberturas:
+
+Como...
+Por que...
+O erro...
+Você está...
+Nunca...
+Antes de...
+O YouTube...
+Este simples...
+Pare de...
+A maioria...
+Quase ninguém...
+Todo criador...
+
+--------------------------------------------------
+
+GATILHOS PSICOLÓGICOS
+
+Utilize apenas um gatilho principal por título.
+
+Exemplos:
 
 - curiosidade
 - surpresa
@@ -332,13 +378,13 @@ Exemplos de gatilhos:
 - descoberta
 - benefício
 - autoridade
-- segredo
 - erro
 - comparação
-- mito
-- verdade escondida
-- conflito
 - urgência
+- conflito
+- prova
+- transformação
+- oportunidade
 
 Nunca repita o mesmo gatilho.
 
@@ -348,25 +394,45 @@ SEO
 
 Sempre que possível:
 
-• coloque a palavra-chave principal no início
+• coloque a palavra-chave principal naturalmente no início
 
 • mantenha entre 45 e 68 caracteres
 
-• escreva de forma natural
+• preserve legibilidade
 
-• evite clickbait mentiroso
+• escreva como uma pessoa real
 
-• priorize CTR sem perder SEO
+• evite clickbait enganoso
+
+• maximize CTR sem prejudicar SEO
 
 --------------------------------------------------
 
-PENSE COMO O ALGORITMO
+ESTILO
+
+Os títulos devem parecer publicados por canais como:
+
+- MrBeast
+- Film Booth
+- Think Media
+- VidIQ
+- TubeBuddy
+
+Mas nunca copie títulos existentes.
+
+Inspire-se apenas no nível de qualidade.
+
+--------------------------------------------------
+
+PENSE COMO O USUÁRIO
 
 Antes de responder imagine:
 
-"Se existirem 20 vídeos iguais na busca...
+"Existem mais de 20 vídeos iguais na busca."
 
-qual título faria você clicar imediatamente?"
+"Qual destes títulos faria alguém clicar imediatamente?"
+
+Se um título não vencer essa disputa mental, descarte-o.
 
 --------------------------------------------------
 
@@ -374,21 +440,23 @@ PROCESSO INTERNO
 
 Antes de responder:
 
-1. Crie mentalmente 20 títulos.
+1. Crie mentalmente 40 títulos.
 
-2. Dê uma nota de CTR para cada um.
+2. Elimine imediatamente os 30 mais fracos.
 
-3. Escolha apenas os 4 melhores.
+3. Dê uma nota de CTR para os 10 restantes.
 
-4. Ordene do MELHOR para o PIOR.
+4. Escolha apenas os 4 melhores.
 
-Nunca mostre esse processo.
+5. Ordene do melhor para o pior.
+
+Nunca revele esse processo.
 
 --------------------------------------------------
 
 FORMATO
 
-Retorne somente os títulos.
+Retorne apenas os 4 títulos.
 
 Um por linha.
 
@@ -401,7 +469,6 @@ Sem markdown.
 Sem explicações.
 
 `;
-
     }
 
   else if (tipo === "descricao") {
@@ -410,37 +477,83 @@ finalPrompt = `
 
 Você é um especialista em SEO para YouTube.
 
-Escreva uma descrição capaz de aumentar as chances de ranqueamento no YouTube e no Google.
+Sua missão é criar uma descrição altamente otimizada para SEO, porém objetiva e agradável de ler.
 
 Tema:
 
 "${prompt}"
 
-Regras:
+--------------------------------------------------
 
-• Entre 1800 e 2800 caracteres.
+OBJETIVO
 
-• Comece exatamente com o título otimizado.
+Escrever uma descrição que ajude o algoritmo do YouTube a entender o vídeo e incentive o usuário a assistir.
 
-• Nos primeiros 200 caracteres explique claramente sobre o que é o vídeo.
+A descrição deve parecer escrita por um criador profissional, nunca por uma IA.
 
-• Inclua naturalmente a palavra-chave principal ao longo do texto.
+--------------------------------------------------
 
-• Utilize palavras-chave relacionadas e variações sem repetir excessivamente.
+REGRAS
 
-• Organize em parágrafos curtos.
+• Entre 700 e 1200 caracteres.
 
-• Responda às principais dúvidas que uma pessoa pesquisando esse assunto teria.
+• Comece exatamente com o título do vídeo.
 
-• Explique os benefícios de assistir ao vídeo.
+• Nos dois primeiros parágrafos explique claramente o assunto.
 
-• Escreva de forma natural, como um especialista falando com outra pessoa.
+• Utilize naturalmente a palavra-chave principal.
+
+• Inclua algumas palavras relacionadas sem repetir excessivamente.
+
+• Utilize parágrafos curtos.
+
+• Escreva de forma conversacional.
 
 • Nunca faça keyword stuffing.
 
-• Finalize com um CTA curto incentivando inscrição e comentários.
+• Nunca escreva frases repetitivas.
+
+• Nunca escreva textos longos apenas para aumentar tamanho.
+
+--------------------------------------------------
+
+ESTRUTURA
+
+Título
+
+Resumo curto do vídeo (2 ou 3 frases)
+
+O que o espectador aprenderá
+
+Benefícios de assistir
+
+CTA curto para inscrição e comentário
+
+--------------------------------------------------
+
+SEO
+
+Utilize naturalmente:
+
+• palavra-chave principal
+
+• palavras relacionadas
+
+• intenção de pesquisa
+
+Sem exagerar.
+
+--------------------------------------------------
+
+FORMATO
 
 Retorne apenas a descrição.
+
+Sem markdown.
+
+Sem aspas.
+
+Sem explicações.
 
 `;
 

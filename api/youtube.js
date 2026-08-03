@@ -1148,9 +1148,162 @@ const median =
 // mapa final
 const tagMap = new Map();
 
-// =====================================
-// LIMPA TEXTO
-// =====================================
+
+
+function hashString(str){
+
+    let hash = 0;
+
+    for(let i = 0; i < str.length; i++){
+
+        hash =
+            str.charCodeAt(i) +
+            ((hash << 5) - hash);
+
+    }
+
+    return Math.abs(hash);
+
+}
+
+// ======================================
+// GERA HISTÓRICO ESTIMADO (30 DIAS)
+// ======================================
+
+function generateEstimatedTrend(volume, competition){
+
+    const seedBase =
+        hashString(keyword);
+
+    let seed = seedBase;
+
+    const trend = [];
+
+    // ======================================
+    // MÉDIA DE PESQUISAS/DIA
+    // ======================================
+
+    const average = Math.round(
+
+        400 +
+
+        Math.pow(volume, 1.35) * 18
+
+    );
+
+    // ======================================
+    // DIREÇÃO DA CURVA
+    // ======================================
+
+    let tendency = 1;
+
+    // Concorrência BAIXA (ótima)
+if(competition >= 70){
+
+    tendency = 1.008;
+
+}
+
+// Concorrência MÉDIA
+else if(competition >= 40){
+
+    tendency = 1.000;
+
+}
+
+// Concorrência ALTA (difícil)
+else{
+
+    tendency = 0.994;
+
+}
+
+
+    // ======================================
+    // VOLATILIDADE
+    // ======================================
+
+   const volatility =
+    average * 0.030;
+
+    // começa próximo da média
+
+   let current =
+
+    average *
+
+    (0.90 + ((seed % 20) / 100));
+
+    // ======================================
+    // 30 DIAS
+    // ======================================
+
+    for(let i = 0; i < 30; i++){
+
+        // random determinístico
+
+        seed =
+            (seed * 9301 + 49297) % 233280;
+
+        const random =
+            seed / 233280;
+
+        // tendência
+
+current *= tendency;
+
+// perde força conforme sobe
+
+current -=
+
+    (current-average)
+
+    *0.04;
+
+
+        // pequenas oscilações
+
+        current +=
+
+            Math.round(
+
+                (random - 0.5)
+
+                * volatility
+
+            );
+
+        // limites
+
+        current = Math.max(
+
+            average * 0.60,
+
+            current
+
+        );
+
+        current = Math.min(
+
+            average * 1.60,
+
+            current
+
+        );
+
+        trend.push({
+
+            day: i + 1,
+
+            value: Math.round(current)
+
+        });
+
+    }
+
+    return trend;
+
+}
 
 function normalizeText(text = ""){
 
@@ -1476,15 +1629,26 @@ items.length
 // 📦 RESPONSE
 // =========================
 
+const trend =
+    generateEstimatedTrend(
+
+        volume,
+
+        competition
+
+    );
+
 const responseData = {
 
-  success: true,
+success:true,
 
-  items,
+items,
 
-  volume,
+volume,
 
-  competition,
+competition,
+
+trend,
 
   tags: rankedTags,
 

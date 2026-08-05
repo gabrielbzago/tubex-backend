@@ -281,12 +281,18 @@ let finalPrompt = "";
   // ======================================================
 // 🧠 TITLE AI
 // ======================================================
-
 if (
     tipo === "tituloSEO" ||
     tipo === "tituloImpactante" ||
-    tipo === "tituloEmocional"
+    tipo === "tituloEmocional" ||
+
+    tipo === "tituloSEO_panel" ||
+    tipo === "tituloImpactante_panel" ||
+    tipo === "tituloEmocional_panel"
 ) {
+
+const painelIA = tipo.endsWith("_panel");
+const quantidade = painelIA ? 1 : 4;
 
 finalPrompt = `
 
@@ -323,7 +329,7 @@ Nunca reutilize a mesma estrutura.
 
 REGRAS
 
-• Crie EXATAMENTE 4 títulos.
+• Crie EXATAMENTE ${quantidade} título${quantidade > 1 ? "s" : ""}.
 
 • Cada título deve utilizar um gatilho psicológico diferente.
 
@@ -446,7 +452,7 @@ Antes de responder:
 
 3. Dê uma nota de CTR para os 10 restantes.
 
-4. Escolha apenas os 4 melhores.
+4. Escolha apenas os ${quantidade} melhores.
 
 5. Ordene do melhor para o pior.
 
@@ -456,9 +462,10 @@ Nunca revele esse processo.
 
 FORMATO
 
-Retorne apenas os 4 títulos.
-
-Um por linha.
+${painelIA
+    ? "Retorne apenas UM título."
+    : "Retorne apenas os 4 títulos.\n\nUm por linha."
+}
 
 Sem números.
 

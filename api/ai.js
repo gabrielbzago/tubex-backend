@@ -3899,7 +3899,7 @@ if (tipo === "video_analysis") {
 if (tipo === "script_generator") {
 
     try {
-
+console.log(text);
         const parsed = JSON.parse(text);
 
         global.__tubexCache.set(cacheKey,{
@@ -3907,24 +3907,88 @@ if (tipo === "script_generator") {
             timestamp: Date.now()
         });
 
+        // ===========================================
+        // monta o roteiro em texto
+        // ===========================================
+
+        let roteiro = "";
+
+        if (parsed.hook) {
+
+            roteiro += "🎣 HOOK\n\n";
+
+            roteiro += typeof parsed.hook === "string"
+                ? parsed.hook
+                : (parsed.hook.text || "");
+
+            roteiro += "\n\n";
+
+        }
+
+        if (parsed.why) {
+
+            roteiro += "❓ POR QUE ASSISTIR\n\n";
+            roteiro += parsed.why + "\n\n";
+
+        }
+
+        if (parsed.intro) {
+
+            roteiro += "📖 INTRODUÇÃO\n\n";
+            roteiro += parsed.intro + "\n\n";
+
+        }
+
+        if (Array.isArray(parsed.sections)) {
+
+            parsed.sections.forEach((sec,i)=>{
+
+                roteiro += `## BLOCO ${i+1}\n\n`;
+
+                if(sec.title)
+                    roteiro += sec.title + "\n\n";
+
+                if(sec.content)
+                    roteiro += sec.content + "\n\n";
+
+            });
+
+        }
+
+        if(parsed.outro){
+
+            roteiro += "🎬 FINAL\n\n";
+            roteiro += parsed.outro;
+
+        }
+
         return res.status(200).json({
+
             success:true,
-            ...parsed
+
+            text:roteiro,
+
+            data:parsed
+
         });
 
-    } catch(err){
+    }
+
+    catch(err){
 
         console.error(err);
 
         return res.status(500).json({
+
             success:false,
+
             error:"invalid_json"
+
         });
 
     }
 
 }
-
 
 if (tipo === "advanced_tags") {
 

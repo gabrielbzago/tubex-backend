@@ -1256,48 +1256,17 @@ const strongVideos = items.filter(video => {
 
 }).length;
 
-   // =========================
-// 🚀 TUBEX VOLUME SCORE
-// =========================
-
-const topScore = Math.min(
-
+   const volume = Math.min(
     100,
-
     Math.round(
 
-        Math.log10(top + 1) * 10
+        (Math.log10(top + 1) * 7)
+
+        +
+
+        (Math.log10(median + 1) * 3)
 
     )
-
-);
-
-const medianScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        Math.log10(median + 1) * 10
-
-    )
-
-);
-
-const volume = Math.round(
-
-    (
-
-        topScore * 0.20 +
-
-        medianScore * 0.20 +
-
-        viewsPerDayScore * 0.35 +
-
-        strongVideosScore * 0.25
-
-    )
-
 );
 
     const dominance = top / (median || 1);
@@ -1314,28 +1283,6 @@ const volume = Math.round(
             Math.log10(dominance + 1) * 30
 
         )
-
-    )
-
-);
-
-// =========================
-// 💪 SCORE DE VÍDEOS FORTES
-// =========================
-
-const strongVideosScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        (
-
-            strongVideos /
-
-            Math.max(items.length, 1)
-
-        ) * 100
 
     )
 

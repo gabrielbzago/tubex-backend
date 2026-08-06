@@ -180,6 +180,11 @@ for (const key of shuffledKeys) {
 
           if (Array.isArray(jsonVideos.items)) {
 
+console.log("================================");
+console.log("KEYWORD:", keyword);
+console.log("VIDEOS API:", jsonVideos.items?.length || 0);
+console.log("================================");
+
   const filtered = jsonVideos.items.filter(v => {
 
     const title =
@@ -226,6 +231,10 @@ for (const key of shuffledKeys) {
   items.push(...filtered);
 
 }
+
+console.log("================================");
+console.log("VIDEOS FILTRADOS:", filtered.length);
+console.log("================================");
         }
 
         if (items.length) {
@@ -1709,6 +1718,21 @@ items.length
 // 📦 RESPONSE
 // =========================
 
+// ===================================================
+// 📈 TUBEX VOLUME SCORE
+// ===================================================
+
+const volume = Math.min(
+    100,
+    Math.round(
+        (
+            Math.log10(top + 1) * 12 +
+            Math.log10(avgViews + 1) * 8 +
+            (interest || 0) * 0.40
+        )
+    )
+);
+
 // Histórico REAL do Google Trends
 const trend = trendHistory;
 
@@ -1719,20 +1743,30 @@ const responseData = {
     items,
 
     // =========================
+    // SEO
+    // =========================
+
+    volume,
+
+    competition: competitionScore,
+
+    // Compatibilidade
+
+    competitionScore,
+
+    opportunityScore,
+
+    // =========================
     // GOOGLE TRENDS
     // =========================
 
     interest,
 
-trend,
+    trend,
 
-trendDirection,
+    trendDirection,
 
-youtubeMetrics,
-
-competitionScore,
-
-opportunityScore,
+    youtubeMetrics,
 
     // =========================
     // TAGS
@@ -1744,7 +1778,7 @@ opportunityScore,
     // MÉTRICAS
     // =========================
 
-    metrics: {
+    metrics:{
 
         averageViews,
 
@@ -1761,7 +1795,6 @@ opportunityScore,
     }
 
 };
-
 // =========================
 // 💾 CACHE SAVE
 // =========================

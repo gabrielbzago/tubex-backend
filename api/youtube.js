@@ -1256,7 +1256,33 @@ const strongVideos = items.filter(video => {
 
 }).length;
 
-   // =========================
+
+
+// =========================
+// 💪 SCORE DE VÍDEOS FORTES
+// =========================
+
+const strongVideosScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        (
+
+            strongVideos /
+
+            Math.max(items.length, 1)
+
+        ) * 100
+
+    )
+
+);
+
+
+
+// =========================
 // 🚀 TUBEX VOLUME SCORE
 // =========================
 
@@ -1299,7 +1325,6 @@ const volume = Math.round(
     )
 
 );
-
     const dominance = top / (median || 1);
   const competition = Math.round(
 
@@ -1320,27 +1345,7 @@ const volume = Math.round(
 );
 
 
-// =========================
-// 💪 SCORE DE VÍDEOS FORTES
-// =========================
 
-const strongVideosScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        (
-
-            strongVideos /
-
-            Math.max(items.length, 1)
-
-        ) * 100
-
-    )
-
-);
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================

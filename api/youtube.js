@@ -1207,6 +1207,34 @@ const maxViewsPerDay = Math.round(
 
 );
 
+// =========================
+// 💪 VÍDEOS FORTES
+// =========================
+
+const strongVideos = items.filter(video => {
+
+    const views = Number(
+        video.statistics?.viewCount || 0
+    );
+
+    const published = new Date(
+        video.snippet?.publishedAt
+    ).getTime();
+
+    const ageDays = Math.max(
+        1,
+        (Date.now() - published) / 86400000
+    );
+
+    const viewsPerDay = views / ageDays;
+
+    return (
+        views >= median &&
+        viewsPerDay >= averageViewsPerDay
+    );
+
+}).length;
+
    const volume = Math.min(
     100,
     Math.round(
@@ -1829,6 +1857,7 @@ const youtubeMetrics = {
     averageAgeDays,
 
     averageViewsPerDay,
+strongVideos,
 
     maxViewsPerDay,
 
@@ -1868,6 +1897,7 @@ youtubeMetrics,
     averageViewsPerDay,
 
     maxViewsPerDay,
+strongVideos,
 
     averageLikes,
 

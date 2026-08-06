@@ -162,29 +162,46 @@ for (const key of shuffledKeys) {
 
         const uniqueIds = [...new Set(allIds)];
 
-        for (let i = 0; i < uniqueIds.length; i += 50) {
+       for (let i = 0; i < uniqueIds.length; i += 50) {
 
-          const chunk = uniqueIds.slice(i, i + 50).join(",");
+    const chunk = uniqueIds
+        .slice(i, i + 50)
+        .join(",");
 
-          const videosUrl =
-            `https://www.googleapis.com/youtube/v3/videos` +
-            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+    const videosUrl =
+        `https://www.googleapis.com/youtube/v3/videos` +
+        `?part=snippet,statistics&id=${chunk}&key=${key}`;
 
-          const resVideos = await fetch(videosUrl);
+    const resVideos = await fetch(videosUrl);
 
-          if (resVideos.status === 403 || resVideos.status === 429) {
-            throw new Error("quota_exceeded");
-          }
+    if (
+        resVideos.status === 403 ||
+        resVideos.status === 429
+    ) {
+        throw new Error("quota_exceeded");
+    }
 
-          const jsonVideos = await resVideos.json();
+    const jsonVideos =
+        await resVideos.json();
 
-          if (Array.isArray(jsonVideos.items)) {
+    console.log("================================");
+    console.log("KEYWORD:", keyword);
+    console.log(
+        "VIDEOS API:",
+        jsonVideos.items?.length || 0
+    );
+    console.log("================================");
+
+    if (!Array.isArray(jsonVideos.items)) {
+        continue;
+    }
 
     const filtered = jsonVideos.items.filter(v => {
 
         const title =
-            String(v?.snippet?.title || "")
-            .toLowerCase();
+            String(
+                v?.snippet?.title || ""
+            ).toLowerCase();
 
         // Remove Shorts
         if (
@@ -195,7 +212,9 @@ for (const key of shuffledKeys) {
         }
 
         const videoViews =
-            Number(v?.statistics?.viewCount || 0);
+            Number(
+                v?.statistics?.viewCount || 0
+            );
 
         const published =
             new Date(
@@ -206,7 +225,7 @@ for (const key of shuffledKeys) {
             (Date.now() - published) /
             (1000 * 60 * 60 * 24);
 
-        // Remove vídeos mortos
+        // Remove vídeos antigos com pouca relevância
         if (
             ageDays > 900 &&
             videoViews < 5000
@@ -218,63 +237,17 @@ for (const key of shuffledKeys) {
 
     });
 
+    console.log("================================");
     console.log(
         "VIDEOS FILTRADOS:",
         filtered.length
     );
+    console.log("================================");
 
     items.push(...filtered);
 
 }
 
-    const title =
-      String(
-        v?.snippet?.title || ""
-      ).toLowerCase();
-
-    // remove shorts
-    if(title.includes("#shorts")){
-      return false;
-    }
-
-    const videoViews =
-      Number(
-        v?.statistics?.viewCount || 0
-      );
-
-    const published =
-      new Date(
-        v?.snippet?.publishedAt
-      ).getTime();
-
-    const ageDays =
-
-      (
-        Date.now() - published
-      )
-
-      / (1000 * 60 * 60 * 24);
-
-    // remove vídeo morto
-    if(
-      ageDays > 900
-      &&
-      videoViews < 5000
-    ){
-      return false;
-    }
-
-    return true;
-
-  });
-
-  items.push(...filtered);
-
-}
-
-console.log("================================");
-console.log("VIDEOS FILTRADOS:", filtered.length);
-console.log("================================");
         }
 
         if (items.length) {
@@ -292,28 +265,52 @@ console.log("================================");
     // =========================
     // 🚫 FALHA TOTAL
     // =========================
-    if (!success) {
-     return res.status(200).json({
+// =========================
+// 🚫 FALHA TOTAL
+// =========================
 
-    success: true,
+if (!success) {
 
-    items: [],
+    return res.status(200).json({
 
-    interest: null,
+        success: true,
 
-    trend: [],
+        items: [],
 
-    trendDirection: null,
+        volume: 0,
 
-    youtubeMetrics: null,
+        competition: 0,
 
-    tags: [],
+        competitionScore: 0,
 
-    metrics: null
+        opportunityScore: 0,
 
-});
-    }
+        interest: 0,
 
+        trend: [],
+
+        trendHistory: [],
+
+        trendDirection: "stable",
+
+        youtubeMetrics: {
+
+            totalViews: 0,
+            averageViews: 0,
+            topViews: 0,
+            medianViews: 0,
+            videoCount: 0,
+            channelCount: 0
+
+        },
+
+        tags: [],
+
+        metrics: null
+
+    });
+
+}
 // =========================
 // 🎬 VIDEO DATA
 // =========================
@@ -1759,20 +1756,37 @@ items.length
 // =========================
 
 // ===================================================
-// 📈 TUBEX VOLUME SCORE
+// 📈 TUBEX SEARCH DEMAND SCORE
+// Baseado em dados reais do YouTube + Google Trends
 // ===================================================
 
-const volume = Math.min(
-    100,
-    Math.round(
-        (
-            Math.log10(top + 1) * 12 +
-            Math.log10(avgViews + 1) * 8 +
-            (interest || 0) * 0.40
-        )
-    )
+// Força dos maiores vídeos
+const topScore = Math.min(
+    40,
+    Math.log10(top + 1) * 6
 );
 
+// Média de visualizações do mercado
+const averageScore = Math.min(
+    30,
+    Math.log10(avgViews + 1) * 5
+);
+
+// Interesse do Google Trends
+const trendsScore = Math.min(
+    30,
+    (interest || 0) * 0.30
+);
+
+// Score final (0–100)
+const volume = Math.round(
+    Math.min(
+        100,
+        topScore +
+        averageScore +
+        trendsScore
+    )
+);
 // Histórico REAL do Google Trends
 const trend = trendHistory;
 
@@ -1802,11 +1816,13 @@ const responseData = {
 
     interest,
 
-    trend,
+trend,
 
-    trendDirection,
+trendHistory,
 
-    youtubeMetrics,
+trendDirection,
+
+youtubeMetrics,
 
     // =========================
     // TAGS

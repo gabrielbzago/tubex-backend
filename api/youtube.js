@@ -1293,18 +1293,27 @@ const exactTitleMatches = items.filter(video => {
 // 🎯 SCORE DE RELEVÂNCIA
 // =========================
 
-const keywordMatchScore = Math.round(
+const keywordMatchScore = Math.min(
 
-    (
+    100,
 
-        exactTitleMatches /
+    Math.round(
 
-        Math.max(items.length, 1)
+        (
 
-    ) * 100
+            exactTitleMatches /
+
+            Math.max(items.length,1)
+
+        )
+
+        *
+
+        160
+
+    )
 
 );
-
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
 // =========================
@@ -1361,17 +1370,43 @@ const volume = Math.round(
 
     (
 
-        topScore * 0.20 +
+        topScore * 0.18 +
 
-        medianScore * 0.20 +
+        medianScore * 0.18 +
 
-        viewsPerDayScore * 0.35 +
+        viewsPerDayScore * 0.30 +
 
-        strongVideosScore * 0.25
+        strongVideosScore * 0.20 +
+
+        keywordMatchScore * 0.14
 
     )
 
 );
+
+
+let finalVolume = volume;
+
+// penaliza quando poucos títulos realmente batem
+if (keywordMatchScore < 40) {
+
+    finalVolume -= 8;
+
+}
+
+if (keywordMatchScore < 25) {
+
+    finalVolume -= 8;
+
+}
+
+// garante faixa válida
+finalVolume = Math.max(
+    5,
+    Math.min(100, finalVolume)
+);
+
+
     const dominance = top / (median || 1);
   const competition = Math.round(
 
@@ -2000,7 +2035,7 @@ const responseData = {
 
     items,
 
-    volume,
+        volume: finalVolume,
 
     competition,
 

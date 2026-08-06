@@ -1640,36 +1640,38 @@ const trend =
 
 const responseData = {
 
-success:true,
+    success: true,
 
-items,
+    items,
 
-volume,
+    volume,
 
-competition,
+    competition,
 
-trend,
+    // Google Trends
+    interest: 0,
 
-  tags: rankedTags,
+    trend,
 
-  metrics:{
+    tags: rankedTags,
 
-    averageViews,
+    metrics: {
 
-    averageLikes,
+        averageViews,
 
-    averageComments,
+        averageLikes,
 
-    maxViews,
+        averageComments,
 
-    minViews,
+        maxViews,
 
-    medianViews: median
+        minViews,
 
-  }
+        medianViews: median
+
+    }
 
 };
-
 // =========================
 // 💾 CACHE SAVE
 // =========================

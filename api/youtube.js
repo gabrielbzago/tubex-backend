@@ -1,4 +1,6 @@
+import googleTrends from "google-trends-api";
 export default async function handler(req, res) {
+
 
   // =========================
   // 🔥 CORS
@@ -242,12 +244,25 @@ for (const key of shuffledKeys) {
     // 🚫 FALHA TOTAL
     // =========================
     if (!success) {
-      return res.status(200).json({
-        success: true,
-        items: [],
-        volume: 0,
-        competition: 0
-      });
+     return res.status(200).json({
+
+    success: true,
+
+    items: [],
+
+    interest: null,
+
+    trend: [],
+
+    trendDirection: null,
+
+    youtubeMetrics: null,
+
+    tags: [],
+
+    metrics: null
+
+});
     }
 
 // =========================
@@ -1107,40 +1122,245 @@ analytics.estimatedMinutesWatched,
       });
     }
 
-    // =========================
-    // 📈 MÉTRICAS SEO
-    // =========================
-    items.sort((a, b) =>
-      Number(b.statistics.viewCount || 0) -
-      Number(a.statistics.viewCount || 0)
+ // =========================
+// 📈 MÉTRICAS SEO
+// =========================
+
+// Ordena pelos vídeos mais vistos
+items.sort((a, b) =>
+    Number(b.statistics?.viewCount || 0) -
+    Number(a.statistics?.viewCount || 0)
+);
+
+// Views totais
+const totalViews = items.reduce(
+    (acc, v) =>
+        acc + Number(v.statistics?.viewCount || 0),
+    0
+);
+
+// Média
+const avgViews =
+    totalViews /
+    Math.max(items.length, 1);
+
+// Top vídeo
+const top =
+    Number(
+        items[0]?.statistics?.viewCount || 0
     );
 
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
-
-    const avgViews =
-  totalViews /
-  Math.max(items.length, 1);
-
-    const top = Number(items[0]?.statistics?.viewCount || 0);
+// Mediana
 const median =
-  Number(
-    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-  );
-
-    const volume = Math.min(100,
-      Math.round(
-        (Math.log10(top + 1) * 10) +
-        (Math.log10(median + 1) * 5)
-      )
+    Number(
+        items[
+            Math.floor(items.length / 2)
+        ]?.statistics?.viewCount || 0
     );
 
-    const dominance = top / (median || 1);
-    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
-// =========================
-// 🏷️ REAL TAG ENGINE
-// =========================
+// ===================================================
+// 📈 GOOGLE TRENDS
+// ===================================================
+
+let interest = null;
+let trendHistory = [];
+let trendDirection = null;
+
+try {
+
+    const trends = await googleTrends.interestOverTime({
+
+        keyword,
+
+        geo: "BR",
+
+        startTime: new Date(
+            Date.now() - (90 * 24 * 60 * 60 * 1000)
+        )
+
+    });
+
+    const json = JSON.parse(trends);
+
+    const timeline =
+        json?.default?.timelineData || [];
+
+    trendHistory = timeline.map(item => ({
+
+        time: item.formattedTime,
+
+        timestamp: Number(item.time),
+
+        value: Number(item.value?.[0] || 0)
+
+    }));
+
+    if (trendHistory.length > 0) {
+
+        interest = Math.round(
+
+            trendHistory.reduce(
+                (sum, item) => sum + item.value,
+                0
+            ) / trendHistory.length
+
+        );
+
+        const first =
+            trendHistory[0].value;
+
+        const last =
+            trendHistory[
+                trendHistory.length - 1
+            ].value;
+
+        if (last > first) {
+
+            trendDirection = "up";
+
+        }
+        else if (last < first) {
+
+            trendDirection = "down";
+
+        }
+        else {
+
+            trendDirection = "stable";
+
+        }
+
+    }
+
+}
+catch (err) {
+
+    console.error(
+        "Google Trends:",
+        err.message
+    );
+
+}
+
+// ===================================================
+// CANAIS ÚNICOS
+// ===================================================
+
+const uniqueChannels = new Set(
+    items.map(video => video.snippet.channelId)
+);
+
+const channelCount = uniqueChannels.size;
+
+// ===================================================
+// 📊 DADOS DO YOUTUBE
+// ===================================================
+
+const youtubeMetrics = {
+
+    totalViews,
+
+    averageViews: avgViews,
+
+    topViews: top,
+
+    medianViews: median,
+
+    videoCount: items.length,
+
+    channelCount
+
+};
+
+// ===================================================
+// 🚀 TUBEX COMPETITION SCORE
+// Baseado em dados REAIS do YouTube + Google Trends
+// ===================================================
+
+let competitionScore = 0;
+
+// ----------------------
+// 📹 Quantidade de vídeos
+// Peso: 30%
+// ----------------------
+
+competitionScore +=
+
+    Math.min(
+        youtubeMetrics.videoCount,
+        50
+    ) * 0.60;
+
+
+// ----------------------
+// 📺 Quantidade de canais
+// Peso: 30%
+// ----------------------
+
+competitionScore +=
+
+    Math.min(
+        youtubeMetrics.channelCount,
+        50
+    ) * 0.60;
+
+
+// ----------------------
+// 📈 Interesse (Google Trends)
+// Peso: 25%
+// ----------------------
+
+competitionScore +=
+
+    (interest || 0) * 0.25;
+
+
+// ----------------------
+// 👀 Força média dos vídeos
+// Peso: 15%
+//
+// Quanto mais views médias,
+// maior tende a ser a concorrência.
+// ----------------------
+
+competitionScore +=
+
+    Math.min(
+
+        Math.log10(
+            youtubeMetrics.averageViews + 1
+        ) * 12,
+
+        15
+
+    );
+
+
+// ----------------------
+// Limita para 0-100
+// ----------------------
+
+competitionScore = Math.round(
+
+    Math.max(
+
+        0,
+
+        Math.min(
+            competitionScore,
+            100
+        )
+
+    )
+
+);
+// ===================================================
+// 🚀 TUBEX OPPORTUNITY SCORE
+// ===================================================
+
+const opportunityScore =
+    100 - competitionScore;
+
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================
@@ -1148,13 +1368,11 @@ const median =
 // mapa final
 const tagMap = new Map();
 
-
-
-function hashString(str){
+function hashString(str) {
 
     let hash = 0;
 
-    for(let i = 0; i < str.length; i++){
+    for (let i = 0; i < str.length; i++) {
 
         hash =
             str.charCodeAt(i) +
@@ -1163,145 +1381,6 @@ function hashString(str){
     }
 
     return Math.abs(hash);
-
-}
-
-// ======================================
-// GERA HISTÓRICO ESTIMADO (30 DIAS)
-// ======================================
-
-function generateEstimatedTrend(volume, competition){
-
-    const seedBase =
-        hashString(keyword);
-
-    let seed = seedBase;
-
-    const trend = [];
-
-    // ======================================
-    // MÉDIA DE PESQUISAS/DIA
-    // ======================================
-
-    const average = Math.round(
-
-        400 +
-
-        Math.pow(volume, 1.35) * 18
-
-    );
-
-    // ======================================
-    // DIREÇÃO DA CURVA
-    // ======================================
-
-    let tendency = 1;
-
-    // Concorrência BAIXA (ótima)
-if(competition >= 70){
-
-    tendency = 1.008;
-
-}
-
-// Concorrência MÉDIA
-else if(competition >= 40){
-
-    tendency = 1.000;
-
-}
-
-// Concorrência ALTA (difícil)
-else{
-
-    tendency = 0.994;
-
-}
-
-
-    // ======================================
-    // VOLATILIDADE
-    // ======================================
-
-   const volatility =
-    average * 0.030;
-
-    // começa próximo da média
-
-   let current =
-
-    average *
-
-    (0.90 + ((seed % 20) / 100));
-
-    // ======================================
-    // 30 DIAS
-    // ======================================
-
-    for(let i = 0; i < 30; i++){
-
-        // random determinístico
-
-        seed =
-            (seed * 9301 + 49297) % 233280;
-
-        const random =
-            seed / 233280;
-
-        // tendência
-
-current *= tendency;
-
-// perde força conforme sobe
-
-current -=
-
-    (current-average)
-
-    *0.04;
-
-
-        // pequenas oscilações
-
-        current +=
-
-            Math.round(
-
-                (random - 0.5)
-
-                * volatility
-
-            );
-
-        // limites
-
-        current = Math.max(
-
-            average * 0.60,
-
-            current
-
-        );
-
-        current = Math.min(
-
-            average * 1.60,
-
-            current
-
-        );
-
-        trend.push({
-
-            day: i + 1,
-
-            value: Math.round(current)
-
-        });
-
-    }
-
-    return trend;
 
 }
 
@@ -1625,48 +1704,61 @@ items.length
     )
   )
 : 0;
+
 // =========================
 // 📦 RESPONSE
 // =========================
 
-const trend =
-    generateEstimatedTrend(
-
-        volume,
-
-        competition
-
-    );
+// Histórico REAL do Google Trends
+const trend = trendHistory;
 
 const responseData = {
 
-success:true,
+    success: true,
 
-items,
+    items,
 
-volume,
+    // =========================
+    // GOOGLE TRENDS
+    // =========================
 
-competition,
+    interest,
 
 trend,
 
-  tags: rankedTags,
+trendDirection,
 
-  metrics:{
+youtubeMetrics,
 
-    averageViews,
+competitionScore,
 
-    averageLikes,
+opportunityScore,
 
-    averageComments,
+    // =========================
+    // TAGS
+    // =========================
 
-    maxViews,
+    tags: rankedTags,
 
-    minViews,
+    // =========================
+    // MÉTRICAS
+    // =========================
 
-    medianViews: median
+    metrics: {
 
-  }
+        averageViews,
+
+        averageLikes,
+
+        averageComments,
+
+        maxViews,
+
+        minViews,
+
+        medianViews: median
+
+    }
 
 };
 

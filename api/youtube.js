@@ -1129,12 +1129,18 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
-    const volume = Math.min(100,
-      Math.round(
-        (Math.log10(top + 1) * 10) +
-        (Math.log10(median + 1) * 5)
-      )
-    );
+   const volume = Math.min(
+    100,
+    Math.round(
+
+        (Math.log10(top + 1) * 7)
+
+        +
+
+        (Math.log10(median + 1) * 3)
+
+    )
+);
 
     const dominance = top / (median || 1);
     const competition = Math.min(100, Math.log10(dominance + 1) * 40);

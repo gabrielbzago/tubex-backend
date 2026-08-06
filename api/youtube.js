@@ -1129,6 +1129,97 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
+
+// =========================
+// CHANNEL AUTHORITY
+// =========================
+
+const channelIds = [
+
+    ...new Set(
+
+        items.map(v => v.snippet.channelId)
+
+    )
+
+];
+
+let channels = [];
+
+for(let i=0;i<channelIds.length;i+=50){
+
+    const ids = channelIds
+        .slice(i,i+50)
+        .join(",");
+
+    const res = await fetch(
+
+        `https://www.googleapis.com/youtube/v3/channels` +
+
+        `?part=statistics&id=${ids}` +
+
+        `&key=${activeKey}`
+
+    );
+
+    const json = await res.json();
+
+    channels.push(
+
+        ...(json.items || [])
+
+    );
+
+}
+const avgSubscribers =
+Math.round(
+
+channels.reduce(
+
+(a,c)=>
+
+a+
+
+Number(
+
+c.statistics?.subscriberCount||0
+
+),
+
+0
+
+)
+
+/
+
+Math.max(
+
+channels.length,
+
+1
+
+)
+
+);
+
+
+const authorityScore = Math.min(
+
+100,
+
+Math.round(
+
+Math.log10(
+
+avgSubscribers+1
+
+)
+
+*16
+
+)
+
+);
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
 // =========================
@@ -2027,9 +2118,9 @@ const ageScore =
 
 const competitionScore =
 
-    Math.round(
+Math.round(
 
-        videoScore +
+videoScore +
 
 averageViewsScore +
 
@@ -2037,9 +2128,11 @@ maxViewsScore +
 
 competitionBase +
 
-ageScore
+ageScore +
 
-    );
+authorityScore * 0.40
+
+);
 // =========================
 // 📦 RESPONSE
 // =========================

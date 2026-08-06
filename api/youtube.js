@@ -1287,9 +1287,29 @@ const strongVideos = items.filter(video => {
     )
 
 );
+
+
 // =========================
-// 🏷️ REAL TAG ENGINE
+// 💪 SCORE DE VÍDEOS FORTES
 // =========================
+
+const strongVideosScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        (
+
+            strongVideos /
+
+            Math.max(items.length, 1)
+
+        ) * 100
+
+    )
+
+);
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================

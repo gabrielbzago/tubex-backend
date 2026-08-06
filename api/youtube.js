@@ -1160,6 +1160,53 @@ const averageAgeDays = Math.round(
 
 );
 
+// =========================
+// 🚀 VIEWS POR DIA
+// =========================
+
+const viewsPerDayList = items.map(video => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    const published =
+        new Date(
+            video.snippet?.publishedAt
+        ).getTime();
+
+    const ageDays =
+        Math.max(
+            1,
+            (Date.now() - published) / 86400000
+        );
+
+    return views / ageDays;
+
+});
+
+const averageViewsPerDay = Math.round(
+
+    viewsPerDayList.reduce(
+        (a, b) => a + b,
+        0
+    ) /
+
+    Math.max(
+        viewsPerDayList.length,
+        1
+    )
+
+);
+
+const maxViewsPerDay = Math.round(
+
+    Math.max(
+        ...viewsPerDayList,
+        0
+    )
+
+);
+
    const volume = Math.min(
     100,
     Math.round(
@@ -1781,6 +1828,10 @@ const youtubeMetrics = {
 
     averageAgeDays,
 
+    averageViewsPerDay,
+
+    maxViewsPerDay,
+
     maxViews,
 
     minViews,
@@ -1810,21 +1861,25 @@ youtubeMetrics,
 
     tags: rankedTags,
 
-    metrics: {
+  metrics: {
 
-        averageViews,
+    averageViews,
 
-        averageLikes,
+    averageViewsPerDay,
 
-        averageComments,
+    maxViewsPerDay,
 
-        maxViews,
+    averageLikes,
 
-        minViews,
+    averageComments,
 
-        medianViews: median
+    maxViews,
 
-    }
+    minViews,
+
+    medianViews: median
+
+}
 
 };
 // =========================

@@ -1625,6 +1625,31 @@ items.length
     )
   )
 : 0;
+
+// =========================
+// 🚀 TUBEX COMPETITION SCORE
+// =========================
+
+const competitionScore = Math.round(
+
+    Math.min(
+
+        100,
+
+        (
+            Math.min(items.length, 50) * 1.2 +
+
+            Math.log10(averageViews + 1) * 10 +
+
+            Math.log10(maxViews + 1) * 8 +
+
+            (competition * 0.40)
+        )
+
+    )
+
+);
+
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -1664,8 +1689,9 @@ const responseData = {
 
     volume,
 
-
     competition,
+
+competitionScore,
 
     // Google Trends
     interest: 0,

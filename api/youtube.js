@@ -1265,6 +1265,11 @@ const normalizedKeyword = keyword
     .toLowerCase()
     .trim();
 
+const keywordTokens =
+    normalizedKeyword
+        .split(/\s+/)
+        .filter(Boolean);
+
 const exactTitleMatches = items.filter(video => {
 
     const title = String(
@@ -1273,8 +1278,13 @@ const exactTitleMatches = items.filter(video => {
     .toLowerCase()
     .trim();
 
-    return title.includes(
-        normalizedKeyword
+    const matches =
+        keywordTokens.filter(token =>
+            title.includes(token)
+        ).length;
+
+    return matches >= Math.ceil(
+        keywordTokens.length * 0.7
     );
 
 }).length;

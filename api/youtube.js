@@ -145,6 +145,15 @@ for (const key of shuffledKeys) {
           }
 
           const searchJson = await searchRes.json();
+// ===================================================
+// TOTAL DE RESULTADOS DA BUSCA
+// ===================================================
+
+const totalResults = Number(
+    searchJson.pageInfo?.totalResults || 0
+);
+
+console.log("TOTAL RESULTS:", totalResults);
 
           const ids = searchJson.items
             ?.map(v => v.id?.videoId)
@@ -1106,38 +1115,190 @@ analytics.estimatedMinutesWatched,
         subscribers: Number(stats?.subscriberCount || 0)
       });
     }
+// ===================================================
+// 📈 TUBEX SEO ENGINE v2
+// ===================================================
 
-    // =========================
-    // 📈 MÉTRICAS SEO
-    // =========================
-    items.sort((a, b) =>
-      Number(b.statistics.viewCount || 0) -
-      Number(a.statistics.viewCount || 0)
-    );
+// Ordena pelos vídeos mais vistos
+items.sort((a, b) =>
+    Number(b.statistics?.viewCount || 0) -
+    Number(a.statistics?.viewCount || 0)
+);
 
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
+// ===================================================
+// ESTATÍSTICAS
+// ===================================================
 
-    const avgViews =
-  totalViews /
-  Math.max(items.length, 1);
+const views = items.map(v =>
+    Number(v.statistics?.viewCount || 0)
+);
 
-    const top = Number(items[0]?.statistics?.viewCount || 0);
+const totalViews =
+    views.reduce((a,b)=>a+b,0);
+
+const avgViews =
+    totalViews /
+    Math.max(views.length,1);
+
+const top =
+    views[0] || 0;
+
 const median =
-  Number(
-    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-  );
+    views[
+        Math.floor(
+            views.length / 2
+        )
+    ] || 0;
 
-    const volume = Math.min(100,
-      Math.round(
-        (Math.log10(top + 1) * 10) +
-        (Math.log10(median + 1) * 5)
-      )
+const minViews =
+    views[
+        views.length - 1
+    ] || 0;
+
+// ===================================================
+// NORMALIZAÇÃO
+// ===================================================
+
+const topScore =
+    Math.min(
+        100,
+        (Math.log10(top + 1) / 8) * 100
     );
 
-    const dominance = top / (median || 1);
-    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
+const avgScore =
+    Math.min(
+        100,
+        (Math.log10(avgViews + 1) / 8) * 100
+    );
+
+const medianScore =
+    Math.min(
+        100,
+        (Math.log10(median + 1) / 8) * 100
+    );
+
+// ===================================================
+// 📈 VOLUME
+// ===================================================
+
+// Peso parecido com ferramentas profissionais
+
+let volume =
+
+      topScore * 0.35 +
+
+      avgScore * 0.40 +
+
+      medianScore * 0.25;
+
+// limita
+
+volume = Math.round(
+
+    Math.max(
+
+        5,
+
+        Math.min(
+
+            volume,
+
+            100
+
+        )
+
+    )
+
+);
+
+// ===================================================
+// ⚔️ CONCORRÊNCIA
+// (100 = Fácil competir)
+// ===================================================
+
+// Quanto maior a diferença entre líder e mediana,
+// mais espaço existe para novos vídeos.
+
+const dominance =
+
+    top /
+    Math.max(
+        median,
+        1
+    );
+
+let dominanceScore =
+
+    Math.min(
+
+        100,
+
+        Math.log10(
+            dominance + 1
+        ) * 32
+
+    );
+
+// Média muito alta aumenta dificuldade
+
+const avgPenalty =
+
+    Math.min(
+
+        30,
+
+        avgScore * 0.30
+
+    );
+
+// Muitos vídeos relevantes aumentam dificuldade
+
+const resultPenalty =
+
+    Math.min(
+
+        items.length,
+
+        50
+
+    ) * 0.50;
+
+// Score invertido
+
+let competition =
+
+    100 -
+
+    (
+
+        avgPenalty +
+
+        resultPenalty +
+
+        (100 - dominanceScore) * 0.40
+
+    );
+
+// Limita
+
+competition = Math.round(
+
+    Math.max(
+
+        5,
+
+        Math.min(
+
+            competition,
+
+            100
+
+        )
+
+    )
+
+);
+
 // =========================
 // 🏷️ REAL TAG ENGINE
 // =========================
@@ -1637,13 +1798,24 @@ const competitionScore = Math.round(
         100,
 
         (
-            Math.min(items.length, 50) * 1.2 +
 
-            Math.log10(averageViews + 1) * 10 +
+            Math.min(
+                Math.log10(totalResults + 1) * 12,
+                45
+            )
 
-            Math.log10(maxViews + 1) * 8 +
+            +
+
+            Math.log10(averageViews + 1) * 10
+
+            +
+
+            Math.log10(maxViews + 1) * 8
+
+            +
 
             (competition * 0.40)
+
         )
 
     )
@@ -1671,6 +1843,8 @@ const youtubeMetrics = {
 
     videoCount: items.length,
 
+    totalResults,
+
     averageViews,
 
     maxViews,
@@ -1680,6 +1854,7 @@ const youtubeMetrics = {
     medianViews: median
 
 };
+
 
 const responseData = {
 

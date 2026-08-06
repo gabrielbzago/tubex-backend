@@ -1336,6 +1336,54 @@ const strongVideosScore = Math.min(
 
 );
 
+// =========================
+// 🔥 FRESH VIDEOS SCORE
+// =========================
+
+const freshVideos = items.filter(video => {
+
+    const published = new Date(
+        video.snippet?.publishedAt
+    ).getTime();
+
+    const ageDays = Math.max(
+        1,
+        (Date.now() - published) / 86400000
+    );
+
+    const views = Number(
+        video.statistics?.viewCount || 0
+    );
+
+    const viewsPerDay = views / ageDays;
+
+    return (
+
+        ageDays <= 180
+
+        &&
+
+        viewsPerDay >= averageViewsPerDay
+
+    );
+
+}).length;
+
+const freshScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        freshVideos /
+
+        Math.max(items.length,1)
+
+        *100
+
+    )
+
+);
 
 
 // =========================
@@ -1368,19 +1416,21 @@ const medianScore = Math.min(
 
 const volume = Math.round(
 
-    (
+(
 
-        topScore * 0.18 +
+topScore * 0.16 +
 
-        medianScore * 0.18 +
+medianScore * 0.16 +
 
-        viewsPerDayScore * 0.30 +
+viewsPerDayScore * 0.25 +
 
-        strongVideosScore * 0.20 +
+strongVideosScore * 0.18 +
 
-        keywordMatchScore * 0.14
+keywordMatchScore * 0.12 +
 
-    )
+freshScore * 0.13
+
+)
 
 );
 
@@ -2045,7 +2095,8 @@ competitionScore,
     interest: 0,
 
 youtubeMetrics,
-
+freshVideos,
+freshScore,
     trend,
 
     tags: rankedTags,
@@ -2058,7 +2109,11 @@ youtubeMetrics,
 
     maxViewsPerDay,
 exactTitleMatches,
-strongVideos,
+    strongVideos,
+
+    freshVideos,
+
+    freshScore,
 
     averageLikes,
 

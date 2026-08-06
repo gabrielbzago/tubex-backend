@@ -1257,6 +1257,43 @@ const strongVideos = items.filter(video => {
 }).length;
 
 
+// =========================
+// 🎯 KEYWORD MATCH
+// =========================
+
+const normalizedKeyword = keyword
+    .toLowerCase()
+    .trim();
+
+const exactTitleMatches = items.filter(video => {
+
+    const title = String(
+        video.snippet?.title || ""
+    )
+    .toLowerCase()
+    .trim();
+
+    return title.includes(
+        normalizedKeyword
+    );
+
+}).length;
+
+// =========================
+// 🎯 SCORE DE RELEVÂNCIA
+// =========================
+
+const keywordMatchScore = Math.round(
+
+    (
+
+        exactTitleMatches /
+
+        Math.max(items.length, 1)
+
+    ) * 100
+
+);
 
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
@@ -1932,6 +1969,7 @@ const youtubeMetrics = {
     averageViews,
 
     averageAgeDays,
+exactTitleMatches,
 
     averageViewsPerDay,
 strongVideos,
@@ -1974,6 +2012,7 @@ youtubeMetrics,
     averageViewsPerDay,
 
     maxViewsPerDay,
+exactTitleMatches,
 strongVideos,
 
     averageLikes,

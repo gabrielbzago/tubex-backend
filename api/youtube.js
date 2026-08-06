@@ -1638,6 +1638,24 @@ const trend =
 
     );
 
+// =========================
+// 📊 YOUTUBE METRICS
+// =========================
+
+const youtubeMetrics = {
+
+    videoCount: items.length,
+
+    averageViews,
+
+    maxViews,
+
+    minViews,
+
+    medianViews: median
+
+};
+
 const responseData = {
 
     success: true,
@@ -1646,10 +1664,13 @@ const responseData = {
 
     volume,
 
+
     competition,
 
     // Google Trends
     interest: 0,
+
+youtubeMetrics,
 
     trend,
 

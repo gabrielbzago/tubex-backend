@@ -1129,6 +1129,37 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
+// =========================
+// 📅 IDADE MÉDIA DOS VÍDEOS
+// =========================
+
+const averageAgeDays = Math.round(
+
+    items.reduce((acc, video) => {
+
+        const published =
+            new Date(
+                video.snippet?.publishedAt
+            ).getTime();
+
+        const age =
+
+            (Date.now() - published)
+
+            /
+
+            86400000;
+
+        return acc + age;
+
+    }, 0)
+
+    /
+
+    Math.max(items.length, 1)
+
+);
+
    const volume = Math.min(
     100,
     Math.round(
@@ -1694,6 +1725,20 @@ const competitionBase =
 
     competition * 0.30;
 
+// =========================
+// IDADE DOS VÍDEOS
+// =========================
+
+const ageScore =
+
+    Math.min(
+
+        averageAgeDays / 365,
+
+        5
+
+    ) * 6;
+
 // Resultado
 
 const competitionScore =
@@ -1702,11 +1747,13 @@ const competitionScore =
 
         videoScore +
 
-        averageViewsScore +
+averageViewsScore +
 
-        maxViewsScore +
+maxViewsScore +
 
-        competitionBase
+competitionBase +
+
+ageScore
 
     );
 // =========================
@@ -1731,6 +1778,8 @@ const youtubeMetrics = {
     videoCount: items.length,
 
     averageViews,
+
+    averageAgeDays,
 
     maxViews,
 

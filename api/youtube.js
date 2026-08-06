@@ -1220,6 +1220,80 @@ avgSubscribers+1
 )
 
 );
+
+// =========================
+// SERP DOMINANCE
+// =========================
+
+const channelFrequency = new Map();
+
+items.forEach(video => {
+
+    const id = video.snippet.channelId;
+
+    channelFrequency.set(
+
+        id,
+
+        (channelFrequency.get(id) || 0) + 1
+
+    );
+
+});
+
+const repeatedChannels =
+
+[...channelFrequency.values()]
+
+.filter(v => v >= 2)
+
+.length;
+
+const maxOccurrences =
+
+Math.max(
+
+...channelFrequency.values(),
+
+1
+
+);
+
+const dominanceScore = Math.min(
+
+100,
+
+Math.round(
+
+(
+
+(repeatedChannels * 8)
+
++
+
+(maxOccurrences * 12)
+
+)
+
+)
+
+);
+
+console.log(
+
+"DOMINANCE",
+
+{
+
+repeatedChannels,
+
+maxOccurrences,
+
+dominanceScore
+
+}
+
+);
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
 // =========================
@@ -2130,9 +2204,26 @@ competitionBase +
 
 ageScore +
 
-authorityScore * 0.40
+authorityScore * 0.30 +
+
+dominanceScore * 0.35
 
 );
+
+const finalCompetition = Math.max(
+
+5,
+
+Math.min(
+
+100,
+
+competitionScore
+
+)
+
+);
+
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -2168,6 +2259,11 @@ strongVideos,
 
     minViews,
 
+repeatedChannels,
+maxOccurrences,
+authorityScore,
+dominanceScore,
+avgSubscribers, 
     medianViews: median
 
 };
@@ -2182,7 +2278,7 @@ const responseData = {
 
     competition,
 
-competitionScore,
+competitionScore: finalCompetition,
 
     // Google Trends
     interest: 0,
@@ -2216,6 +2312,10 @@ exactTitleMatches,
 
     minViews,
 
+authorityScore,
+dominanceScore,
+repeatedChannels,
+maxOccurrences, 
     medianViews: median
 
 }

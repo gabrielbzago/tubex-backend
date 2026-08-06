@@ -111,6 +111,12 @@ if(
     let success = false;
 let activeKey = keys[0] || null;
 
+// ===================================================
+// TOTAL DE RESULTADOS DA PESQUISA
+// ===================================================
+
+let totalResults = 0;
+
     // =========================
     // 🔁 MULTI KEY FETCH
     // =========================
@@ -149,10 +155,9 @@ for (const key of shuffledKeys) {
 // TOTAL DE RESULTADOS DA BUSCA
 // ===================================================
 
-const totalResults = Number(
+totalResults = Number(
     searchJson.pageInfo?.totalResults || 0
 );
-
 console.log("TOTAL RESULTS:", totalResults);
 
           const ids = searchJson.items
@@ -1806,15 +1811,15 @@ const competitionScore = Math.round(
 
             +
 
-            Math.log10(averageViews + 1) * 10
+            Math.log10(averageViews + 1) * 8
 
             +
 
-            Math.log10(maxViews + 1) * 8
+            Math.log10(maxViews + 1) * 6
 
             +
 
-            (competition * 0.40)
+            (competition * 0.50)
 
         )
 

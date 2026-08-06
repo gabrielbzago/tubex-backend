@@ -1652,26 +1652,63 @@ items.length
 // 🚀 TUBEX COMPETITION SCORE
 // =========================
 
-const competitionScore = Math.round(
+// Score da quantidade de vídeos analisados
+
+const videoScore =
 
     Math.min(
 
-        100,
+        items.length / 50,
 
-        (
-            Math.min(items.length, 50) * 1.2 +
+        1
 
-            Math.log10(averageViews + 1) * 10 +
+    ) * 20;
 
-            Math.log10(maxViews + 1) * 8 +
+// Score da média de views
 
-            (competition * 0.40)
-        )
+const averageViewsScore =
 
-    )
+    Math.min(
 
-);
+        Math.log10(averageViews + 1) / 8,
 
+        1
+
+    ) * 30;
+
+// Score do maior vídeo
+
+const maxViewsScore =
+
+    Math.min(
+
+        Math.log10(maxViews + 1) / 8,
+
+        1
+
+    ) * 20;
+
+// Score da concorrência
+
+const competitionBase =
+
+    competition * 0.30;
+
+// Resultado
+
+const competitionScore =
+
+    Math.round(
+
+        videoScore +
+
+        averageViewsScore +
+
+        maxViewsScore +
+
+        competitionBase
+
+    );
 // =========================
 // 📦 RESPONSE
 // =========================

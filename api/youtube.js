@@ -1143,34 +1143,7 @@ const median =
 );
 
     const dominance = top / (median || 1);
-    // =========================
-// 📊 DOMINÂNCIA
-// =========================
-
-const dominance =
-    top /
-    Math.max(median, 1);
-
-// =========================
-// 🏆 CONCORRÊNCIA
-// 100 = Fácil competir
-// =========================
-
-let competition =
-
-    100 -
-
-    Math.min(
-
-        95,
-
-        Math.log10(dominance + 1) * 22
-
-    );
-
-// Limites
-
-competition = Math.round(
+  const competition = Math.round(
 
     Math.max(
 
@@ -1178,9 +1151,9 @@ competition = Math.round(
 
         Math.min(
 
-            competition,
+            100,
 
-            100
+            Math.log10(dominance + 1) * 30
 
         )
 

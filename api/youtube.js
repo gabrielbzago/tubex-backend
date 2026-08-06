@@ -180,12 +180,52 @@ for (const key of shuffledKeys) {
 
           if (Array.isArray(jsonVideos.items)) {
 
-console.log("================================");
-console.log("KEYWORD:", keyword);
-console.log("VIDEOS API:", jsonVideos.items?.length || 0);
-console.log("================================");
+    const filtered = jsonVideos.items.filter(v => {
 
-  const filtered = jsonVideos.items.filter(v => {
+        const title =
+            String(v?.snippet?.title || "")
+            .toLowerCase();
+
+        // Remove Shorts
+        if (
+            title.includes("#shorts") ||
+            title.includes(" shorts")
+        ) {
+            return false;
+        }
+
+        const videoViews =
+            Number(v?.statistics?.viewCount || 0);
+
+        const published =
+            new Date(
+                v?.snippet?.publishedAt
+            ).getTime();
+
+        const ageDays =
+            (Date.now() - published) /
+            (1000 * 60 * 60 * 24);
+
+        // Remove vídeos mortos
+        if (
+            ageDays > 900 &&
+            videoViews < 5000
+        ) {
+            return false;
+        }
+
+        return true;
+
+    });
+
+    console.log(
+        "VIDEOS FILTRADOS:",
+        filtered.length
+    );
+
+    items.push(...filtered);
+
+}
 
     const title =
       String(

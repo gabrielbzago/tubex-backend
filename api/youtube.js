@@ -2633,34 +2633,36 @@ const trend =
 
 const youtubeMetrics = {
 
+    // Quantidade de vídeos analisados
     videoCount: items.length,
 
+    // Performance da SERP
     averageViews,
-weakVideos,
-opportunityScore,
-dominanceIndex,
-    averageAgeDays,
-exactTitleMatches,
-consistencyScore,
+    medianViews: median,
     averageViewsPerDay,
-strongVideos,
-serpPower,
-    maxViewsPerDay,
 
-    maxViews,
+    // Autoridade
+    authorityScore,
+    avgSubscribers,
 
-    minViews,
+    // Competitividade
+    dominanceScore,
+    dominanceIndex,
 
-repeatedChannels,
-maxOccurrences,
-authorityScore,
-dominanceScore,
-avgSubscribers, 
-intentConsistency,
-commonWords,
-    medianViews: median
+    // Intenção da busca
+    intentConsistency,
+
+    // Oportunidade
+    opportunityScore,
+
+    // Tendência
+    trend,
+
+    // Vídeos fortes
+    strongVideos
 
 };
+
 
 const responseData = {
 
@@ -2668,56 +2670,46 @@ const responseData = {
 
     items,
 
-        volume: finalVolume,
+    // Scores finais
+    volume: finalVolume,
 
     competition,
 
-competitionScore: finalCompetition,
+    competitionScore: finalCompetition,
 
-    // Google Trends
     interest: 0,
 
-youtubeMetrics,
-freshVideos,
-freshScore,
     trend,
 
     tags: rankedTags,
 
-  metrics: {
+    youtubeMetrics,
 
-    averageViews,
+    metrics: {
 
-    averageViewsPerDay,
-dominanceIndex,
-    maxViewsPerDay,
-exactTitleMatches,
-    strongVideos,
-consistencyScore,
-weakVideos,
-opportunityScore,
-serpPower,
-    freshVideos,
+        // Apenas métricas finais utilizadas pelo frontend
 
-    freshScore,
+        averageViews,
 
-    averageLikes,
+        medianViews: median,
 
-    averageComments,
+        averageViewsPerDay,
 
-    maxViews,
+        authorityScore,
 
-    minViews,
+        dominanceScore,
 
-authorityScore,
-dominanceScore,
-repeatedChannels,
-maxOccurrences, 
-intentConsistency,
-commonWords,
-    medianViews: median
+        dominanceIndex,
 
-}
+        avgSubscribers,
+
+        intentConsistency,
+
+        opportunityScore,
+
+        strongVideos
+
+    }
 
 };
 // =========================

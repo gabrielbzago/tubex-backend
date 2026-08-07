@@ -1682,50 +1682,31 @@ const keywordMatchScore = Math.min(
 // 🔥 KEYWORD DIFFICULTY
 // =========================
 
-let keywordDifficulty =
+const keywordLength =
+    keywordTokens.length;
+
+// quanto menor a keyword,
+// maior a dificuldade
+
+const keywordDifficulty =
 
 keywordLength <= 1 ? 100 :
 
-keywordLength == 2 ? 88 :
+keywordLength == 2 ? 90 :
 
-keywordLength == 3 ? 72 :
+keywordLength == 3 ? 75 :
 
-keywordLength == 4 ? 58 :
+keywordLength == 4 ? 60 :
 
-keywordLength == 5 ? 46 :
+keywordLength == 5 ? 45 :
 
 keywordLength == 6 ? 35 :
 
 25;
 
-
-// ajuste pelo tamanho da SERP
-
-if(items.length >= 45){
-
-    keywordDifficulty += 10;
-
-}
-
-else if(items.length <= 20){
-
-    keywordDifficulty -= 10;
-
-}
-
-keywordDifficulty = Math.max(
-
-20,
-
-Math.min(
-
-100,
-
-keywordDifficulty
-
-)
-
-);
+console.log({
+    keywordDifficulty
+});
 
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
@@ -2703,8 +2684,6 @@ const responseData = {
     }
 
 };
-
-
 // =========================
 // 💾 CACHE SAVE
 // =========================

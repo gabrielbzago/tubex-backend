@@ -1326,6 +1326,49 @@ keywordScore = Math.max(
     )
 );
 
+
+// =========================
+// MARKET SIZE
+// =========================
+
+let marketDifficulty = 0;
+
+if(keywordWordCount === 1){
+
+    marketDifficulty = 100;
+
+}
+
+else if(keywordWordCount === 2){
+
+    marketDifficulty = 85;
+
+}
+
+else if(keywordWordCount === 3){
+
+    marketDifficulty = 65;
+
+}
+
+else if(keywordWordCount === 4){
+
+    marketDifficulty = 45;
+
+}
+
+else if(keywordWordCount === 5){
+
+    marketDifficulty = 30;
+
+}
+
+else{
+
+    marketDifficulty = 15;
+
+}
+
 // =========================
 // 🎯 RELEVANCE SCORE
 // Quanto os títulos realmente respondem à busca
@@ -1749,17 +1792,17 @@ else if (dominanceRatio >= 2)
 
 const competition = Math.round(
 
-      authorityDifficulty * 0.40
+      authorityDifficulty * 0.30
 
     + velocityDifficulty * 0.10
 
     + strengthDifficulty * 0.10
 
-    + keywordDifficulty * 0.20
-
     + dominanceDifficulty * 0.15
 
-    + (100 - relevanceScore) * 0.05
+    + marketDifficulty * 0.25
+
+    + (100 - relevanceScore) * 0.10
 
 );
 

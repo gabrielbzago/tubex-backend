@@ -1328,62 +1328,122 @@ keywordScore = Math.max(
 
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE
+// 🚀 TUBEX VOLUME SCORE V3
 // =========================
 
+// Views do vídeo mais forte
 const topScore = Math.min(
-
     100,
-
-    Math.round(
-
-        Math.log10(top + 1) * 10
-
-    )
-
+    Math.round(Math.log10(top + 1) * 14)
 );
 
+// Mediana da SERP
 const medianScore = Math.min(
-
     100,
-
-    Math.round(
-
-        Math.log10(median + 1) * 10
-
-    )
-
+    Math.round(Math.log10(median + 1) * 14)
 );
+
+// Média de views por dia
+const velocityScore = Math.min(
+    100,
+    Math.round(Math.log10(averageViewsPerDay + 1) * 18)
+);
+
+// Quantidade de vídeos fortes
+const strengthScore = Math.round(
+    (strongVideos / Math.max(items.length,1)) * 100
+);
+
+// Long Tail
+const longTailBonus = keywordScore;
 
 const volume = Math.round(
 
-      topScore * 0.18
+      topScore * 0.28
 
-    + medianScore * 0.18
+    + medianScore * 0.24
 
-    + viewsPerDayScore * 0.30
+    + velocityScore * 0.28
 
-    + strongVideosScore * 0.18
+    + strengthScore * 0.10
 
-    + keywordScore * 0.16
+    + longTailBonus * 0.10
 
 );
-    const dominance = top / (median || 1);
-  const competition = Math.round(
+    // =========================
+// 🚀 TUBEX COMPETITION V3
+// =========================
 
-    Math.max(
+// Quanto maior a média de views/dia,
+// mais difícil competir.
 
-        5,
+const velocityDifficulty = Math.min(
 
-        Math.min(
+    100,
 
-            100,
+    Math.round(
 
-            Math.log10(dominance + 1) * 30
+        Math.log10(
 
-        )
+            averageViewsPerDay + 1
+
+        ) * 22
 
     )
+
+);
+
+// Muitos vídeos fortes = difícil
+
+const strengthDifficulty = Math.round(
+
+    (
+
+        strongVideos /
+
+        Math.max(items.length,1)
+
+    ) * 100
+
+);
+
+// Palavra curta costuma ser mais concorrida
+
+const keywordDifficulty =
+
+    100 - keywordScore;
+
+// SERP muito concentrada
+
+const dominanceDifficulty = Math.round(
+
+    Math.min(
+
+        100,
+
+        Math.log10(
+
+            top /
+
+            (median || 1)
+
+            + 1
+
+        ) * 30
+
+    )
+
+);
+
+const competition = Math.round(
+
+      velocityDifficulty * 0.35
+
+    + strengthDifficulty * 0.30
+
+    + keywordDifficulty * 0.20
+
+    + dominanceDifficulty * 0.15
 
 );
 

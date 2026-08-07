@@ -1610,7 +1610,52 @@ const finalVolume = Math.max(
 
 );
 
+// ====================================
+// MERCADO INEXISTENTE
+// ====================================
 
+if (
+    totalResults <= 5 ||
+    items.length <= 2
+){
+
+    finalVolume = 5;
+
+    finalCompetition = 100;
+
+}
+
+else if(
+    totalResults <= 20
+){
+
+    finalVolume = Math.min(
+        finalVolume,
+        15
+    );
+
+    finalCompetition = Math.max(
+        finalCompetition,
+        95
+    );
+
+}
+
+else if(
+    totalResults <= 100
+){
+
+    finalVolume = Math.min(
+        finalVolume,
+        30
+    );
+
+    finalCompetition = Math.max(
+        finalCompetition,
+        85
+    );
+
+}
 
 // =========================
 // 🚀 TUBEX COMPETITION V4
@@ -1766,7 +1811,7 @@ const finalCompetition = Math.max(
 
         100,
 
-        competition
+        finalCompetition
 
     )
 

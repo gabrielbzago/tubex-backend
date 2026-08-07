@@ -1326,6 +1326,71 @@ keywordScore = Math.max(
     )
 );
 
+// =========================
+// 🎯 RELEVANCE SCORE
+// Quanto os títulos realmente respondem à busca
+// =========================
+
+const normalizedKeyword =
+    keyword
+        .toLowerCase()
+        .trim();
+
+let relevancePoints = 0;
+
+items.forEach(video => {
+
+    const title =
+        String(video.snippet?.title || "")
+        .toLowerCase();
+
+    // título começa exatamente igual
+    if (title.startsWith(normalizedKeyword)) {
+
+        relevancePoints += 3;
+
+    }
+
+    // contém exatamente a frase
+    else if (title.includes(normalizedKeyword)) {
+
+        relevancePoints += 2;
+
+    }
+
+    // contém todas as palavras
+    else {
+
+        const words =
+            normalizedKeyword.split(/\s+/);
+
+        const matched =
+            words.filter(w =>
+                title.includes(w)
+            ).length;
+
+        relevancePoints +=
+            matched / words.length;
+
+    }
+
+});
+
+const relevanceScore = Math.round(
+
+    Math.min(
+
+        100,
+
+        relevancePoints /
+
+        (items.length * 3)
+
+        * 100
+
+    )
+
+);
 
 // =========================
 // 🚀 TUBEX VOLUME SCORE V3
@@ -1359,17 +1424,20 @@ const longTailBonus = keywordScore;
 
 const volume = Math.round(
 
-      topScore * 0.28
+      topScore * 0.22
 
-    + medianScore * 0.24
+    + medianScore * 0.20
 
-    + velocityScore * 0.28
+    + velocityScore * 0.22
 
-    + strengthScore * 0.10
+    + strengthScore * 0.08
 
-    + longTailBonus * 0.10
+    + longTailBonus * 0.08
+
+    + relevanceScore * 0.20
 
 );
+
     // =========================
 // 🚀 TUBEX COMPETITION V3
 // =========================
@@ -1437,13 +1505,15 @@ const dominanceDifficulty = Math.round(
 
 const competition = Math.round(
 
-      velocityDifficulty * 0.35
+      velocityDifficulty * 0.30
 
-    + strengthDifficulty * 0.30
+    + strengthDifficulty * 0.25
 
-    + keywordDifficulty * 0.20
+    + keywordDifficulty * 0.15
 
-    + dominanceDifficulty * 0.15
+    + dominanceDifficulty * 0.10
+
+    + (100 - relevanceScore) * 0.20
 
 );
 
@@ -2035,7 +2105,7 @@ const youtubeMetrics = {
     averageViews,
 
 keywordScore,
-
+relevanceScore,
     averageAgeDays,
 
     averageViewsPerDay,
@@ -2080,7 +2150,7 @@ youtubeMetrics,
 
     maxViewsPerDay,
 strongVideos,
-
+relevanceScore,
     averageLikes,
 
     averageComments,

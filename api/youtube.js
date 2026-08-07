@@ -1319,26 +1319,33 @@ const dominanceIndex =
 
     );
 
-const dominanceScore = Math.min(
+// =========================
+// DOMINÂNCIA DA SERP
+// =========================
 
-100,
+const channelShare =
 
-Math.round(
+    maxOccurrences /
 
-(
+    Math.max(items.length, 1);
 
-(repeatedChannels * 8)
+const dominanceScore = Math.round(
 
-+
+    Math.min(
 
-(maxOccurrences * 12)
+        100,
 
-)
+        (
 
-)
+            channelShare * 70 +
+
+            (repeatedChannels / Math.max(items.length,1)) * 30
+
+        ) * 100
+
+    )
 
 );
-
 console.log(
 
 "DOMINANCE",
@@ -2497,33 +2504,13 @@ const authorityWeight =
 
     authorityScore * 0.30;
 
-// =========================
+// --------------------------------
 // DOMINÂNCIA DA SERP
-// =========================
+// --------------------------------
 
-const channelShare =
+const dominanceWeight =
 
-    maxOccurrences /
-
-    Math.max(items.length, 1);
-
-const dominanceScore = Math.round(
-
-    Math.min(
-
-        100,
-
-        (
-
-            channelShare * 70 +
-
-            (repeatedChannels / Math.max(items.length,1)) * 30
-
-        ) * 100
-
-    )
-
-);
+    dominanceScore * 0.20;
 
 // --------------------------------
 // CONSISTÊNCIA DOS RESULTADOS

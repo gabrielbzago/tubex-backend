@@ -1489,6 +1489,81 @@ const exactTitleMatches = items.filter(video => {
 
 }).length;
 
+
+// =========================
+// SEARCH INTENT ENGINE
+// =========================
+
+const stopWords = new Set([
+
+"a","o","e","de","do","da","dos","das",
+
+"para","com","sem","como","em","no","na",
+
+"nos","nas","um","uma","os","as"
+
+]);
+
+const tokenFrequency = new Map();
+
+items.forEach(video=>{
+
+    const words = normalizeText(
+
+        video.snippet.title
+
+    )
+
+    .split(" ")
+
+    .filter(word=>
+
+        word.length>=3 &&
+
+        !stopWords.has(word)
+
+    );
+
+    [...new Set(words)]
+
+    .forEach(word=>{
+
+        tokenFrequency.set(
+
+            word,
+
+            (tokenFrequency.get(word)||0)+1
+
+        );
+
+    });
+
+});
+
+const commonWords =
+
+[...tokenFrequency.entries()]
+
+.filter(v=>
+
+v[1]>=items.length*0.45
+
+);
+
+const intentConsistency = Math.round(
+
+(commonWords.length/20)*100
+
+);
+
+console.log({
+
+commonWords,
+
+intentConsistency
+
+});
+
 // =========================
 // 🎯 SCORE DE RELEVÂNCIA
 // =========================
@@ -1618,24 +1693,25 @@ const volume = Math.round(
 
 (
 
-topScore * 0.14 +
+topScore * 0.13 +
 
-medianScore * 0.14 +
+medianScore * 0.13 +
 
-viewsPerDayScore * 0.22 +
+viewsPerDayScore * 0.20 +
 
-strongVideosScore * 0.16 +
+strongVideosScore * 0.15 +
 
 keywordMatchScore * 0.10 +
 
 freshScore * 0.10 +
 
-opportunityScore * 0.14
+opportunityScore * 0.12 +
+
+(100-intentConsistency) * 0.07
 
 )
 
 );
-
 
 let finalVolume = volume;
 
@@ -2303,6 +2379,8 @@ maxOccurrences,
 authorityScore,
 dominanceScore,
 avgSubscribers, 
+intentConsistency,
+commonWords,
     medianViews: median
 
 };
@@ -2358,6 +2436,8 @@ authorityScore,
 dominanceScore,
 repeatedChannels,
 maxOccurrences, 
+intentConsistency,
+commonWords,
     medianViews: median
 
 }

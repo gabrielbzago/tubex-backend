@@ -1,8 +1,5 @@
 export default async function handler(req, res) {
-console.log("==================================");
-console.log("BACKEND V4");
-console.log("Keyword:", req.body?.keyword);
-console.log("==================================");
+
   // =========================
   // 🔥 CORS
   // =========================
@@ -151,16 +148,6 @@ for (const key of shuffledKeys) {
           }
 
           const searchJson = await searchRes.json();
-
-console.log("SEARCH JSON");
-console.log(searchJson);
-
-console.log("TOTAL RESULTS:", searchJson.pageInfo?.totalResults);
-
-console.log("ITENS:", searchJson.items?.length);
-
-console.log(searchJson.items);
-
 if (pageCount === 0) {
 
     totalResults = Number(
@@ -212,7 +199,11 @@ if (pageCount === 0) {
       return false;
     }
 
-    
+    const videoViews =
+      Number(
+        v?.statistics?.viewCount || 0
+      );
+
     const published =
       new Date(
         v?.snippet?.publishedAt
@@ -226,12 +217,18 @@ if (pageCount === 0) {
 
       / (1000 * 60 * 60 * 24);
 
-   
+    // remove vídeo morto
+    if(
+      ageDays > 900
+      &&
+      videoViews < 5000
+    ){
+      return false;
+    }
+
     return true;
 
   });
-console.log("VIDEOS API:", jsonVideos.items?.length);
-console.log(filtered.length);
 
   items.push(...filtered);
 
@@ -253,25 +250,14 @@ console.log(filtered.length);
     // =========================
     // 🚫 FALHA TOTAL
     // =========================
-  if (!success) {
-
-    return res.status(200).json({
-
-        success: false,
-
-        stage: "SEARCH",
-
-        totalItems: items.length,
-
-        activeKey,
-
-        totalResults,
-
-        items
-
-    });
-
-}
+    if (!success) {
+      return res.status(200).json({
+        success: true,
+        items: [],
+        volume: 0,
+        competition: 0
+      });
+    }
 
 // =========================
 // 🎬 VIDEO DATA
@@ -1130,7 +1116,27 @@ analytics.estimatedMinutesWatched,
       });
     }
 
-  
+    // =========================
+    // 📈 MÉTRICAS SEO
+    // =========================
+    items.sort((a, b) =>
+      Number(b.statistics.viewCount || 0) -
+      Number(a.statistics.viewCount || 0)
+    );
+
+    const totalViews = items.reduce((acc, v) =>
+      acc + Number(v.statistics?.viewCount || 0), 0
+    );
+
+    const avgViews =
+  totalViews /
+  Math.max(items.length, 1);
+
+    const top = Number(items[0]?.statistics?.viewCount || 0);
+const median =
+  Number(
+    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
+  );
 
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
@@ -1163,9 +1169,125 @@ const averageAgeDays = Math.round(
 
 );
 
+// =========================
+// 🚀 VIEWS POR DIA
+// =========================
+
+const viewsPerDayList = items.map(video => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    const published =
+        new Date(
+            video.snippet?.publishedAt
+        ).getTime();
+
+    const ageDays =
+        Math.max(
+            1,
+            (Date.now() - published) / 86400000
+        );
+
+    return views / ageDays;
+
+});
+
+const averageViewsPerDay = Math.round(
+
+    viewsPerDayList.reduce(
+        (a, b) => a + b,
+        0
+    ) /
+
+    Math.max(
+        viewsPerDayList.length,
+        1
+    )
+
+);
+
+const maxViewsPerDay = Math.round(
+
+    Math.max(
+        ...viewsPerDayList,
+        0
+    )
+
+);
+
+
+// =========================
+// 📊 SCORE DE VIEWS/DIA
+// =========================
+
+const viewsPerDayScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(
+
+            averageViewsPerDay + 1
+
+        ) * 18
+
+    )
+
+);
+
+// =========================
+// 💪 VÍDEOS FORTES
+// =========================
+
+const strongVideos = items.filter(video => {
+
+    const views = Number(
+        video.statistics?.viewCount || 0
+    );
+
+    const published = new Date(
+        video.snippet?.publishedAt
+    ).getTime();
+
+    const ageDays = Math.max(
+        1,
+        (Date.now() - published) / 86400000
+    );
+
+    const viewsPerDay = views / ageDays;
+
+    return (
+        views >= median &&
+        viewsPerDay >= averageViewsPerDay
+    );
+
+}).length;
 
 
 
+// =========================
+// 💪 SCORE DE VÍDEOS FORTES
+// =========================
+
+const strongVideosScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        (
+
+            strongVideos /
+
+            Math.max(items.length, 1)
+
+        ) * 100
+
+    )
+
+);
 
 // =========================
 // 🔍 KEYWORD SCORE
@@ -1341,79 +1463,113 @@ const relevanceScore = Math.round(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V4
-// Totalmente baseado na SERP
+// 🚀 TUBEX VOLUME SCORE V3
 // =========================
 
-// ======================================
-// DEMANDA NATURAL DA KEYWORD
-// ======================================
+// Views do vídeo mais forte
+const topScore = Math.min(
+    100,
+    Math.round(Math.log10(top + 1) * 14)
+);
+
+// Mediana da SERP
+const medianScore = Math.min(
+    100,
+    Math.round(Math.log10(median + 1) * 14)
+);
+
+// Média de views por dia
+const velocityScore = Math.min(
+    100,
+    Math.round(Math.log10(averageViewsPerDay + 1) * 18)
+);
+
+// Quantidade de vídeos fortes
+const strengthScore = Math.round(
+    (strongVideos / Math.max(items.length,1)) * 100
+);
+
+// Long Tail
+const longTailBonus = keywordScore;
+
+// =========================
+// 🔥 DEMAND SCORE
+// Mede a força natural da palavra
+// =========================
 
 let demandScore = 0;
 
-// Palavras curtas normalmente possuem
-// maior procura.
+// Palavra curta costuma ter enorme procura
+if(keywordWordCount === 1){
 
-switch (keywordWordCount) {
-
-    case 1:
-        demandScore += 45;
-        break;
-
-    case 2:
-        demandScore += 32;
-        break;
-
-    case 3:
-        demandScore += 22;
-        break;
-
-    case 4:
-        demandScore += 14;
-        break;
-
-    default:
-        demandScore += 8;
+    demandScore += 45;
 
 }
 
-// ======================================
-// RELEVÂNCIA DOS RESULTADOS
-// Quanto os títulos realmente respondem
-// à pesquisa.
-// ======================================
+else if(keywordWordCount === 2){
 
-demandScore += relevanceScore * 0.35;
+    demandScore += 30;
 
-// ======================================
-// TAMANHO DO MERCADO
-// pageInfo.totalResults
-// ======================================
+}
 
-demandScore += totalResultsScore * 0.30;
+else if(keywordWordCount === 3){
 
-// ======================================
-// LONG TAIL
-// Quanto mais específica,
-// maior chance de existir demanda
-// qualificada.
-// ======================================
+    demandScore += 18;
 
-demandScore += keywordScore * 0.20;
+}
 
-// ======================================
-// COBERTURA / CONSISTÊNCIA DA SERP
-// Mede quantos resultados apresentam
-// forte relação textual com a pesquisa.
-// ======================================
+else if(keywordWordCount === 4){
 
-const volumeCoverageScore = relevanceScore;
+    demandScore += 10;
 
-demandScore += volumeCoverageScore * 0.15;
+}
 
-// ======================================
-// LIMITE
-// ======================================
+else{
+
+    demandScore += 5;
+
+}
+
+// Muitos vídeos realmente relevantes
+
+demandScore += relevanceScore * 0.25;
+demandScore += totalResultsScore * 0.20;
+
+// Vídeos extremamente fortes
+
+if(top > 10000000){
+
+    demandScore += 20;
+
+}
+
+else if(top > 1000000){
+
+    demandScore += 15;
+
+}
+
+else if(top > 100000){
+
+    demandScore += 10;
+
+}
+
+// Mediana forte
+
+if(median > 1000000){
+
+    demandScore += 10;
+
+}
+
+else if(median > 100000){
+
+    demandScore += 5;
+
+}
+
+// Limite
 
 demandScore = Math.min(
 
@@ -1423,11 +1579,24 @@ demandScore = Math.min(
 
 );
 
-// ======================================
-// VOLUME FINAL
-// ======================================
 
-let finalVolume = Math.max(
+const volume = Math.round(
+
+      demandScore * 0.45
+
+    + topScore * 0.15
+
+    + medianScore * 0.15
+
+    + velocityScore * 0.10
+
+    + strengthScore * 0.05
+
+    + relevanceScore * 0.10
+
+);
+
+const finalVolume = Math.max(
 
     5,
 
@@ -1435,12 +1604,11 @@ let finalVolume = Math.max(
 
         100,
 
-        demandScore
+        volume
 
     )
 
 );
-
 
 
 
@@ -1588,64 +1756,21 @@ const competition = Math.round(
     + (100 - totalResultsScore) * 0.15
 
 );
+// Garante faixa válida
 
-let finalCompetition =
-    Math.max(
-        5,
-        Math.min(
-            100,
-            competition
-        )
-    );
+const finalCompetition = Math.max(
 
+    5,
 
-// ====================================
-// MERCADO INEXISTENTE
-// ====================================
+    Math.min(
 
-if (
-    totalResults <= 5 ||
-    items.length <= 2
-){
+        100,
 
-    finalVolume = 5;
+        competition
 
-    finalCompetition = 100;
+    )
 
-}
-
-else if(
-    totalResults <= 20
-){
-
-    finalVolume = Math.min(
-        finalVolume,
-        15
-    );
-
-    finalCompetition = Math.max(
-        finalCompetition,
-        95
-    );
-
-}
-
-else if(
-    totalResults <= 100
-){
-
-    finalVolume = Math.min(
-        finalVolume,
-        30
-    );
-
-    finalCompetition = Math.max(
-        finalCompetition,
-        85
-    );
-
-}
-
+);
 
 // -------------------------
 // Detalhes
@@ -1709,13 +1834,13 @@ function generateEstimatedTrend(volume, competition){
     // MÉDIA DE PESQUISAS/DIA
     // ======================================
 
-  const average = Math.round(
+    const average = Math.round(
 
-    400 +
+        400 +
 
-    volume * 8
+        Math.pow(volume, 1.35) * 18
 
-);
+    );
 
     // ======================================
     // DIREÇÃO DA CURVA
@@ -1961,51 +2086,306 @@ titleTags.forEach(tag => {
 
 });
 
+// =====================================
+// API YOUTUBE COMPLEMENTAR
+// =====================================
+
+items
+
+  .sort((a,b)=>
+
+    Number(b.statistics?.viewCount || 0)
+
+    -
+
+    Number(a.statistics?.viewCount || 0)
+
+  )
+
+  .slice(0,10)
+
+  .forEach(video => {
+
+    const tags =
+      video?.snippet?.tags || [];
+
+    tags.forEach(tag => {
+
+      const normalized =
+        normalizeText(tag);
+
+      // tamanho
+      if(
+        !normalized
+        ||
+        normalized.length < 3
+        ||
+        normalized.length > 80
+      ){
+        return;
+      }
+
+      // relevância contextual
+      const relevance =
+        titleTags.some(titleTag =>
+
+          normalized.includes(titleTag)
+
+          ||
+
+          titleTag.includes(normalized)
+
+        );
+
+      if(!relevance){
+        return;
+      }
+
+      // views
+      const views =
+        Number(
+          video.statistics?.viewCount || 0
+        );
+
+      // peso
+      const weight =
+
+        Math.max(
+          1,
+          Math.log10(views + 1)
+        );
+
+      tagMap.set(
+
+        normalized,
+
+        (tagMap.get(normalized) || 0)
+
+        +
+
+        weight
+
+      );
+
+    });
+
+  });
+
+// =====================================
+// ORDENA
+// =====================================
+
+const rankedTags =
+
+  [...tagMap.entries()]
+
+    .sort((a,b)=>
+
+      b[1] - a[1]
+
+    )
+
+    .slice(0,40)
+
+    .map(([keyword,score]) => ({
+
+      keyword,
+
+      score: Math.min(
+
+        99,
+
+        Math.round(
+          60 + (score * 2)
+        )
+
+      )
+
+    }));
+// =========================
+// 📊 EXTRA METRICS
+// =========================
+
+const averageViews =
+  Math.round(avgViews);
+
+const averageLikes =
+  Math.round(
+
+    items.reduce(
+
+      (acc,v)=>
+
+        acc +
+
+        Number(
+          v.statistics?.likeCount || 0
+        ),
+
+      0
+
+    )
+
+    /
+
+    Math.max(items.length,1)
+
+  );
+
+const averageComments =
+  Math.round(
+
+    items.reduce(
+
+      (acc,v)=>
+
+        acc +
+
+        Number(
+          v.statistics?.commentCount || 0
+        ),
+
+      0
+
+    )
+
+    /
+
+    Math.max(items.length,1)
+
+  );
+
+const maxViews =
+items.length
+? Math.max(
+    ...items.map(v =>
+      Number(
+        v.statistics?.viewCount || 0
+      )
+    )
+  )
+: 0;
+
+const minViews =
+items.length
+? Math.min(
+    ...items.map(v =>
+      Number(
+        v.statistics?.viewCount || 0
+      )
+    )
+  )
+: 0;
 
 // =========================
 // 🚀 TUBEX COMPETITION SCORE
-// Baseado somente na SERP
 // =========================
 
-const competitionScore = Math.round(
+// Score da quantidade de vídeos analisados
 
-      competitionMarketDifficulty * 0.40
-    + coverageDifficulty         * 0.30
-    + freshnessDifficulty        * 0.20
-    + totalResultsScore          * 0.10
+const videoScore =
 
-);
+    Math.min(
 
+        items.length / 50,
+
+        1
+
+    ) * 20;
+
+// Score da média de views
+
+const averageViewsScore =
+
+    Math.min(
+
+        Math.log10(averageViews + 1) / 8,
+
+        1
+
+    ) * 30;
+
+// Score do maior vídeo
+
+const maxViewsScore =
+
+    Math.min(
+
+        Math.log10(maxViews + 1) / 8,
+
+        1
+
+    ) * 20;
+
+// Score da concorrência
+
+const competitionBase =
+
+    competition * 0.30;
+
+// =========================
+// IDADE DOS VÍDEOS
+// =========================
+
+const ageScore =
+
+    Math.min(
+
+        averageAgeDays / 365,
+
+        5
+
+    ) * 6;
+
+// Resultado
+
+const competitionScore =
+
+    Math.round(
+
+        videoScore +
+
+averageViewsScore +
+
+maxViewsScore +
+
+competitionBase +
+
+ageScore
+
+    );
 // =========================
 // 📦 RESPONSE
 // =========================
+
 const trend = generateEstimatedTrend(
     finalVolume,
-    finalCompetition
+    competition
 );
-
-
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================
 
 const youtubeMetrics = {
 
-    // Quantidade de vídeos analisados
     videoCount: items.length,
 
-    // Qualidade da SERP
-    keywordScore,
-    relevanceScore,
+    averageViews,
 
-    // Idade média dos vídeos
+keywordScore,
+relevanceScore,
     averageAgeDays,
 
-    // Mercado
-    totalResults,
+    averageViewsPerDay,
+strongVideos,
 
-    // Concorrência
-    competitionDetails
+    maxViewsPerDay,
+
+    maxViews,
+
+    minViews,
+
+    medianViews: median
 
 };
 
@@ -2015,41 +2395,43 @@ const responseData = {
 
     items,
 
-    // Scores finais
     volume: finalVolume,
 
     competition: finalCompetition,
+competitionDetails,
+competitionScore,
 
-    competitionScore,
-
-    competitionDetails,
-
-    // Google Trends estimado
+    // Google Trends
     interest: 0,
 
-    youtubeMetrics,
+youtubeMetrics,
 
     trend,
 
     tags: rankedTags,
 
-    metrics: {
+  metrics: {
 
-        keywordScore,
+    averageViews,
 
-        relevanceScore,
+    averageViewsPerDay,
 
-        averageAgeDays,
+    maxViewsPerDay,
+strongVideos,
+relevanceScore,
+    averageLikes,
 
-        totalResults,
+    averageComments,
 
-        competitionScore
+    maxViews,
 
-    }
+    minViews,
+
+    medianViews: median
+
+}
 
 };
-
-
 // =========================
 // 💾 CACHE SAVE
 // =========================

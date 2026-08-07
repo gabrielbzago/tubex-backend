@@ -1,5 +1,8 @@
 export default async function handler(req, res) {
-
+console.log("==================================");
+console.log("BACKEND V4");
+console.log("Keyword:", req.body?.keyword);
+console.log("==================================");
   // =========================
   // 🔥 CORS
   // =========================

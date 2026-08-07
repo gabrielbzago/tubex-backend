@@ -1129,18 +1129,223 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
-    const volume = Math.min(100,
-      Math.round(
-        (Math.log10(top + 1) * 10) +
-        (Math.log10(median + 1) * 5)
-      )
+// =========================
+// 📅 IDADE MÉDIA DOS VÍDEOS
+// =========================
+
+const averageAgeDays = Math.round(
+
+    items.reduce((acc, video) => {
+
+        const published =
+            new Date(
+                video.snippet?.publishedAt
+            ).getTime();
+
+        const age =
+
+            (Date.now() - published)
+
+            /
+
+            86400000;
+
+        return acc + age;
+
+    }, 0)
+
+    /
+
+    Math.max(items.length, 1)
+
+);
+
+// =========================
+// 🚀 VIEWS POR DIA
+// =========================
+
+const viewsPerDayList = items.map(video => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    const published =
+        new Date(
+            video.snippet?.publishedAt
+        ).getTime();
+
+    const ageDays =
+        Math.max(
+            1,
+            (Date.now() - published) / 86400000
+        );
+
+    return views / ageDays;
+
+});
+
+const averageViewsPerDay = Math.round(
+
+    viewsPerDayList.reduce(
+        (a, b) => a + b,
+        0
+    ) /
+
+    Math.max(
+        viewsPerDayList.length,
+        1
+    )
+
+);
+
+const maxViewsPerDay = Math.round(
+
+    Math.max(
+        ...viewsPerDayList,
+        0
+    )
+
+);
+
+
+// =========================
+// 📊 SCORE DE VIEWS/DIA
+// =========================
+
+const viewsPerDayScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(
+
+            averageViewsPerDay + 1
+
+        ) * 18
+
+    )
+
+);
+
+// =========================
+// 💪 VÍDEOS FORTES
+// =========================
+
+const strongVideos = items.filter(video => {
+
+    const views = Number(
+        video.statistics?.viewCount || 0
     );
 
+    const published = new Date(
+        video.snippet?.publishedAt
+    ).getTime();
+
+    const ageDays = Math.max(
+        1,
+        (Date.now() - published) / 86400000
+    );
+
+    const viewsPerDay = views / ageDays;
+
+    return (
+        views >= median &&
+        viewsPerDay >= averageViewsPerDay
+    );
+
+}).length;
+
+
+
+// =========================
+// 💪 SCORE DE VÍDEOS FORTES
+// =========================
+
+const strongVideosScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        (
+
+            strongVideos /
+
+            Math.max(items.length, 1)
+
+        ) * 100
+
+    )
+
+);
+
+
+
+// =========================
+// 🚀 TUBEX VOLUME SCORE
+// =========================
+
+const topScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(top + 1) * 10
+
+    )
+
+);
+
+const medianScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(median + 1) * 10
+
+    )
+
+);
+
+const volume = Math.round(
+
+    (
+
+        topScore * 0.20 +
+
+        medianScore * 0.20 +
+
+        viewsPerDayScore * 0.35 +
+
+        strongVideosScore * 0.25
+
+    )
+
+);
     const dominance = top / (median || 1);
-    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
-// =========================
-// 🏷️ REAL TAG ENGINE
-// =========================
+  const competition = Math.round(
+
+    Math.max(
+
+        5,
+
+        Math.min(
+
+            100,
+
+            Math.log10(dominance + 1) * 30
+
+        )
+
+    )
+
+);
+
+
+
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================
@@ -1630,26 +1835,79 @@ items.length
 // 🚀 TUBEX COMPETITION SCORE
 // =========================
 
-const competitionScore = Math.round(
+// Score da quantidade de vídeos analisados
+
+const videoScore =
 
     Math.min(
 
-        100,
+        items.length / 50,
 
-        (
-            Math.min(items.length, 50) * 1.2 +
+        1
 
-            Math.log10(averageViews + 1) * 10 +
+    ) * 20;
 
-            Math.log10(maxViews + 1) * 8 +
+// Score da média de views
 
-            (competition * 0.40)
-        )
+const averageViewsScore =
 
-    )
+    Math.min(
 
-);
+        Math.log10(averageViews + 1) / 8,
 
+        1
+
+    ) * 30;
+
+// Score do maior vídeo
+
+const maxViewsScore =
+
+    Math.min(
+
+        Math.log10(maxViews + 1) / 8,
+
+        1
+
+    ) * 20;
+
+// Score da concorrência
+
+const competitionBase =
+
+    competition * 0.30;
+
+// =========================
+// IDADE DOS VÍDEOS
+// =========================
+
+const ageScore =
+
+    Math.min(
+
+        averageAgeDays / 365,
+
+        5
+
+    ) * 6;
+
+// Resultado
+
+const competitionScore =
+
+    Math.round(
+
+        videoScore +
+
+averageViewsScore +
+
+maxViewsScore +
+
+competitionBase +
+
+ageScore
+
+    );
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -1672,6 +1930,13 @@ const youtubeMetrics = {
     videoCount: items.length,
 
     averageViews,
+
+    averageAgeDays,
+
+    averageViewsPerDay,
+strongVideos,
+
+    maxViewsPerDay,
 
     maxViews,
 
@@ -1702,21 +1967,26 @@ youtubeMetrics,
 
     tags: rankedTags,
 
-    metrics: {
+  metrics: {
 
-        averageViews,
+    averageViews,
 
-        averageLikes,
+    averageViewsPerDay,
 
-        averageComments,
+    maxViewsPerDay,
+strongVideos,
 
-        maxViews,
+    averageLikes,
 
-        minViews,
+    averageComments,
 
-        medianViews: median
+    maxViews,
 
-    }
+    minViews,
+
+    medianViews: median
+
+}
 
 };
 // =========================

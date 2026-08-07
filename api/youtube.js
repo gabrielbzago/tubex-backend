@@ -1810,25 +1810,15 @@ const medianScore = Math.min(
 
 const volume = Math.round(
 
-(
+      topScore * 0.28
 
-topScore * 0.13 +
+    + medianScore * 0.24
 
-medianScore * 0.13 +
+    + viewsPerDayScore * 0.20
 
-viewsPerDayScore * 0.20 +
+    + strongVideosScore * 0.16
 
-strongVideosScore * 0.15 +
-
-keywordMatchScore * 0.10 +
-
-freshScore * 0.10 +
-
-opportunityScore * 0.12 +
-
-(100-intentConsistency) * 0.07
-
-)
+    + keywordMatchScore * 0.12
 
 );
 
@@ -2532,43 +2522,43 @@ console.log({
 // --------------------------------
 
 const authorityWeight =
-    authorityScore * 0.22;
+    authorityScore * 0.30;
 
 // --------------------------------
 // DOMINÂNCIA
 // --------------------------------
 
 const dominanceWeight =
-    dominanceScore * 0.16;
+    dominanceScore * 0.25;
 
 // --------------------------------
 // CONSISTÊNCIA
 // --------------------------------
 
+
 const intentWeight =
-    consistencyScore * 0.12;
+    consistencyScore * 0.00;
+
 
 // --------------------------------
 // VELOCIDADE
 // --------------------------------
 
 const speedWeight =
-    viewsPerDayScore * 0.12;
+    viewsPerDayScore * 0.20;
 
 // --------------------------------
 // CONCORRÊNCIA DA SERP
 // --------------------------------
-
 const rawWeight =
-    rawCompetition * 0.18;
+    rawCompetition * 0.00;
 
 // --------------------------------
 // DIFICULDADE DA KEYWORD
 // --------------------------------
 
 const keywordWeight =
-    keywordDifficulty * 0.20;
-
+    keywordDifficulty * 0.25;
 // --------------------------------
 // SCORE FINAL DA SERP
 // --------------------------------

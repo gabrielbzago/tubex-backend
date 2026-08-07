@@ -1286,6 +1286,20 @@ items.forEach(video => {
 
 });
 
+const dominanceIndex =
+
+    Math.round(
+
+        (
+
+            maxOccurrences /
+
+            Math.max(items.length,1)
+
+        ) * 100
+
+    );
+
 const repeatedChannels =
 
 [...channelFrequency.values()]
@@ -1520,7 +1534,9 @@ weakVideos,
 opportunityScore
 
 });
-
+console.log({
+    dominanceIndex
+});
 // =========================
 // 🎯 KEYWORD MATCH
 // =========================
@@ -2580,7 +2596,7 @@ const youtubeMetrics = {
     averageViews,
 weakVideos,
 opportunityScore,
-
+dominanceIndex,
     averageAgeDays,
 exactTitleMatches,
 consistencyScore,
@@ -2631,7 +2647,7 @@ freshScore,
     averageViews,
 
     averageViewsPerDay,
-
+dominanceIndex,
     maxViewsPerDay,
 exactTitleMatches,
     strongVideos,

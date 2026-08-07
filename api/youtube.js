@@ -1582,73 +1582,11 @@ const finalVolume = Math.max(
 
 );
 
-// =========================
-// MATCH DA KEYWORD
-// =========================
-
-// reutiliza normalizedKeyword já criado acima
-let exactMatches = 0;
-let partialMatches = 0;
-let recentVideos = 0;
-
-items.forEach(video=>{
-
-    const title =
-        String(video.snippet?.title || "")
-        .toLowerCase();
-
-    const ageDays =
-        (Date.now() -
-        new Date(video.snippet.publishedAt).getTime())
-        /86400000;
-
-    if(keywordWords.length >= 3){
-
-        if(title.startsWith(normalizedKeyword)){
-
-            exactMatches += 2;
-
-        }
-
-        else if(title.includes(normalizedKeyword)){
-
-            exactMatches++;
-
-        }
-
-    }
-
-    else{
-
-        const matched =
-            keywordWords.filter(word=>
-                title.includes(word)
-            ).length;
-
-        if(matched === keywordWords.length){
-
-            partialMatches++;
-
-        }
-
-    }
-
-    if(ageDays <= 365){
-
-        recentVideos++;
-
-    }
-
-});
 
 
 // =========================
 // 🚀 TUBEX COMPETITION V4
 // =========================
-
-// keyword normalizada
-const normalizedKeyword =
-    keyword.toLowerCase().trim();
 
 let exactMatches = 0;
 let partialMatches = 0;
@@ -1727,18 +1665,18 @@ const titleCoverage =
 // Dificuldade natural
 // -------------------------
 
-let marketDifficulty = 0;
+let competitionMarketDifficulty = 0;
 
 switch(keywordWords.length){
 
     case 1:
 
-        marketDifficulty = 100;
+        competitionMarketDifficulty = 100;
         break;
 
     case 2:
 
-        marketDifficulty = 85;
+        competitionMarketDifficulty * 0.50
         break;
 
     case 3:
@@ -1814,9 +1752,8 @@ const finalCompetition =
 
 // detalhes
 
-const competitionDetails = {
-
-    marketDifficulty,
+competitionDetails = {
+    marketDifficulty: competitionMarketDifficulty,
 
     coverageDifficulty,
 
@@ -2435,7 +2372,7 @@ const responseData = {
 
     volume: finalVolume,
 
-    competition,
+    competition: finalCompetition,
 competitionDetails,
 competitionScore,
 

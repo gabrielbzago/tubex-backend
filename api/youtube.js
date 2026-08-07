@@ -1463,113 +1463,83 @@ const relevanceScore = Math.round(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V3
+// 🚀 TUBEX VOLUME SCORE V4
+// Totalmente baseado na SERP
 // =========================
 
-// Views do vídeo mais forte
-const topScore = Math.min(
-    100,
-    Math.round(Math.log10(top + 1) * 14)
-);
-
-// Mediana da SERP
-const medianScore = Math.min(
-    100,
-    Math.round(Math.log10(median + 1) * 14)
-);
-
-// Média de views por dia
-const velocityScore = Math.min(
-    100,
-    Math.round(Math.log10(averageViewsPerDay + 1) * 18)
-);
-
-// Quantidade de vídeos fortes
-const strengthScore = Math.round(
-    (strongVideos / Math.max(items.length,1)) * 100
-);
-
-// Long Tail
-const longTailBonus = keywordScore;
-
-// =========================
-// 🔥 DEMAND SCORE
-// Mede a força natural da palavra
-// =========================
+// ======================================
+// DEMANDA NATURAL DA KEYWORD
+// ======================================
 
 let demandScore = 0;
 
-// Palavra curta costuma ter enorme procura
-if(keywordWordCount === 1){
+// Palavras curtas normalmente possuem
+// maior procura.
 
-    demandScore += 45;
+switch (keywordWordCount) {
 
-}
+    case 1:
+        demandScore += 45;
+        break;
 
-else if(keywordWordCount === 2){
+    case 2:
+        demandScore += 32;
+        break;
 
-    demandScore += 30;
+    case 3:
+        demandScore += 22;
+        break;
 
-}
+    case 4:
+        demandScore += 14;
+        break;
 
-else if(keywordWordCount === 3){
-
-    demandScore += 18;
-
-}
-
-else if(keywordWordCount === 4){
-
-    demandScore += 10;
-
-}
-
-else{
-
-    demandScore += 5;
+    default:
+        demandScore += 8;
 
 }
 
-// Muitos vídeos realmente relevantes
+// ======================================
+// RELEVÂNCIA DOS RESULTADOS
+// Quanto os títulos realmente respondem
+// à pesquisa.
+// ======================================
 
-demandScore += relevanceScore * 0.25;
-demandScore += totalResultsScore * 0.20;
+demandScore += relevanceScore * 0.35;
 
-// Vídeos extremamente fortes
+// ======================================
+// TAMANHO DO MERCADO
+// pageInfo.totalResults
+// ======================================
 
-if(top > 10000000){
+demandScore += totalResultsScore * 0.30;
 
-    demandScore += 20;
+// ======================================
+// LONG TAIL
+// Quanto mais específica,
+// maior chance de existir demanda
+// qualificada.
+// ======================================
 
-}
+demandScore += keywordScore * 0.20;
 
-else if(top > 1000000){
+// ======================================
+// COBERTURA DOS TÍTULOS
+// Muitos títulos contendo exatamente
+// a pesquisa indicam forte intenção.
+// ======================================
 
-    demandScore += 15;
+const coverageScore = Math.round(
 
-}
+    titleCoverage * 100
 
-else if(top > 100000){
+);
 
-    demandScore += 10;
+demandScore += coverageScore * 0.15;
 
-}
-
-// Mediana forte
-
-if(median > 1000000){
-
-    demandScore += 10;
-
-}
-
-else if(median > 100000){
-
-    demandScore += 5;
-
-}
-
-// Limite
+// ======================================
+// LIMITE
+// ======================================
 
 demandScore = Math.min(
 
@@ -1579,23 +1549,23 @@ demandScore = Math.min(
 
 );
 
+// ======================================
+// VOLUME FINAL
+// ======================================
 
-let finalVolume = Math.round(
+let finalVolume = Math.max(
 
-      demandScore * 0.45
+    5,
 
-    + topScore * 0.15
+    Math.min(
 
-    + medianScore * 0.15
+        100,
 
-    + velocityScore * 0.10
+        demandScore
 
-    + strengthScore * 0.05
-
-    + relevanceScore * 0.10
+    )
 
 );
-
 
 
 // =========================

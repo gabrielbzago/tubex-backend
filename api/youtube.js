@@ -2337,6 +2337,14 @@ competitionScore
 
 );
 
+const competition = Math.max(
+
+    5,
+
+    100 - finalCompetition
+
+);
+
 // =========================
 // 📦 RESPONSE
 // =========================

@@ -1149,8 +1149,6 @@ analytics.estimatedMinutesWatched,
       });
     }
 
-
-
 // =========================
 // 📈 SEO CORE METRICS
 // =========================
@@ -1429,8 +1427,6 @@ console.log({
     dominanceScore
 
 });
-
-
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
 // =========================

@@ -1746,7 +1746,7 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-competition = Math.max(
+const competition = Math.max(
 
     competitionMarketDifficulty,
 

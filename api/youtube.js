@@ -1148,42 +1148,77 @@ analytics.estimatedMinutesWatched,
         subscribers: Number(stats?.subscriberCount || 0)
       });
     }
+// =========================
+// 📈 SEO CORE METRICS
+// =========================
 
-    // =========================
-    // 📈 MÉTRICAS SEO
-    // =========================
-    items.sort((a, b) =>
-      Number(b.statistics.viewCount || 0) -
-      Number(a.statistics.viewCount || 0)
-    );
+// Ordena por visualizações
+items.sort(
 
-// Mantém somente os 50 vídeos mais fortes
+    (a, b) =>
+
+        Number(b.statistics?.viewCount || 0) -
+
+        Number(a.statistics?.viewCount || 0)
+
+);
+
+// Mantém somente os 50 vídeos mais relevantes
 items = items.slice(0, 50);
 
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
+// =========================
+// PERFORMANCE DA SERP
+// =========================
 
-    const avgViews =
-  totalViews /
-  Math.max(items.length, 1);
+const totalViews = items.reduce(
 
-    const top = Number(items[0]?.statistics?.viewCount || 0);
-const median =
-  Number(
-    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-  );
+    (acc, video) =>
 
+        acc +
+
+        Number(video.statistics?.viewCount || 0),
+
+    0
+
+);
+
+const averageViews = Math.round(
+
+    totalViews /
+
+    Math.max(items.length, 1)
+
+);
+
+const top = Number(
+
+    items[0]?.statistics?.viewCount || 0
+
+);
+
+const median = Number(
+
+    items[
+
+        Math.floor(items.length / 2)
+
+    ]?.statistics?.viewCount || 0
+
+);
 
 // =========================
-// CHANNEL AUTHORITY
+// AUTORIDADE DOS CANAIS
 // =========================
 
 const channelIds = [
 
     ...new Set(
 
-        items.map(v => v.snippet.channelId)
+        items.map(
+
+            video => video.snippet.channelId
+
+        )
 
     )
 
@@ -1191,17 +1226,31 @@ const channelIds = [
 
 let channels = [];
 
-for(let i=0;i<channelIds.length;i+=50){
+for (
 
-    const ids = channelIds
-        .slice(i,i+50)
-        .join(",");
+    let i = 0;
+
+    i < channelIds.length;
+
+    i += 50
+
+){
+
+    const ids =
+
+        channelIds
+
+            .slice(i, i + 50)
+
+            .join(",");
 
     const res = await fetch(
 
         `https://www.googleapis.com/youtube/v3/channels` +
 
-        `?part=statistics&id=${ids}` +
+        `?part=statistics` +
+
+        `&id=${ids}` +
 
         `&key=${activeKey}`
 
@@ -1216,118 +1265,119 @@ for(let i=0;i<channelIds.length;i+=50){
     );
 
 }
-const avgSubscribers =
-Math.round(
 
-channels.reduce(
+// =========================
+// MEDIANA DE INSCRITOS
+// (melhor que média)
+// =========================
 
-(a,c)=>
+const subscriberList =
 
-a+
+    channels
 
-Number(
+        .map(channel =>
 
-c.statistics?.subscriberCount||0
+            Number(
 
-),
+                channel.statistics?.subscriberCount || 0
 
-0
+            )
+
+        )
+
+        .sort(
+
+            (a,b)=>a-b
+
+        );
+
+const medianSubscribers =
+
+subscriberList.length
+
+?
+
+subscriberList[
+
+Math.floor(
+
+subscriberList.length / 2
 
 )
 
-/
+]
 
-Math.max(
+:
 
-channels.length,
+0;
 
-1
-
-)
-
-);
-
+// =========================
+// AUTHORITY SCORE
+// =========================
 
 const authorityScore = Math.min(
 
-100,
+    100,
 
-Math.round(
+    Math.round(
 
-Math.log10(
+        Math.log10(
 
-avgSubscribers+1
+            medianSubscribers + 1
 
-)
+        ) * 16
 
-*16
-
-)
+    )
 
 );
 
 // =========================
-// SERP DOMINANCE
+// DOMINÂNCIA DA SERP
 // =========================
 
 const channelFrequency = new Map();
 
 items.forEach(video => {
 
-    const id = video.snippet.channelId;
+    const channelId =
+
+        video.snippet.channelId;
 
     channelFrequency.set(
 
-        id,
+        channelId,
 
-        (channelFrequency.get(id) || 0) + 1
+        (
+
+            channelFrequency.get(channelId) || 0
+
+        ) + 1
 
     );
 
 });
 
+const frequencies =
 
-const repeatedChannels =
-
-[...channelFrequency.values()]
-
-.filter(v => v >= 2)
-
-.length;
+    [...channelFrequency.values()];
 
 const maxOccurrences =
 
-Math.max(
+    Math.max(
 
-...channelFrequency.values(),
+        ...frequencies,
 
-1
-
-);
-
-const dominanceIndex =
-
-    Math.round(
-
-        (
-
-            maxOccurrences /
-
-            Math.max(items.length,1)
-
-        ) * 100
+        1
 
     );
 
-// =========================
-// DOMINÂNCIA DA SERP
-// =========================
+const repeatedChannels =
 
-const channelShare =
+    frequencies.filter(
 
-    maxOccurrences /
+        count => count >= 2
 
-    Math.max(items.length, 1);
+    ).length;
 
 const dominanceScore = Math.round(
 
@@ -1337,30 +1387,46 @@ const dominanceScore = Math.round(
 
         (
 
-            channelShare * 70 +
+            (
 
-            (repeatedChannels / Math.max(items.length,1)) * 30
+                maxOccurrences /
 
-        ) * 100
+                items.length
+
+            ) * 75
+
+        )
+
+        +
+
+        (
+
+            (
+
+                repeatedChannels /
+
+                items.length
+
+            ) * 25
+
+        )
 
     )
 
 );
-console.log(
 
-"DOMINANCE",
+console.log({
 
-{
+    averageViews,
 
-repeatedChannels,
+    median,
 
-maxOccurrences,
+    authorityScore,
 
-dominanceScore
+    dominanceScore
 
-}
+});
 
-);
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
 // =========================
@@ -2629,27 +2695,40 @@ const trend =
 
 // =========================
 // 📊 YOUTUBE METRICS
-// Apenas métricas de alto impacto
 // =========================
 
 const youtubeMetrics = {
+
+    // Quantidade de vídeos analisados
+    videoCount: items.length,
 
     // Performance da SERP
     averageViews,
     medianViews: median,
     averageViewsPerDay,
 
-    // Competição
+    // Autoridade
     authorityScore,
+    avgSubscribers,
+
+    // Competitividade
     dominanceScore,
+    dominanceIndex,
+
+    // Intenção da busca
+    intentConsistency,
 
     // Oportunidade
     opportunityScore,
 
-    // Força da SERP
+    // Tendência
+    trend,
+
+    // Vídeos fortes
     strongVideos
 
 };
+
 
 const responseData = {
 
@@ -2657,31 +2736,56 @@ const responseData = {
 
     items,
 
-    // Scores oficiais
-    volume: finalVolume,
-    competition,
-    competitionScore: finalCompetition,
+        volume: finalVolume,
 
+    competition,
+
+competitionScore: finalCompetition,
+
+    // Google Trends
     interest: 0,
+
+youtubeMetrics,
+freshVideos,
+freshScore,
+    trend,
 
     tags: rankedTags,
 
-    youtubeMetrics,
+  metrics: {
 
-    metrics: {
+    averageViews,
 
-        averageViews,
-        medianViews: median,
-        averageViewsPerDay,
+    averageViewsPerDay,
+dominanceIndex,
+    maxViewsPerDay,
+exactTitleMatches,
+    strongVideos,
+consistencyScore,
+weakVideos,
+opportunityScore,
+serpPower,
+    freshVideos,
 
-        authorityScore,
-        dominanceScore,
+    freshScore,
 
-        opportunityScore,
+    averageLikes,
 
-        strongVideos
+    averageComments,
 
-    }
+    maxViews,
+
+    minViews,
+
+authorityScore,
+dominanceScore,
+repeatedChannels,
+maxOccurrences, 
+intentConsistency,
+commonWords,
+    medianViews: median
+
+}
 
 };
 // =========================

@@ -1935,6 +1935,21 @@ titleTags.forEach(tag => {
 
 });
 
+
+// =========================
+// 🚀 TUBEX COMPETITION SCORE
+// Baseado somente na SERP
+// =========================
+
+const competitionScore = Math.round(
+
+      competitionMarketDifficulty * 0.40
+    + coverageDifficulty         * 0.30
+    + freshnessDifficulty        * 0.20
+    + totalResultsScore          * 0.10
+
+);
+
 // =========================
 // 📦 RESPONSE
 // =========================

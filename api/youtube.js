@@ -1107,25 +1107,6 @@ analytics.estimatedMinutesWatched,
       });
     }
 
-
-// =========================
-// 🎯 POSITION WEIGHT
-// =========================
-
-const positionWeight = index => {
-
-    if(index === 0) return 1.00;
-    if(index === 1) return 0.95;
-    if(index === 2) return 0.90;
-    if(index === 3) return 0.85;
-    if(index === 4) return 0.80;
-    if(index <= 9) return 0.70;
-    if(index <= 14) return 0.55;
-
-    return 0.40;
-};
-
-
     // =========================
     // 📈 MÉTRICAS SEO
     // =========================
@@ -1134,45 +1115,19 @@ const positionWeight = index => {
       Number(a.statistics.viewCount || 0)
     );
 
-    const weightedViews =
+    const totalViews = items.reduce((acc, v) =>
+      acc + Number(v.statistics?.viewCount || 0), 0
+    );
 
-items.reduce((acc, video, index) => {
-
-    return acc +
-
-        Number(video.statistics?.viewCount || 0)
-
-        *
-
-        positionWeight(index);
-
-},0);
-
-const totalWeight =
-
-items.reduce(
-
-    (acc, _, index)=>
-
-        acc + positionWeight(index),
-
-    0
-
-);
-
-const avgViews =
-
-weightedViews /
-
-Math.max(totalWeight,1);
+    const avgViews =
+  totalViews /
+  Math.max(items.length, 1);
 
     const top = Number(items[0]?.statistics?.viewCount || 0);
 const median =
   Number(
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
-
-
 
 
 // =========================
@@ -1345,33 +1300,28 @@ dominanceScore
 
 const averageAgeDays = Math.round(
 
-items.reduce((acc, video, index) => {
+    items.reduce((acc, video) => {
 
-    const published =
+        const published =
+            new Date(
+                video.snippet?.publishedAt
+            ).getTime();
 
-        new Date(
+        const age =
 
-            video.snippet?.publishedAt
+            (Date.now() - published)
 
-        ).getTime();
+            /
 
-    const age =
+            86400000;
 
-        (Date.now()-published)
+        return acc + age;
 
-        /86400000;
+    }, 0)
 
-    return acc +
+    /
 
-        age *
-
-        positionWeight(index);
-
-},0)
-
-/
-
-Math.max(totalWeight,1)
+    Math.max(items.length, 1)
 
 );
 
@@ -1399,29 +1349,29 @@ const viewsPerDayList = items.map(video => {
 
 });
 
-const weightedViewsPerDay =
+const averageViewsPerDay = Math.round(
 
-viewsPerDayList.reduce(
+    viewsPerDayList.reduce(
+        (a, b) => a + b,
+        0
+    ) /
 
-    (acc,value,index)=>
-
-        acc +
-
-        value *
-
-        positionWeight(index),
-
-0);
-
-const averageViewsPerDay =
-
-Math.round(
-
-weightedViewsPerDay /
-
-Math.max(totalWeight,1)
+    Math.max(
+        viewsPerDayList.length,
+        1
+    )
 
 );
+
+const maxViewsPerDay = Math.round(
+
+    Math.max(
+        ...viewsPerDayList,
+        0
+    )
+
+);
+
 
 // =========================
 // 📊 SCORE DE VIEWS/DIA

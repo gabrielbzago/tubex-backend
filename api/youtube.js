@@ -1583,9 +1583,17 @@ for (let i = 0; i < channelIds.length; i += 50) {
 
 }
 
+const topChannels = channels
+    .sort(
+        (a, b) =>
+            Number(b.statistics?.subscriberCount || 0) -
+            Number(a.statistics?.subscriberCount || 0)
+    )
+    .slice(0, 10);
+
 const avgSubscribers = Math.round(
 
-    channels.reduce(
+    topChannels.reduce(
 
         (acc, c) =>
 
@@ -1605,31 +1613,70 @@ const avgSubscribers = Math.round(
 
     Math.max(
 
-        channels.length,
+        topChannels.length,
 
         1
 
     )
 
 );
-
 // Score 0~100
 
-const authorityDifficulty = Math.min(
+let authorityDifficulty = 0;
 
-    100,
+if (avgSubscribers >= 5000000) {
 
-    Math.round(
+    authorityDifficulty = 100;
 
-        Math.log10(
+}
 
-            avgSubscribers + 1
+else if (avgSubscribers >= 2000000) {
 
-        ) * 16
+    authorityDifficulty = 95;
 
-    )
+}
 
-);
+else if (avgSubscribers >= 1000000) {
+
+    authorityDifficulty = 90;
+
+}
+
+else if (avgSubscribers >= 500000) {
+
+    authorityDifficulty = 80;
+
+}
+
+else if (avgSubscribers >= 200000) {
+
+    authorityDifficulty = 70;
+
+}
+
+else if (avgSubscribers >= 100000) {
+
+    authorityDifficulty = 60;
+
+}
+
+else if (avgSubscribers >= 50000) {
+
+    authorityDifficulty = 45;
+
+}
+
+else if (avgSubscribers >= 10000) {
+
+    authorityDifficulty = 30;
+
+}
+
+else {
+
+    authorityDifficulty = 15;
+
+}
 
  // =========================
 // 🚀 TUBEX COMPETITION V3
@@ -1677,42 +1724,44 @@ const keywordDifficulty =
 
 // SERP muito concentrada
 
-const dominanceDifficulty = Math.round(
+const dominanceRatio =
+    top / Math.max(median, 1);
 
-    Math.min(
+let dominanceDifficulty = 15;
 
-        100,
+if (dominanceRatio >= 100)
+    dominanceDifficulty = 100;
 
-        Math.log10(
+else if (dominanceRatio >= 50)
+    dominanceDifficulty = 90;
 
-            top /
+else if (dominanceRatio >= 20)
+    dominanceDifficulty = 75;
 
-            (median || 1)
+else if (dominanceRatio >= 10)
+    dominanceDifficulty = 60;
 
-            + 1
+else if (dominanceRatio >= 5)
+    dominanceDifficulty = 40;
 
-        ) * 30
-
-    )
-
-);
+else if (dominanceRatio >= 2)
+    dominanceDifficulty = 25;
 
 const competition = Math.round(
 
-      authorityDifficulty * 0.35
+      authorityDifficulty * 0.40
 
-    + velocityDifficulty * 0.20
+    + velocityDifficulty * 0.10
 
-    + strengthDifficulty * 0.20
+    + strengthDifficulty * 0.10
 
-    + keywordDifficulty * 0.10
+    + keywordDifficulty * 0.20
 
-    + dominanceDifficulty * 0.05
+    + dominanceDifficulty * 0.15
 
-    + (100 - relevanceScore) * 0.10
+    + (100 - relevanceScore) * 0.05
 
 );
-
 
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE

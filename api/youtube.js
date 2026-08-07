@@ -1735,23 +1735,16 @@ finalVolume = Math.max(
 );
 
 
-    const dominance = top / (median || 1);
-  const competition = Math.round(
+const dominance = top / (median || 1);
 
+const rawCompetition = Math.round(
     Math.max(
-
         5,
-
         Math.min(
-
             100,
-
             Math.log10(dominance + 1) * 30
-
         )
-
     )
-
 );
 
 
@@ -2284,8 +2277,7 @@ const maxViewsScore =
 // Score da concorrência
 
 const competitionBase =
-
-    competition * 0.30;
+    rawCompetition * 0.30;
 
 // =========================
 // IDADE DOS VÍDEOS
@@ -2337,12 +2329,10 @@ competitionScore
 
 );
 
+
 const competition = Math.max(
-
     5,
-
     100 - finalCompetition
-
 );
 
 // =========================

@@ -2497,13 +2497,33 @@ const authorityWeight =
 
     authorityScore * 0.30;
 
-// --------------------------------
+// =========================
 // DOMINÂNCIA DA SERP
-// --------------------------------
+// =========================
 
-const dominanceWeight =
+const channelShare =
 
-    dominanceScore * 0.20;
+    maxOccurrences /
+
+    Math.max(items.length, 1);
+
+const dominanceScore = Math.round(
+
+    Math.min(
+
+        100,
+
+        (
+
+            channelShare * 70 +
+
+            (repeatedChannels / Math.max(items.length,1)) * 30
+
+        ) * 100
+
+    )
+
+);
 
 // --------------------------------
 // CONSISTÊNCIA DOS RESULTADOS

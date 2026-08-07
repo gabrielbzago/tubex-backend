@@ -185,11 +185,53 @@ for (const key of shuffledKeys) {
         v?.snippet?.title || ""
       ).toLowerCase();
 
-    // remove shorts
-    if(title.includes("#shorts")){
-      return false;
-    }
+// =========================
+// REMOVE CONTEÚDO RUIM
+// =========================
 
+const blockedWords = [
+
+    "#shorts",
+
+    "shorts",
+
+    "podcast",
+
+    "podcasts",
+
+    "live",
+
+    "ao vivo",
+
+    "trailer",
+
+    "teaser",
+
+    "highlight",
+
+    "highlights",
+
+    "clip",
+
+    "clips"
+
+];
+
+if(
+
+    blockedWords.some(
+
+        word => title.includes(word)
+
+    )
+
+){
+
+    return false;
+
+}
+
+ 
     const videoViews =
       Number(
         v?.statistics?.viewCount || 0

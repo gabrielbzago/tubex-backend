@@ -1286,19 +1286,6 @@ items.forEach(video => {
 
 });
 
-const dominanceIndex =
-
-    Math.round(
-
-        (
-
-            maxOccurrences /
-
-            Math.max(items.length,1)
-
-        ) * 100
-
-    );
 
 const repeatedChannels =
 
@@ -1317,6 +1304,20 @@ Math.max(
 1
 
 );
+
+const dominanceIndex =
+
+    Math.round(
+
+        (
+
+            maxOccurrences /
+
+            Math.max(items.length,1)
+
+        ) * 100
+
+    );
 
 const dominanceScore = Math.min(
 

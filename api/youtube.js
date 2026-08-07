@@ -1115,6 +1115,9 @@ analytics.estimatedMinutesWatched,
       Number(a.statistics.viewCount || 0)
     );
 
+// Mantém somente os 50 vídeos mais fortes
+items = items.slice(0, 50);
+
     const totalViews = items.reduce((acc, v) =>
       acc + Number(v.statistics?.viewCount || 0), 0
     );

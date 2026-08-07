@@ -2234,6 +2234,110 @@ items.length
   )
 : 0;
 
+
+// =========================
+// 📊 SERP CONSISTENCY
+// =========================
+
+const sortedViews =
+
+items
+
+.map(v =>
+
+    Number(
+
+        v.statistics?.viewCount || 0
+
+    )
+
+)
+
+.sort((a,b)=>b-a);
+
+let variation = 0;
+
+for(
+
+    let i=1;
+
+    i<sortedViews.length;
+
+    i++
+
+){
+
+    variation +=
+
+        Math.abs(
+
+            sortedViews[i-1]
+
+            -
+
+            sortedViews[i]
+
+        );
+
+}
+
+const averageVariation =
+
+variation /
+
+Math.max(
+
+    sortedViews.length-1,
+
+    1
+
+);
+
+const consistencyRatio =
+
+1 -
+
+(
+
+averageVariation /
+
+Math.max(
+
+    top,
+
+    1
+
+)
+
+);
+
+const consistencyScore =
+
+Math.max(
+
+    0,
+
+    Math.min(
+
+        100,
+
+        Math.round(
+
+            consistencyRatio*100
+
+        )
+
+    )
+
+);
+
+console.log({
+
+    consistencyScore
+
+});
+
+
 // =========================
 // 🚀 TUBEX COMPETITION SCORE
 // =========================
@@ -2309,9 +2413,11 @@ competitionBase +
 
 ageScore +
 
-authorityScore * 0.30 +
+authorityScore * 0.25 +
 
-dominanceScore * 0.35
+dominanceScore * 0.25 +
+
+consistencyScore * 0.20
 
 );
 
@@ -2362,7 +2468,7 @@ opportunityScore,
 
     averageAgeDays,
 exactTitleMatches,
-
+consistencyScore,
     averageViewsPerDay,
 strongVideos,
 
@@ -2414,7 +2520,7 @@ freshScore,
     maxViewsPerDay,
 exactTitleMatches,
     strongVideos,
-
+consistencyScore,
 weakVideos,
 opportunityScore,
 

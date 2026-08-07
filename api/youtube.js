@@ -2105,7 +2105,7 @@ const youtubeMetrics = {
     averageViews,
 
 keywordScore,
-
+relevanceScore,
     averageAgeDays,
 
     averageViewsPerDay,
@@ -2150,7 +2150,7 @@ youtubeMetrics,
 
     maxViewsPerDay,
 strongVideos,
-
+relevanceScore,
     averageLikes,
 
     averageComments,

@@ -1674,10 +1674,9 @@ switch(keywordWords.length){
         competitionMarketDifficulty = 100;
         break;
 
-    case 2:
-
-        competitionMarketDifficulty * 0.50
-        break;
+   case 2:
+    competitionMarketDifficulty = 85;
+    break;
 
     case 3:
 
@@ -1702,30 +1701,58 @@ switch(keywordWords.length){
 
 
 // -------------------------
+// Dificuldade natural
+// -------------------------
+
+let competitionMarketDifficulty = 0;
+
+switch (keywordWords.length) {
+
+    case 1:
+        competitionMarketDifficulty = 100;
+        break;
+
+    case 2:
+        competitionMarketDifficulty = 85;
+        break;
+
+    case 3:
+        competitionMarketDifficulty = 65;
+        break;
+
+    case 4:
+        competitionMarketDifficulty = 45;
+        break;
+
+    case 5:
+        competitionMarketDifficulty = 30;
+        break;
+
+    default:
+        competitionMarketDifficulty = 15;
+        break;
+
+}
+
+// -------------------------
 // Vídeos recentes
 // -------------------------
 
-const freshnessDifficulty =
+const freshnessDifficulty = Math.round(
 
-    Math.round(
+    (recentVideos / Math.max(items.length, 1)) * 100
 
-        (recentVideos / items.length) * 100
-
-    );
-
+);
 
 // -------------------------
 // Cobertura dos títulos
 // -------------------------
 
-const coverageDifficulty =
+const coverageDifficulty = Math.round(
 
-    Math.round(
+    titleCoverage * 100
 
-        titleCoverage * 100
-
-    );
-
+);
 
 // -------------------------
 // Competição Final
@@ -1733,26 +1760,34 @@ const coverageDifficulty =
 
 const competition = Math.round(
 
-      marketDifficulty * 0.50
+      competitionMarketDifficulty * 0.50
     + coverageDifficulty * 0.35
     + freshnessDifficulty * 0.15
 
 );
 
+// Garante faixa válida
 
-// garante faixa
+const finalCompetition = Math.max(
 
-const finalCompetition =
+    5,
 
-    Math.max(
-        5,
-        Math.min(100, competition)
-    );
+    Math.min(
 
+        100,
 
-// detalhes
+        competition
 
-competitionDetails = {
+    )
+
+);
+
+// -------------------------
+// Detalhes
+// -------------------------
+
+const competitionDetails = {
+
     marketDifficulty: competitionMarketDifficulty,
 
     coverageDifficulty,

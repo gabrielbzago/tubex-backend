@@ -124,7 +124,7 @@ for (const key of shuffledKeys) {
         let allIds = [];
         let nextPageToken = "";
         let pageCount = 0;
-
+let totalResults = 0;
         let maxPages = 2;
         if (body?.plan === "free") maxPages = 1;
         if (body?.plan === "pro") maxPages = 3;
@@ -145,7 +145,13 @@ for (const key of shuffledKeys) {
           }
 
           const searchJson = await searchRes.json();
+if (pageCount === 0) {
 
+    totalResults = Number(
+        searchJson.pageInfo?.totalResults || 0
+    );
+
+}
           const ids = searchJson.items
             ?.map(v => v.id?.videoId)
             .filter(Boolean) || [];
@@ -1369,6 +1375,24 @@ else{
 
 }
 
+
+// =========================
+// TOTAL RESULTS SCORE
+// =========================
+
+const totalResultsScore = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(totalResults + 1) * 12
+
+    )
+
+);
+
+
 // =========================
 // 🎯 RELEVANCE SCORE
 // Quanto os títulos realmente respondem à busca
@@ -1506,6 +1530,7 @@ else{
 // Muitos vídeos realmente relevantes
 
 demandScore += relevanceScore * 0.25;
+demandScore += totalResultsScore * 0.20;
 
 // Vídeos extremamente fortes
 
@@ -1718,12 +1743,12 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-
 const competition = Math.round(
 
-      competitionMarketDifficulty * 0.50
-    + coverageDifficulty * 0.35
-    + freshnessDifficulty * 0.15
+      competitionMarketDifficulty * 0.40
+    + coverageDifficulty * 0.25
+    + freshnessDifficulty * 0.10
+    + totalResultsScore * 0.25
 
 );
 

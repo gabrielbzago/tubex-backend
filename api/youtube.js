@@ -1335,30 +1335,46 @@ keywordScore = Math.max(
     )
 );
 
-const keywordLength =
-    keywordWords.length;
 
-let keywordDifficulty = 0;
+// =========================
+// MARKET SIZE
+// =========================
 
-if(keywordLength === 1){
+let marketDifficulty = 0;
 
-    keywordDifficulty = 100;
+if(keywordWordCount === 1){
 
-}else if(keywordLength === 2){
+    marketDifficulty = 100;
 
-    keywordDifficulty = 80;
+}
 
-}else if(keywordLength === 3){
+else if(keywordWordCount === 2){
 
-    keywordDifficulty = 60;
+    marketDifficulty = 85;
 
-}else if(keywordLength === 4){
+}
 
-    keywordDifficulty = 40;
+else if(keywordWordCount === 3){
 
-}else{
+    marketDifficulty = 65;
 
-    keywordDifficulty = 20;
+}
+
+else if(keywordWordCount === 4){
+
+    marketDifficulty = 45;
+
+}
+
+else if(keywordWordCount === 5){
+
+    marketDifficulty = 30;
+
+}
+
+else{
+
+    marketDifficulty = 15;
 
 }
 
@@ -1732,23 +1748,14 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-
-const serpDifficulty = Math.round(
-
-      competitionMarketDifficulty * 0.40
-    + coverageDifficulty * 0.30
-    + freshnessDifficulty * 0.15
-    + viewsPerDayScore * 0.15
-
-);
 const competition = Math.round(
 
-    serpDifficulty * 0.60 +
-
-    keywordDifficulty * 0.40
+      competitionMarketDifficulty * 0.45
+    + (100 - coverageDifficulty) * 0.30
+    + (100 - freshnessDifficulty) * 0.10
+    + (100 - totalResultsScore) * 0.15
 
 );
-
 // Garante faixa válida
 
 const finalCompetition = Math.max(
@@ -2313,9 +2320,7 @@ const maxViewsScore =
 // Score da concorrência
 
 const competitionBase =
-
-    competition * 0.30;
-
+    finalCompetition * 0.30;
 // =========================
 // IDADE DOS VÍDEOS
 // =========================
@@ -2350,11 +2355,11 @@ ageScore
 // =========================
 // 📦 RESPONSE
 // =========================
-
 const trend = generateEstimatedTrend(
     finalVolume,
-    competition
+    finalCompetition
 );
+
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================

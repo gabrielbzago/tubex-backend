@@ -1586,12 +1586,7 @@ const finalVolume = Math.max(
 // MATCH DA KEYWORD
 // =========================
 
-const normalizedKeyword =
-    keyword.toLowerCase().trim();
-
-const keywordWords =
-    normalizedKeyword.split(/\s+/);
-
+// reutiliza normalizedKeyword já criado acima
 let exactMatches = 0;
 let partialMatches = 0;
 let recentVideos = 0;

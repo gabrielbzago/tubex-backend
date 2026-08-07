@@ -1667,45 +1667,6 @@ const titleCoverage =
 
 let competitionMarketDifficulty = 0;
 
-switch(keywordWords.length){
-
-    case 1:
-
-        competitionMarketDifficulty = 100;
-        break;
-
-   case 2:
-    competitionMarketDifficulty = 85;
-    break;
-
-    case 3:
-
-        marketDifficulty = 65;
-        break;
-
-    case 4:
-
-        marketDifficulty = 45;
-        break;
-
-    case 5:
-
-        marketDifficulty = 30;
-        break;
-
-    default:
-
-        marketDifficulty = 15;
-
-}
-
-
-// -------------------------
-// Dificuldade natural
-// -------------------------
-
-let competitionMarketDifficulty = 0;
-
 switch (keywordWords.length) {
 
     case 1:

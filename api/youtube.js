@@ -107,9 +107,12 @@ if(
       .map(k => k.trim())
       .filter(Boolean);
 
-    let items = [];
-    let success = false;
+let items = [];
+let success = false;
 let activeKey = keys[0] || null;
+
+// NOVO
+let totalResults = 0;
 
     // =========================
     // 🔁 MULTI KEY FETCH
@@ -124,7 +127,7 @@ for (const key of shuffledKeys) {
         let allIds = [];
         let nextPageToken = "";
         let pageCount = 0;
-let totalResults = 0;
+
         let maxPages = 2;
         if (body?.plan === "free") maxPages = 1;
         if (body?.plan === "pro") maxPages = 3;

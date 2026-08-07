@@ -253,14 +253,25 @@ console.log(filtered.length);
     // =========================
     // 🚫 FALHA TOTAL
     // =========================
-    if (!success) {
-      return res.status(200).json({
-        success: true,
-        items: [],
-        volume: 0,
-        competition: 0
-      });
-    }
+  if (!success) {
+
+    return res.status(200).json({
+
+        success: false,
+
+        stage: "SEARCH",
+
+        totalItems: items.length,
+
+        activeKey,
+
+        totalResults,
+
+        items
+
+    });
+
+}
 
 // =========================
 // 🎬 VIDEO DATA

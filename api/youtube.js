@@ -1335,6 +1335,32 @@ keywordScore = Math.max(
     )
 );
 
+const keywordLength =
+    keywordWords.length;
+
+let keywordDifficulty = 0;
+
+if(keywordLength === 1){
+
+    keywordDifficulty = 100;
+
+}else if(keywordLength === 2){
+
+    keywordDifficulty = 80;
+
+}else if(keywordLength === 3){
+
+    keywordDifficulty = 60;
+
+}else if(keywordLength === 4){
+
+    keywordDifficulty = 40;
+
+}else{
+
+    keywordDifficulty = 20;
+
+}
 
 // =========================
 // MARKET SIZE
@@ -1748,14 +1774,23 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-const competition = Math.round(
+const serpDifficulty = Math.round(
 
-      competitionMarketDifficulty * 0.45
-    + (100 - coverageDifficulty) * 0.30
-    + (100 - freshnessDifficulty) * 0.10
-    + (100 - totalResultsScore) * 0.15
+      marketDifficulty * 0.40
+    + coverageDifficulty * 0.30
+    + freshnessDifficulty * 0.15
+    + velocityDifficulty * 0.15
 
 );
+
+const competition = Math.round(
+
+    serpDifficulty * 0.60 +
+
+    keywordDifficulty * 0.40
+
+);
+
 // Garante faixa válida
 
 const finalCompetition = Math.max(

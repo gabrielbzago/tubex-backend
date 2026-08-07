@@ -148,6 +148,16 @@ for (const key of shuffledKeys) {
           }
 
           const searchJson = await searchRes.json();
+
+console.log("SEARCH JSON");
+console.log(searchJson);
+
+console.log("TOTAL RESULTS:", searchJson.pageInfo?.totalResults);
+
+console.log("ITENS:", searchJson.items?.length);
+
+console.log(searchJson.items);
+
 if (pageCount === 0) {
 
     totalResults = Number(
@@ -217,6 +227,8 @@ if (pageCount === 0) {
     return true;
 
   });
+console.log("VIDEOS API:", jsonVideos.items?.length);
+console.log(filtered.length);
 
   items.push(...filtered);
 
@@ -1683,13 +1695,13 @@ function generateEstimatedTrend(volume, competition){
     // MÉDIA DE PESQUISAS/DIA
     // ======================================
 
-    const average = Math.round(
+  const average = Math.round(
 
-        400 +
+    400 +
 
-        Math.pow(volume, 1.35) * 18
+    volume * 8
 
-    );
+);
 
     // ======================================
     // DIREÇÃO DA CURVA

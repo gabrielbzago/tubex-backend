@@ -1690,35 +1690,37 @@ const titleCoverage =
 
 
 // -------------------------
-// Dificuldade natural
+// Facilidade natural
+// 100 = muito fácil
+// 0 = muito difícil
 // -------------------------
 
-let competitionMarketDifficulty = 0;
+let competitionMarketDifficulty = 100;
 
-switch (keywordWords.length) {
+switch (keywordWords.length){
 
     case 1:
-        competitionMarketDifficulty = 100;
+        competitionMarketDifficulty = 5;
         break;
 
     case 2:
-        competitionMarketDifficulty = 85;
+        competitionMarketDifficulty = 20;
         break;
 
     case 3:
-        competitionMarketDifficulty = 65;
+        competitionMarketDifficulty = 40;
         break;
 
     case 4:
-        competitionMarketDifficulty = 45;
+        competitionMarketDifficulty = 60;
         break;
 
     case 5:
-        competitionMarketDifficulty = 30;
+        competitionMarketDifficulty = 80;
         break;
 
     default:
-        competitionMarketDifficulty = 15;
+        competitionMarketDifficulty = 95;
         break;
 
 }
@@ -1746,20 +1748,14 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-const competition = Math.max(
+const competition = Math.round(
 
-    competitionMarketDifficulty,
-
-    Math.round(
-
-          coverageDifficulty * 0.40
-        + freshnessDifficulty * 0.20
-        + totalResultsScore * 0.40
-
-    )
+      competitionMarketDifficulty * 0.45
+    + (100 - coverageDifficulty) * 0.30
+    + (100 - freshnessDifficulty) * 0.10
+    + (100 - totalResultsScore) * 0.15
 
 );
-
 // Garante faixa válida
 
 const finalCompetition = Math.max(

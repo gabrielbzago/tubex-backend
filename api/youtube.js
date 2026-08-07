@@ -2467,7 +2467,7 @@ console.log({
 });
 
 // =========================
-// 🚀 TUBEX COMPETITION ENGINE
+// 🚀 TUBEX COMPETITION SCORE v2
 // 100 = Muito fácil competir
 // 0 = Muito difícil competir
 // =========================
@@ -2478,43 +2478,23 @@ console.log({
 
 const authorityWeight =
 
-    authorityScore * 0.20;
+    authorityScore * 0.30;
 
 // --------------------------------
-// MÉDIA DE VIEWS DA SERP
+// DOMINÂNCIA DA SERP
 // --------------------------------
 
-const averageViewsWeight =
+const dominanceWeight =
 
-    Math.min(
-
-        100,
-
-        Math.log10(averageViews + 1) * 12
-
-    ) * 0.25;
+    dominanceScore * 0.20;
 
 // --------------------------------
-// MAIOR VÍDEO DA BUSCA
+// CONSISTÊNCIA DOS RESULTADOS
 // --------------------------------
 
-const maxViewsWeight =
+const intentWeight =
 
-    Math.min(
-
-        100,
-
-        Math.log10(maxViews + 1) * 11
-
-    ) * 0.15;
-
-// --------------------------------
-// QUANTIDADE DE VÍDEOS FORTES
-// --------------------------------
-
-const strongVideosWeight =
-
-    strongVideosScore * 0.15;
+    consistencyScore * 0.15;
 
 // --------------------------------
 // VELOCIDADE DE CRESCIMENTO
@@ -2525,73 +2505,57 @@ const speedWeight =
     viewsPerDayScore * 0.15;
 
 // --------------------------------
-// DOMINÂNCIA DA SERP
+// CONCORRÊNCIA BRUTA
 // --------------------------------
 
-const dominanceWeight =
+const rawWeight =
 
-    dominanceScore * 0.10;
+    rawCompetition * 0.20;
 
 // --------------------------------
-// CONSISTÊNCIA DA INTENÇÃO
+// SCORE FINAL DA SERP
 // --------------------------------
 
-const intentWeight =
-
-    consistencyScore * 0.05;
-
-// ====================================
-// FORÇA TOTAL DA SERP
-// ====================================
-
-const serpPower = Math.round(
+const competitionScore = Math.round(
 
       authorityWeight
-    + averageViewsWeight
-    + maxViewsWeight
-    + strongVideosWeight
-    + speedWeight
+
     + dominanceWeight
+
     + intentWeight
+
+    + speedWeight
+
+    + rawWeight
 
 );
 
-// ====================================
+// --------------------------------
 // LIMITES
-// ====================================
+// --------------------------------
 
-const finalCompetition =
+const finalCompetition = Math.max(
 
-    Math.max(
+    5,
 
-        5,
+    Math.min(
 
-        Math.min(
+        100,
 
-            100,
+        competitionScore
 
-            serpPower
+    )
 
-        )
+);
 
-    );
-
-// ====================================
+// --------------------------------
 // RESULTADO FINAL
 // 100 = Muito fácil competir
-// 0 = Muito difícil competir
-// ====================================
+// --------------------------------
 
 const competition =
 
-    Math.max(
-
-        5,
-
-        100 - finalCompetition
-
-    );
-
+    100 - finalCompetition;
 // =========================
 // 📦 RESPONSE
 // =========================

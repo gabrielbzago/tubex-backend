@@ -2467,94 +2467,81 @@ console.log({
 });
 
 // =========================
-// 🚀 TUBEX COMPETITION SCORE v2
-// 100 = SERP MUITO FÁCIL
-// 0 = SERP MUITO DIFÍCIL
+// =========================
+// 🚀 SERP POWER ENGINE
 // =========================
 
-// --------------------------------
-// AUTORIDADE DOS CANAIS
-// --------------------------------
-
+// Autoridade dos canais
 const authorityWeight =
+    authorityScore * 0.20;
 
-    authorityScore * 0.35;
+// Média de views da SERP
+const averageViewsWeight =
+    Math.min(
+        100,
+        Math.log10(averageViews + 1) * 12
+    ) * 0.25;
 
-// --------------------------------
-// DOMINÂNCIA DA SERP
-// Poucos canais dominando = difícil
-// --------------------------------
+// Vídeo mais forte
+const maxViewsWeight =
+    Math.min(
+        100,
+        Math.log10(maxViews + 1) * 11
+    ) * 0.15;
 
-const dominanceWeight =
+// Quantidade de vídeos fortes
+const strongVideosWeight =
+    strongVideosScore * 0.15;
 
-    dominanceScore * 0.25;
-
-// --------------------------------
-// CONSISTÊNCIA DA INTENÇÃO
-// Todos fazem exatamente o mesmo vídeo
-// --------------------------------
-
-const intentWeight =
-
-    consistencyScore * 0.20;
-
-// --------------------------------
-// VELOCIDADE DE CRESCIMENTO
-// Vídeos ganhando views rapidamente
-// --------------------------------
-
+// Velocidade média
 const speedWeight =
+    viewsPerDayScore * 0.15;
 
-    viewsPerDayScore * 0.20;
+// Domínio da SERP
+const dominanceWeight =
+    dominanceScore * 0.10;
 
-// --------------------------------
-// SCORE FINAL DE DIFICULDADE
-// --------------------------------
+// Consistência da intenção
+const intentWeight =
+    consistencyScore * 0.05;
 
-const competitionScore = Math.round(
+// ----------------------------
+// FORÇA TOTAL DA SERP
+// ----------------------------
 
-    authorityWeight +
+const serpPower = Math.round(
 
-    dominanceWeight +
-
-    intentWeight +
-
-    speedWeight
+      authorityWeight
+    + averageViewsWeight
+    + maxViewsWeight
+    + strongVideosWeight
+    + speedWeight
+    + dominanceWeight
+    + intentWeight
 
 );
 
-// --------------------------------
-// LIMITES
-// --------------------------------
+// ----------------------------
+// Limites
+// ----------------------------
 
 const finalCompetition = Math.max(
-
     5,
-
     Math.min(
-
         100,
-
-        competitionScore
-
+        serpPower
     )
-
 );
 
-// --------------------------------
-// INVERTE
-// 100 = Fácil competir
-// --------------------------------
+// ----------------------------
+// Inverte
+// 100 = Muito Fácil
+// 0 = Muito Difícil
+// ----------------------------
 
-const competition = Math.max(
+const competition =
+    100 - finalCompetition;
 
-    5,
-
-    100 -
-
-    finalCompetition
-
-);
 // =========================
 // 📦 RESPONSE
 // =========================

@@ -2467,47 +2467,82 @@ console.log({
 });
 
 // =========================
-// =========================
-// 🚀 SERP POWER ENGINE
+// 🚀 TUBEX COMPETITION ENGINE
+// 100 = Muito fácil competir
+// 0 = Muito difícil competir
 // =========================
 
-// Autoridade dos canais
+// --------------------------------
+// AUTORIDADE DOS CANAIS
+// --------------------------------
+
 const authorityWeight =
+
     authorityScore * 0.20;
 
-// Média de views da SERP
+// --------------------------------
+// MÉDIA DE VIEWS DA SERP
+// --------------------------------
+
 const averageViewsWeight =
+
     Math.min(
+
         100,
+
         Math.log10(averageViews + 1) * 12
+
     ) * 0.25;
 
-// Vídeo mais forte
+// --------------------------------
+// MAIOR VÍDEO DA BUSCA
+// --------------------------------
+
 const maxViewsWeight =
+
     Math.min(
+
         100,
+
         Math.log10(maxViews + 1) * 11
+
     ) * 0.15;
 
-// Quantidade de vídeos fortes
+// --------------------------------
+// QUANTIDADE DE VÍDEOS FORTES
+// --------------------------------
+
 const strongVideosWeight =
+
     strongVideosScore * 0.15;
 
-// Velocidade média
+// --------------------------------
+// VELOCIDADE DE CRESCIMENTO
+// --------------------------------
+
 const speedWeight =
+
     viewsPerDayScore * 0.15;
 
-// Domínio da SERP
+// --------------------------------
+// DOMINÂNCIA DA SERP
+// --------------------------------
+
 const dominanceWeight =
+
     dominanceScore * 0.10;
 
-// Consistência da intenção
+// --------------------------------
+// CONSISTÊNCIA DA INTENÇÃO
+// --------------------------------
+
 const intentWeight =
+
     consistencyScore * 0.05;
 
-// ----------------------------
+// ====================================
 // FORÇA TOTAL DA SERP
-// ----------------------------
+// ====================================
 
 const serpPower = Math.round(
 
@@ -2521,26 +2556,41 @@ const serpPower = Math.round(
 
 );
 
-// ----------------------------
-// Limites
-// ----------------------------
+// ====================================
+// LIMITES
+// ====================================
 
-const finalCompetition = Math.max(
-    5,
-    Math.min(
-        100,
-        serpPower
-    )
-);
+const finalCompetition =
 
-// ----------------------------
-// Inverte
-// 100 = Muito Fácil
-// 0 = Muito Difícil
-// ----------------------------
+    Math.max(
+
+        5,
+
+        Math.min(
+
+            100,
+
+            serpPower
+
+        )
+
+    );
+
+// ====================================
+// RESULTADO FINAL
+// 100 = Muito fácil competir
+// 0 = Muito difícil competir
+// ====================================
 
 const competition =
-    100 - finalCompetition;
+
+    Math.max(
+
+        5,
+
+        100 - finalCompetition
+
+    );
 
 // =========================
 // 📦 RESPONSE

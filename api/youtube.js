@@ -2337,6 +2337,70 @@ console.log({
 
 });
 
+// =========================
+// 💪 SERP POWER INDEX
+// =========================
+
+const serpPowerList =
+
+items.map(video => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    const published =
+        new Date(
+            video.snippet?.publishedAt
+        ).getTime();
+
+    const ageDays =
+        Math.max(
+            1,
+            (Date.now() - published) / 86400000
+        );
+
+    const viewsPerDay =
+        views / ageDays;
+
+    return (
+
+        Math.log10(views + 1) * 0.45 +
+
+        Math.log10(viewsPerDay + 1) * 0.55
+
+    );
+
+});
+
+const serpPower =
+
+Math.round(
+
+    serpPowerList.reduce(
+
+        (a,b)=>a+b,
+
+        0
+
+    )
+
+    /
+
+    Math.max(
+
+        serpPowerList.length,
+
+        1
+
+    )
+
+);
+
+console.log({
+
+    serpPower
+
+});
 
 // =========================
 // 🚀 TUBEX COMPETITION SCORE
@@ -2413,11 +2477,13 @@ competitionBase +
 
 ageScore +
 
-authorityScore * 0.25 +
+authorityScore * 0.20 +
 
-dominanceScore * 0.25 +
+dominanceScore * 0.20 +
 
-consistencyScore * 0.20
+consistencyScore * 0.15 +
+
+serpPower * 0.25
 
 );
 
@@ -2471,7 +2537,7 @@ exactTitleMatches,
 consistencyScore,
     averageViewsPerDay,
 strongVideos,
-
+serpPower,
     maxViewsPerDay,
 
     maxViews,
@@ -2523,7 +2589,7 @@ exactTitleMatches,
 consistencyScore,
 weakVideos,
 opportunityScore,
-
+serpPower,
     freshVideos,
 
     freshScore,

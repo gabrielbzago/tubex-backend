@@ -1107,6 +1107,25 @@ analytics.estimatedMinutesWatched,
       });
     }
 
+
+// =========================
+// 🎯 POSITION WEIGHT
+// =========================
+
+const positionWeight = index => {
+
+    if(index === 0) return 1.00;
+    if(index === 1) return 0.95;
+    if(index === 2) return 0.90;
+    if(index === 3) return 0.85;
+    if(index === 4) return 0.80;
+    if(index <= 9) return 0.70;
+    if(index <= 14) return 0.55;
+
+    return 0.40;
+};
+
+
     // =========================
     // 📈 MÉTRICAS SEO
     // =========================
@@ -1153,29 +1172,7 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
-// =========================
-// 🎯 POSITION WEIGHT
-// =========================
 
-const positionWeight = index => {
-
-    if(index === 0) return 1.00;
-
-    if(index === 1) return 0.95;
-
-    if(index === 2) return 0.90;
-
-    if(index === 3) return 0.85;
-
-    if(index === 4) return 0.80;
-
-    if(index <= 9) return 0.70;
-
-    if(index <= 14) return 0.55;
-
-    return 0.40;
-
-};
 
 
 // =========================

@@ -2467,110 +2467,94 @@ console.log({
 });
 
 // =========================
-// 🚀 TUBEX COMPETITION SCORE
+// 🚀 TUBEX COMPETITION SCORE v2
+// 100 = SERP MUITO FÁCIL
+// 0 = SERP MUITO DIFÍCIL
 // =========================
 
-// Score da quantidade de vídeos analisados
+// --------------------------------
+// AUTORIDADE DOS CANAIS
+// --------------------------------
 
-const videoScore =
+const authorityWeight =
 
-    Math.min(
+    authorityScore * 0.35;
 
-        items.length / 50,
+// --------------------------------
+// DOMINÂNCIA DA SERP
+// Poucos canais dominando = difícil
+// --------------------------------
 
-        1
+const dominanceWeight =
 
-    ) * 20;
+    dominanceScore * 0.25;
 
-// Score da média de views
+// --------------------------------
+// CONSISTÊNCIA DA INTENÇÃO
+// Todos fazem exatamente o mesmo vídeo
+// --------------------------------
 
-const averageViewsScore =
+const intentWeight =
 
-    Math.min(
+    consistencyScore * 0.20;
 
-        Math.log10(averageViews + 1) / 8,
+// --------------------------------
+// VELOCIDADE DE CRESCIMENTO
+// Vídeos ganhando views rapidamente
+// --------------------------------
 
-        1
+const speedWeight =
 
-    ) * 30;
+    viewsPerDayScore * 0.20;
 
-// Score do maior vídeo
+// --------------------------------
+// SCORE FINAL DE DIFICULDADE
+// --------------------------------
 
-const maxViewsScore =
+const competitionScore = Math.round(
 
-    Math.min(
+    authorityWeight +
 
-        Math.log10(maxViews + 1) / 8,
+    dominanceWeight +
 
-        1
+    intentWeight +
 
-    ) * 20;
-
-// Score da concorrência
-
-const competitionBase =
-    rawCompetition * 0.30;
-
-// =========================
-// IDADE DOS VÍDEOS
-// =========================
-
-const ageScore =
-
-    Math.min(
-
-        averageAgeDays / 365,
-
-        5
-
-    ) * 6;
-
-// Resultado
-
-const competitionScore =
-
-Math.round(
-
-videoScore +
-
-averageViewsScore +
-
-maxViewsScore +
-
-competitionBase +
-
-ageScore +
-
-authorityScore * 0.20 +
-
-dominanceScore * 0.20 +
-
-consistencyScore * 0.15 +
-
-serpPower * 0.25
+    speedWeight
 
 );
+
+// --------------------------------
+// LIMITES
+// --------------------------------
 
 const finalCompetition = Math.max(
 
-5,
+    5,
 
-Math.min(
+    Math.min(
 
-100,
+        100,
 
-competitionScore
+        competitionScore
 
-)
+    )
 
 );
 
+// --------------------------------
+// INVERTE
+// 100 = Fácil competir
+// --------------------------------
 
 const competition = Math.max(
-    5,
-    100 - finalCompetition
-);
 
+    5,
+
+    100 -
+
+    finalCompetition
+
+);
 // =========================
 // 📦 RESPONSE
 // =========================

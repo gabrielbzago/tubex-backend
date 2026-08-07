@@ -199,11 +199,7 @@ if (pageCount === 0) {
       return false;
     }
 
-    const videoViews =
-      Number(
-        v?.statistics?.viewCount || 0
-      );
-
+    
     const published =
       new Date(
         v?.snippet?.publishedAt
@@ -217,15 +213,7 @@ if (pageCount === 0) {
 
       / (1000 * 60 * 60 * 24);
 
-    // remove vídeo morto
-    if(
-      ageDays > 900
-      &&
-      videoViews < 5000
-    ){
-      return false;
-    }
-
+   
     return true;
 
   });
@@ -1116,27 +1104,7 @@ analytics.estimatedMinutesWatched,
       });
     }
 
-    // =========================
-    // 📈 MÉTRICAS SEO
-    // =========================
-    items.sort((a, b) =>
-      Number(b.statistics.viewCount || 0) -
-      Number(a.statistics.viewCount || 0)
-    );
-
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
-
-    const avgViews =
-  totalViews /
-  Math.max(items.length, 1);
-
-    const top = Number(items[0]?.statistics?.viewCount || 0);
-const median =
-  Number(
-    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-  );
+  
 
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
@@ -1169,125 +1137,9 @@ const averageAgeDays = Math.round(
 
 );
 
-// =========================
-// 🚀 VIEWS POR DIA
-// =========================
-
-const viewsPerDayList = items.map(video => {
-
-    const views =
-        Number(video.statistics?.viewCount || 0);
-
-    const published =
-        new Date(
-            video.snippet?.publishedAt
-        ).getTime();
-
-    const ageDays =
-        Math.max(
-            1,
-            (Date.now() - published) / 86400000
-        );
-
-    return views / ageDays;
-
-});
-
-const averageViewsPerDay = Math.round(
-
-    viewsPerDayList.reduce(
-        (a, b) => a + b,
-        0
-    ) /
-
-    Math.max(
-        viewsPerDayList.length,
-        1
-    )
-
-);
-
-const maxViewsPerDay = Math.round(
-
-    Math.max(
-        ...viewsPerDayList,
-        0
-    )
-
-);
-
-
-// =========================
-// 📊 SCORE DE VIEWS/DIA
-// =========================
-
-const viewsPerDayScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        Math.log10(
-
-            averageViewsPerDay + 1
-
-        ) * 18
-
-    )
-
-);
-
-// =========================
-// 💪 VÍDEOS FORTES
-// =========================
-
-const strongVideos = items.filter(video => {
-
-    const views = Number(
-        video.statistics?.viewCount || 0
-    );
-
-    const published = new Date(
-        video.snippet?.publishedAt
-    ).getTime();
-
-    const ageDays = Math.max(
-        1,
-        (Date.now() - published) / 86400000
-    );
-
-    const viewsPerDay = views / ageDays;
-
-    return (
-        views >= median &&
-        viewsPerDay >= averageViewsPerDay
-    );
-
-}).length;
 
 
 
-// =========================
-// 💪 SCORE DE VÍDEOS FORTES
-// =========================
-
-const strongVideosScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        (
-
-            strongVideos /
-
-            Math.max(items.length, 1)
-
-        ) * 100
-
-    )
-
-);
 
 // =========================
 // 🔍 KEYWORD SCORE
@@ -1524,18 +1376,14 @@ demandScore += totalResultsScore * 0.30;
 demandScore += keywordScore * 0.20;
 
 // ======================================
-// COBERTURA DOS TÍTULOS
-// Muitos títulos contendo exatamente
-// a pesquisa indicam forte intenção.
+// COBERTURA / CONSISTÊNCIA DA SERP
+// Mede quantos resultados apresentam
+// forte relação textual com a pesquisa.
 // ======================================
 
-const coverageScore = Math.round(
+const volumeCoverageScore = relevanceScore;
 
-    titleCoverage * 100
-
-);
-
-demandScore += coverageScore * 0.15;
+demandScore += volumeCoverageScore * 0.15;
 
 // ======================================
 // LIMITE
@@ -1566,6 +1414,8 @@ let finalVolume = Math.max(
     )
 
 );
+
+
 
 
 // =========================
@@ -2085,272 +1935,6 @@ titleTags.forEach(tag => {
 
 });
 
-// =====================================
-// API YOUTUBE COMPLEMENTAR
-// =====================================
-
-items
-
-  .sort((a,b)=>
-
-    Number(b.statistics?.viewCount || 0)
-
-    -
-
-    Number(a.statistics?.viewCount || 0)
-
-  )
-
-  .slice(0,10)
-
-  .forEach(video => {
-
-    const tags =
-      video?.snippet?.tags || [];
-
-    tags.forEach(tag => {
-
-      const normalized =
-        normalizeText(tag);
-
-      // tamanho
-      if(
-        !normalized
-        ||
-        normalized.length < 3
-        ||
-        normalized.length > 80
-      ){
-        return;
-      }
-
-      // relevância contextual
-      const relevance =
-        titleTags.some(titleTag =>
-
-          normalized.includes(titleTag)
-
-          ||
-
-          titleTag.includes(normalized)
-
-        );
-
-      if(!relevance){
-        return;
-      }
-
-      // views
-      const views =
-        Number(
-          video.statistics?.viewCount || 0
-        );
-
-      // peso
-      const weight =
-
-        Math.max(
-          1,
-          Math.log10(views + 1)
-        );
-
-      tagMap.set(
-
-        normalized,
-
-        (tagMap.get(normalized) || 0)
-
-        +
-
-        weight
-
-      );
-
-    });
-
-  });
-
-// =====================================
-// ORDENA
-// =====================================
-
-const rankedTags =
-
-  [...tagMap.entries()]
-
-    .sort((a,b)=>
-
-      b[1] - a[1]
-
-    )
-
-    .slice(0,40)
-
-    .map(([keyword,score]) => ({
-
-      keyword,
-
-      score: Math.min(
-
-        99,
-
-        Math.round(
-          60 + (score * 2)
-        )
-
-      )
-
-    }));
-// =========================
-// 📊 EXTRA METRICS
-// =========================
-
-const averageViews =
-  Math.round(avgViews);
-
-const averageLikes =
-  Math.round(
-
-    items.reduce(
-
-      (acc,v)=>
-
-        acc +
-
-        Number(
-          v.statistics?.likeCount || 0
-        ),
-
-      0
-
-    )
-
-    /
-
-    Math.max(items.length,1)
-
-  );
-
-const averageComments =
-  Math.round(
-
-    items.reduce(
-
-      (acc,v)=>
-
-        acc +
-
-        Number(
-          v.statistics?.commentCount || 0
-        ),
-
-      0
-
-    )
-
-    /
-
-    Math.max(items.length,1)
-
-  );
-
-const maxViews =
-items.length
-? Math.max(
-    ...items.map(v =>
-      Number(
-        v.statistics?.viewCount || 0
-      )
-    )
-  )
-: 0;
-
-const minViews =
-items.length
-? Math.min(
-    ...items.map(v =>
-      Number(
-        v.statistics?.viewCount || 0
-      )
-    )
-  )
-: 0;
-
-// =========================
-// 🚀 TUBEX COMPETITION SCORE
-// =========================
-
-// Score da quantidade de vídeos analisados
-
-const videoScore =
-
-    Math.min(
-
-        items.length / 50,
-
-        1
-
-    ) * 20;
-
-// Score da média de views
-
-const averageViewsScore =
-
-    Math.min(
-
-        Math.log10(averageViews + 1) / 8,
-
-        1
-
-    ) * 30;
-
-// Score do maior vídeo
-
-const maxViewsScore =
-
-    Math.min(
-
-        Math.log10(maxViews + 1) / 8,
-
-        1
-
-    ) * 20;
-
-// Score da concorrência
-
-const competitionBase =
-    finalCompetition * 0.30;
-// =========================
-// IDADE DOS VÍDEOS
-// =========================
-
-const ageScore =
-
-    Math.min(
-
-        averageAgeDays / 365,
-
-        5
-
-    ) * 6;
-
-// Resultado
-
-const competitionScore =
-
-    Math.round(
-
-        videoScore +
-
-averageViewsScore +
-
-maxViewsScore +
-
-competitionBase +
-
-ageScore
-
-    );
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -2359,30 +1943,28 @@ const trend = generateEstimatedTrend(
     finalCompetition
 );
 
+
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================
 
 const youtubeMetrics = {
 
+    // Quantidade de vídeos analisados
     videoCount: items.length,
 
-    averageViews,
+    // Qualidade da SERP
+    keywordScore,
+    relevanceScore,
 
-keywordScore,
-relevanceScore,
+    // Idade média dos vídeos
     averageAgeDays,
 
-    averageViewsPerDay,
-strongVideos,
+    // Mercado
+    totalResults,
 
-    maxViewsPerDay,
-
-    maxViews,
-
-    minViews,
-
-    medianViews: median
+    // Concorrência
+    competitionDetails
 
 };
 
@@ -2392,43 +1974,41 @@ const responseData = {
 
     items,
 
+    // Scores finais
     volume: finalVolume,
 
     competition: finalCompetition,
-competitionDetails,
-competitionScore,
 
-    // Google Trends
+    competitionScore,
+
+    competitionDetails,
+
+    // Google Trends estimado
     interest: 0,
 
-youtubeMetrics,
+    youtubeMetrics,
 
     trend,
 
     tags: rankedTags,
 
-  metrics: {
+    metrics: {
 
-    averageViews,
+        keywordScore,
 
-    averageViewsPerDay,
+        relevanceScore,
 
-    maxViewsPerDay,
-strongVideos,
-relevanceScore,
-    averageLikes,
+        averageAgeDays,
 
-    averageComments,
+        totalResults,
 
-    maxViews,
+        competitionScore
 
-    minViews,
-
-    medianViews: median
-
-}
+    }
 
 };
+
+
 // =========================
 // 💾 CACHE SAVE
 // =========================

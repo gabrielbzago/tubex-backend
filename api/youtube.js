@@ -1580,7 +1580,7 @@ demandScore = Math.min(
 );
 
 
-const volume = Math.round(
+let finalVolume = Math.round(
 
       demandScore * 0.45
 
@@ -1596,66 +1596,7 @@ const volume = Math.round(
 
 );
 
-const finalVolume = Math.max(
 
-    5,
-
-    Math.min(
-
-        100,
-
-        volume
-
-    )
-
-);
-
-// ====================================
-// MERCADO INEXISTENTE
-// ====================================
-
-if (
-    totalResults <= 5 ||
-    items.length <= 2
-){
-
-    finalVolume = 5;
-
-    finalCompetition = 100;
-
-}
-
-else if(
-    totalResults <= 20
-){
-
-    finalVolume = Math.min(
-        finalVolume,
-        15
-    );
-
-    finalCompetition = Math.max(
-        finalCompetition,
-        95
-    );
-
-}
-
-else if(
-    totalResults <= 100
-){
-
-    finalVolume = Math.min(
-        finalVolume,
-        30
-    );
-
-    finalCompetition = Math.max(
-        finalCompetition,
-        85
-    );
-
-}
 
 // =========================
 // 🚀 TUBEX COMPETITION V4
@@ -1801,21 +1742,64 @@ const competition = Math.round(
     + (100 - totalResultsScore) * 0.15
 
 );
-// Garante faixa válida
 
-const finalCompetition = Math.max(
+let finalCompetition =
+    Math.max(
+        5,
+        Math.min(
+            100,
+            competition
+        )
+    );
 
-    5,
 
-    Math.min(
+// ====================================
+// MERCADO INEXISTENTE
+// ====================================
 
-        100,
+if (
+    totalResults <= 5 ||
+    items.length <= 2
+){
 
-        finalCompetition
+    finalVolume = 5;
 
-    )
+    finalCompetition = 100;
 
-);
+}
+
+else if(
+    totalResults <= 20
+){
+
+    finalVolume = Math.min(
+        finalVolume,
+        15
+    );
+
+    finalCompetition = Math.max(
+        finalCompetition,
+        95
+    );
+
+}
+
+else if(
+    totalResults <= 100
+){
+
+    finalVolume = Math.min(
+        finalVolume,
+        30
+    );
+
+    finalCompetition = Math.max(
+        finalCompetition,
+        85
+    );
+
+}
+
 
 // -------------------------
 // Detalhes

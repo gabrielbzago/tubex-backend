@@ -1583,143 +1583,68 @@ const finalVolume = Math.max(
 );
 
 // =========================
-// 👑 CHANNEL AUTHORITY
+// MATCH DA KEYWORD
 // =========================
 
-const channelIds = [
+const normalizedKeyword =
+    keyword.toLowerCase().trim();
 
-    ...new Set(
+const keywordWords =
+    normalizedKeyword.split(/\s+/);
 
-        items.map(v => v.snippet.channelId)
+let exactMatches = 0;
+let partialMatches = 0;
+let recentVideos = 0;
 
-    )
+items.forEach(video=>{
 
-];
+    const title =
+        String(video.snippet?.title || "")
+        .toLowerCase();
 
-let channels = [];
+    const ageDays =
+        (Date.now() -
+        new Date(video.snippet.publishedAt).getTime())
+        /86400000;
 
-for (let i = 0; i < channelIds.length; i += 50) {
+    if(keywordWords.length >= 3){
 
-    const ids = channelIds
+        if(title.startsWith(normalizedKeyword)){
 
-        .slice(i, i + 50)
+            exactMatches += 2;
 
-        .join(",");
+        }
 
-    const response = await fetch(
+        else if(title.includes(normalizedKeyword)){
 
-        `https://www.googleapis.com/youtube/v3/channels` +
+            exactMatches++;
 
-        `?part=statistics&id=${ids}` +
+        }
 
-        `&key=${activeKey}`
+    }
 
-    );
+    else{
 
-    const json = await response.json();
+        const matched =
+            keywordWords.filter(word=>
+                title.includes(word)
+            ).length;
 
-    channels.push(
+        if(matched === keywordWords.length){
 
-        ...(json.items || [])
+            partialMatches++;
 
-    );
+        }
 
-}
+    }
 
-const topChannels = channels
-    .sort(
-        (a, b) =>
-            Number(b.statistics?.subscriberCount || 0) -
-            Number(a.statistics?.subscriberCount || 0)
-    )
-    .slice(0, 10);
+    if(ageDays <= 365){
 
-const avgSubscribers = Math.round(
+        recentVideos++;
 
-    topChannels.reduce(
+    }
 
-        (acc, c) =>
-
-            acc +
-
-            Number(
-
-                c.statistics?.subscriberCount || 0
-
-            ),
-
-        0
-
-    )
-
-    /
-
-    Math.max(
-
-        topChannels.length,
-
-        1
-
-    )
-
-);
-// Score 0~100
-
-let authorityDifficulty = 0;
-
-if (avgSubscribers >= 5000000) {
-
-    authorityDifficulty = 100;
-
-}
-
-else if (avgSubscribers >= 2000000) {
-
-    authorityDifficulty = 95;
-
-}
-
-else if (avgSubscribers >= 1000000) {
-
-    authorityDifficulty = 90;
-
-}
-
-else if (avgSubscribers >= 500000) {
-
-    authorityDifficulty = 80;
-
-}
-
-else if (avgSubscribers >= 200000) {
-
-    authorityDifficulty = 70;
-
-}
-
-else if (avgSubscribers >= 100000) {
-
-    authorityDifficulty = 60;
-
-}
-
-else if (avgSubscribers >= 50000) {
-
-    authorityDifficulty = 45;
-
-}
-
-else if (avgSubscribers >= 10000) {
-
-    authorityDifficulty = 30;
-
-}
-
-else {
-
-    authorityDifficulty = 15;
-
-}
+});
 
  // =========================
 // 🚀 TUBEX COMPETITION V3
@@ -1790,21 +1715,34 @@ else if (dominanceRatio >= 5)
 else if (dominanceRatio >= 2)
     dominanceDifficulty = 25;
 
-const competition = Math.round(
+let competition = 0;
 
-      authorityDifficulty * 0.30
+if(keywordWords.length >= 3){
 
-    + velocityDifficulty * 0.10
+    competition += exactMatches * 4;
 
-    + strengthDifficulty * 0.10
+}else{
 
-    + dominanceDifficulty * 0.15
+    competition += partialMatches * 4;
 
-    + marketDifficulty * 0.25
+}
 
-    + (100 - relevanceScore) * 0.10
+competition += recentVideos * 1.5;
 
+competition = Math.min(
+    100,
+    Math.round(competition)
 );
+
+const competitionDetails = {
+
+    exactMatches,
+
+    partialMatches,
+
+    recentVideos
+
+};
 
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
@@ -2412,7 +2350,7 @@ const responseData = {
     volume: finalVolume,
 
     competition,
-
+competitionDetails,
 competitionScore,
 
     // Google Trends

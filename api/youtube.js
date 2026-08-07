@@ -2186,15 +2186,10 @@ ageScore
 // 📦 RESPONSE
 // =========================
 
-const trend =
-    generateEstimatedTrend(
-
-       volume: finalVolume,
-
-        competition
-
-    );
-
+const trend = generateEstimatedTrend(
+    finalVolume,
+    competition
+);
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================
@@ -2228,7 +2223,7 @@ const responseData = {
 
     items,
 
-    volume,
+    volume: finalVolume,
 
     competition,
 

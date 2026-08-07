@@ -1539,12 +1539,105 @@ const finalVolume = Math.max(
 
 );
 
+// =========================
+// 👑 CHANNEL AUTHORITY
+// =========================
+
+const channelIds = [
+
+    ...new Set(
+
+        items.map(v => v.snippet.channelId)
+
+    )
+
+];
+
+let channels = [];
+
+for (let i = 0; i < channelIds.length; i += 50) {
+
+    const ids = channelIds
+
+        .slice(i, i + 50)
+
+        .join(",");
+
+    const response = await fetch(
+
+        `https://www.googleapis.com/youtube/v3/channels` +
+
+        `?part=statistics&id=${ids}` +
+
+        `&key=${activeKey}`
+
+    );
+
+    const json = await response.json();
+
+    channels.push(
+
+        ...(json.items || [])
+
+    );
+
+}
+
+const avgSubscribers = Math.round(
+
+    channels.reduce(
+
+        (acc, c) =>
+
+            acc +
+
+            Number(
+
+                c.statistics?.subscriberCount || 0
+
+            ),
+
+        0
+
+    )
+
+    /
+
+    Math.max(
+
+        channels.length,
+
+        1
+
+    )
+
+);
+
+// Score 0~100
+
+const authorityDifficulty = Math.min(
+
+    100,
+
+    Math.round(
+
+        Math.log10(
+
+            avgSubscribers + 1
+
+        ) * 16
+
+    )
+
+);
+
  // =========================
 // 🚀 TUBEX COMPETITION V3
 // =========================
 
 // Quanto maior a média de views/dia,
 // mais difícil competir.
+
 
 const velocityDifficulty = Math.min(
 
@@ -1606,18 +1699,19 @@ const dominanceDifficulty = Math.round(
 
 const competition = Math.round(
 
-      velocityDifficulty * 0.30
+      authorityDifficulty * 0.35
 
-    + strengthDifficulty * 0.25
+    + velocityDifficulty * 0.20
 
-    + keywordDifficulty * 0.15
+    + strengthDifficulty * 0.20
 
-    + dominanceDifficulty * 0.10
+    + keywordDifficulty * 0.10
 
-    + (100 - relevanceScore) * 0.20
+    + dominanceDifficulty * 0.05
+
+    + (100 - relevanceScore) * 0.10
 
 );
-
 
 
 // =========================

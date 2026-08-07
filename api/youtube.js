@@ -185,53 +185,11 @@ for (const key of shuffledKeys) {
         v?.snippet?.title || ""
       ).toLowerCase();
 
-// =========================
-// REMOVE CONTEÚDO RUIM
-// =========================
+    // remove shorts
+    if(title.includes("#shorts")){
+      return false;
+    }
 
-const blockedWords = [
-
-    "#shorts",
-
-    "shorts",
-
-    "podcast",
-
-    "podcasts",
-
-    "live",
-
-    "ao vivo",
-
-    "trailer",
-
-    "teaser",
-
-    "highlight",
-
-    "highlights",
-
-    "clip",
-
-    "clips"
-
-];
-
-if(
-
-    blockedWords.some(
-
-        word => title.includes(word)
-
-    )
-
-){
-
-    return false;
-
-}
-
- 
     const videoViews =
       Number(
         v?.statistics?.viewCount || 0
@@ -1157,9 +1115,6 @@ analytics.estimatedMinutesWatched,
       Number(a.statistics.viewCount || 0)
     );
 
-// Mantém somente os 50 vídeos mais fortes
-items = items.slice(0, 50);
-
     const totalViews = items.reduce((acc, v) =>
       acc + Number(v.statistics?.viewCount || 0), 0
     );
@@ -1174,690 +1129,18 @@ const median =
     items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
   );
 
-
-// =========================
-// CHANNEL AUTHORITY
-// =========================
-
-const channelIds = [
-
-    ...new Set(
-
-        items.map(v => v.snippet.channelId)
-
-    )
-
-];
-
-let channels = [];
-
-for(let i=0;i<channelIds.length;i+=50){
-
-    const ids = channelIds
-        .slice(i,i+50)
-        .join(",");
-
-    const res = await fetch(
-
-        `https://www.googleapis.com/youtube/v3/channels` +
-
-        `?part=statistics&id=${ids}` +
-
-        `&key=${activeKey}`
-
+    const volume = Math.min(100,
+      Math.round(
+        (Math.log10(top + 1) * 10) +
+        (Math.log10(median + 1) * 5)
+      )
     );
 
-    const json = await res.json();
-
-    channels.push(
-
-        ...(json.items || [])
-
-    );
-
-}
-const avgSubscribers =
-Math.round(
-
-channels.reduce(
-
-(a,c)=>
-
-a+
-
-Number(
-
-c.statistics?.subscriberCount||0
-
-),
-
-0
-
-)
-
-/
-
-Math.max(
-
-channels.length,
-
-1
-
-)
-
-);
-
-
-const authorityScore = Math.min(
-
-100,
-
-Math.round(
-
-Math.log10(
-
-avgSubscribers+1
-
-)
-
-*16
-
-)
-
-);
-
+    const dominance = top / (median || 1);
+    const competition = Math.min(100, Math.log10(dominance + 1) * 40);
 // =========================
-// SERP DOMINANCE
+// 🏷️ REAL TAG ENGINE
 // =========================
-
-const channelFrequency = new Map();
-
-items.forEach(video => {
-
-    const id = video.snippet.channelId;
-
-    channelFrequency.set(
-
-        id,
-
-        (channelFrequency.get(id) || 0) + 1
-
-    );
-
-});
-
-
-const repeatedChannels =
-
-[...channelFrequency.values()]
-
-.filter(v => v >= 2)
-
-.length;
-
-const maxOccurrences =
-
-Math.max(
-
-...channelFrequency.values(),
-
-1
-
-);
-
-const dominanceIndex =
-
-    Math.round(
-
-        (
-
-            maxOccurrences /
-
-            Math.max(items.length,1)
-
-        ) * 100
-
-    );
-
-// =========================
-// DOMINÂNCIA DA SERP
-// =========================
-
-const channelShare =
-
-    maxOccurrences /
-
-    Math.max(items.length, 1);
-
-const dominanceScore = Math.round(
-
-    Math.min(
-
-        100,
-
-        (
-
-            channelShare * 70 +
-
-            (repeatedChannels / Math.max(items.length,1)) * 30
-
-        ) * 100
-
-    )
-
-);
-console.log(
-
-"DOMINANCE",
-
-{
-
-repeatedChannels,
-
-maxOccurrences,
-
-dominanceScore
-
-}
-
-);
-// =========================
-// 📅 IDADE MÉDIA DOS VÍDEOS
-// =========================
-
-const averageAgeDays = Math.round(
-
-    items.reduce((acc, video) => {
-
-        const published =
-            new Date(
-                video.snippet?.publishedAt
-            ).getTime();
-
-        const age =
-
-            (Date.now() - published)
-
-            /
-
-            86400000;
-
-        return acc + age;
-
-    }, 0)
-
-    /
-
-    Math.max(items.length, 1)
-
-);
-
-// =========================
-// 🚀 VIEWS POR DIA
-// =========================
-
-const viewsPerDayList = items.map(video => {
-
-    const views =
-        Number(video.statistics?.viewCount || 0);
-
-    const published =
-        new Date(
-            video.snippet?.publishedAt
-        ).getTime();
-
-    const ageDays =
-        Math.max(
-            1,
-            (Date.now() - published) / 86400000
-        );
-
-    return views / ageDays;
-
-});
-
-const averageViewsPerDay = Math.round(
-
-    viewsPerDayList.reduce(
-        (a, b) => a + b,
-        0
-    ) /
-
-    Math.max(
-        viewsPerDayList.length,
-        1
-    )
-
-);
-
-const maxViewsPerDay = Math.round(
-
-    Math.max(
-        ...viewsPerDayList,
-        0
-    )
-
-);
-
-
-// =========================
-// 📊 SCORE DE VIEWS/DIA
-// =========================
-
-const viewsPerDayScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        Math.log10(
-
-            averageViewsPerDay + 1
-
-        ) * 18
-
-    )
-
-);
-
-// Mapa de inscritos por canal
-const subscriberMap = new Map();
-
-channels.forEach(channel => {
-
-    subscriberMap.set(
-        channel.id,
-        Number(channel.statistics?.subscriberCount || 0)
-    );
-
-});
-
-// =========================
-// 💪 VÍDEOS FORTES
-// =========================
-
-const strongVideos = items.filter(video => {
-
-    const views = Number(video.statistics?.viewCount || 0);
-
-    const published = new Date(
-        video.snippet?.publishedAt
-    ).getTime();
-
-    const ageDays = Math.max(
-        1,
-        (Date.now() - published) / 86400000
-    );
-
-    const viewsPerDay = views / ageDays;
-
-    const subscribers =
-        subscriberMap.get(video.snippet.channelId) || 1;
-
-    const viewRatio = views / subscribers;
-
-    return (
-
-        views >= median &&
-
-        viewsPerDay >= averageViewsPerDay &&
-
-        viewRatio >= 0.25
-
-    );
-
-}).length;
-// =========================
-// OPPORTUNITY
-// =========================
-
-const weakVideos =
-
-items.length - strongVideos;
-
-const opportunityRatio =
-
-weakVideos /
-
-Math.max(
-
-items.length,
-
-1
-
-);
-
-const opportunityScore = Math.round(
-
-opportunityRatio * 100
-
-);
-
-console.log({
-
-strongVideos,
-
-weakVideos,
-
-opportunityScore
-
-});
-console.log({
-    dominanceIndex
-});
-// =========================
-// 🎯 KEYWORD MATCH
-// =========================
-
-const normalizedKeyword = keyword
-    .toLowerCase()
-    .trim();
-
-const keywordTokens =
-    normalizedKeyword
-        .split(/\s+/)
-        .filter(Boolean);
-
-const exactTitleMatches = items.filter(video => {
-
-    const title = String(
-        video.snippet?.title || ""
-    )
-    .toLowerCase()
-    .trim();
-
-    const matches =
-        keywordTokens.filter(token =>
-            title.includes(token)
-        ).length;
-
-    return matches >= Math.ceil(
-        keywordTokens.length * 0.7
-    );
-
-}).length;
-
-
-// =========================
-// SEARCH INTENT ENGINE
-// =========================
-
-const stopWords = new Set([
-
-"a","o","e","de","do","da","dos","das",
-
-"para","com","sem","como","em","no","na",
-
-"nos","nas","um","uma","os","as"
-
-]);
-
-const tokenFrequency = new Map();
-
-items.forEach(video=>{
-
-    const words = normalizeText(
-
-        video.snippet.title
-
-    )
-
-    .split(" ")
-
-    .filter(word=>
-
-        word.length>=3 &&
-
-        !stopWords.has(word)
-
-    );
-
-    [...new Set(words)]
-
-    .forEach(word=>{
-
-        tokenFrequency.set(
-
-            word,
-
-            (tokenFrequency.get(word)||0)+1
-
-        );
-
-    });
-
-});
-
-const commonWords =
-
-[...tokenFrequency.entries()]
-
-.filter(v=>
-
-v[1]>=items.length*0.45
-
-);
-
-const intentConsistency = Math.round(
-
-(commonWords.length/20)*100
-
-);
-
-console.log({
-
-commonWords,
-
-intentConsistency
-
-});
-
-// =========================
-// 🎯 SCORE DE RELEVÂNCIA
-// =========================
-
-const keywordMatchScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        (
-
-            exactTitleMatches /
-
-            Math.max(items.length,1)
-
-        )
-
-        *
-
-        160
-
-    )
-
-);
-
-// =========================
-// 🔥 KEYWORD DIFFICULTY
-// =========================
-
-const keywordLength =
-    keywordTokens.length;
-
-// quanto menor a keyword,
-// maior a dificuldade
-
-const keywordDifficulty =
-
-keywordLength <= 1 ? 100 :
-
-keywordLength == 2 ? 90 :
-
-keywordLength == 3 ? 75 :
-
-keywordLength == 4 ? 60 :
-
-keywordLength == 5 ? 45 :
-
-keywordLength == 6 ? 35 :
-
-25;
-
-console.log({
-    keywordDifficulty
-});
-
-// =========================
-// 💪 SCORE DE VÍDEOS FORTES
-// =========================
-
-const strongVideosScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        (
-
-            strongVideos /
-
-            Math.max(items.length, 1)
-
-        ) * 100
-
-    )
-
-);
-
-// =========================
-// 🔥 FRESH VIDEOS SCORE
-// =========================
-
-const freshVideos = items.filter(video => {
-
-    const published = new Date(
-        video.snippet?.publishedAt
-    ).getTime();
-
-    const ageDays = Math.max(
-        1,
-        (Date.now() - published) / 86400000
-    );
-
-    const views = Number(
-        video.statistics?.viewCount || 0
-    );
-
-    const viewsPerDay = views / ageDays;
-
-    return (
-
-        ageDays <= 180
-
-        &&
-
-        viewsPerDay >= averageViewsPerDay
-
-    );
-
-}).length;
-
-const freshScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        freshVideos /
-
-        Math.max(items.length,1)
-
-        *100
-
-    )
-
-);
-
-
-// =========================
-// 🚀 TUBEX VOLUME SCORE
-// =========================
-
-const topScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        Math.log10(top + 1) * 10
-
-    )
-
-);
-
-const medianScore = Math.min(
-
-    100,
-
-    Math.round(
-
-        Math.log10(median + 1) * 10
-
-    )
-
-);
-
-const volume = Math.round(
-
-      topScore * 0.28
-
-    + medianScore * 0.24
-
-    + viewsPerDayScore * 0.20
-
-    + strongVideosScore * 0.16
-
-    + keywordMatchScore * 0.12
-
-);
-
-let finalVolume = volume;
-
-// penaliza quando poucos títulos realmente batem
-if (keywordMatchScore < 40) {
-
-    finalVolume -= 8;
-
-}
-
-if (keywordMatchScore < 25) {
-
-    finalVolume -= 8;
-
-}
-
-// garante faixa válida
-finalVolume = Math.max(
-    5,
-    Math.min(100, finalVolume)
-);
-
-
-const dominance = top / (median || 1);
-
-const rawCompetition = Math.round(
-    Math.max(
-        5,
-        Math.min(
-            100,
-            Math.log10(dominance + 1) * 30
-        )
-    )
-);
-
-
-
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================
@@ -2343,267 +1626,30 @@ items.length
   )
 : 0;
 
-
 // =========================
-// 📊 SERP CONSISTENCY
+// 🚀 TUBEX COMPETITION SCORE
 // =========================
 
-const sortedViews =
-
-items
-
-.map(v =>
-
-    Number(
-
-        v.statistics?.viewCount || 0
-
-    )
-
-)
-
-.sort((a,b)=>b-a);
-
-let variation = 0;
-
-for(
-
-    let i=1;
-
-    i<sortedViews.length;
-
-    i++
-
-){
-
-    variation +=
-
-        Math.abs(
-
-            sortedViews[i-1]
-
-            -
-
-            sortedViews[i]
-
-        );
-
-}
-
-const averageVariation =
-
-variation /
-
-Math.max(
-
-    sortedViews.length-1,
-
-    1
-
-);
-
-const consistencyRatio =
-
-1 -
-
-(
-
-averageVariation /
-
-Math.max(
-
-    top,
-
-    1
-
-)
-
-);
-
-const consistencyScore =
-
-Math.max(
-
-    0,
+const competitionScore = Math.round(
 
     Math.min(
 
         100,
 
-        Math.round(
+        (
+            Math.min(items.length, 50) * 1.2 +
 
-            consistencyRatio*100
+            Math.log10(averageViews + 1) * 10 +
 
+            Math.log10(maxViews + 1) * 8 +
+
+            (competition * 0.40)
         )
 
     )
 
 );
 
-console.log({
-
-    consistencyScore
-
-});
-
-// =========================
-// 💪 SERP POWER INDEX
-// =========================
-
-const serpPowerList =
-
-items.map(video => {
-
-    const views =
-        Number(video.statistics?.viewCount || 0);
-
-    const published =
-        new Date(
-            video.snippet?.publishedAt
-        ).getTime();
-
-    const ageDays =
-        Math.max(
-            1,
-            (Date.now() - published) / 86400000
-        );
-
-    const viewsPerDay =
-        views / ageDays;
-
-    return (
-
-        Math.log10(views + 1) * 0.45 +
-
-        Math.log10(viewsPerDay + 1) * 0.55
-
-    );
-
-});
-
-const serpPower =
-
-Math.round(
-
-    serpPowerList.reduce(
-
-        (a,b)=>a+b,
-
-        0
-
-    )
-
-    /
-
-    Math.max(
-
-        serpPowerList.length,
-
-        1
-
-    )
-
-);
-
-console.log({
-
-    serpPower
-
-});
-
-// =========================
-// 🚀 TUBEX COMPETITION SCORE v2
-// 100 = Muito fácil competir
-// 0 = Muito difícil competir
-// =========================
-
-// --------------------------------
-// AUTORIDADE DOS CANAIS
-// --------------------------------
-
-const authorityWeight =
-    authorityScore * 0.30;
-
-// --------------------------------
-// DOMINÂNCIA
-// --------------------------------
-
-const dominanceWeight =
-    dominanceScore * 0.25;
-
-// --------------------------------
-// CONSISTÊNCIA
-// --------------------------------
-
-
-const intentWeight =
-    consistencyScore * 0.00;
-
-
-// --------------------------------
-// VELOCIDADE
-// --------------------------------
-
-const speedWeight =
-    viewsPerDayScore * 0.20;
-
-// --------------------------------
-// CONCORRÊNCIA DA SERP
-// --------------------------------
-const rawWeight =
-    rawCompetition * 0.00;
-
-// --------------------------------
-// DIFICULDADE DA KEYWORD
-// --------------------------------
-
-const keywordWeight =
-    keywordDifficulty * 0.25;
-// --------------------------------
-// SCORE FINAL DA SERP
-// --------------------------------
-
-const competitionScore = Math.round(
-
-      authorityWeight
-
-    + dominanceWeight
-
-    + intentWeight
-
-    + speedWeight
-
-    + rawWeight
-
-    + keywordWeight
-
-);
-// --------------------------------
-// LIMITES
-// --------------------------------
-
-const finalCompetition = Math.max(
-
-    5,
-
-    Math.min(
-
-        100,
-
-        competitionScore
-
-    )
-
-);
-
-// --------------------------------
-// RESULTADO FINAL
-// 100 = Muito fácil competir
-// --------------------------------
-
-const competition =
-
-    100 - finalCompetition;
 // =========================
 // 📦 RESPONSE
 // =========================
@@ -2623,91 +1669,54 @@ const trend =
 
 const youtubeMetrics = {
 
-    // Quantidade de vídeos analisados
     videoCount: items.length,
 
-    // Performance da SERP
     averageViews,
-    medianViews: median,
-    averageViewsPerDay,
 
-    // Autoridade
-    authorityScore,
-    avgSubscribers,
+    maxViews,
 
-    // Competitividade
-    dominanceScore,
-    dominanceIndex,
+    minViews,
 
-    // Intenção da busca
-    intentConsistency,
-
-    // Oportunidade
-    opportunityScore,
-
-    // Tendência
-    trend,
-
-    // Vídeos fortes
-    strongVideos
+    medianViews: median
 
 };
+
 const responseData = {
 
     success: true,
 
     items,
 
-        volume: finalVolume,
+    volume,
 
     competition,
 
-competitionScore: finalCompetition,
+competitionScore,
 
     // Google Trends
     interest: 0,
 
 youtubeMetrics,
-freshVideos,
-freshScore,
+
     trend,
 
     tags: rankedTags,
 
-  metrics: {
+    metrics: {
 
-    averageViews,
+        averageViews,
 
-    averageViewsPerDay,
-dominanceIndex,
-    maxViewsPerDay,
-exactTitleMatches,
-    strongVideos,
-consistencyScore,
-weakVideos,
-opportunityScore,
-serpPower,
-    freshVideos,
+        averageLikes,
 
-    freshScore,
+        averageComments,
 
-    averageLikes,
+        maxViews,
 
-    averageComments,
+        minViews,
 
-    maxViews,
+        medianViews: median
 
-    minViews,
-
-authorityScore,
-dominanceScore,
-repeatedChannels,
-maxOccurrences, 
-intentConsistency,
-commonWords,
-    medianViews: median
-
-}
+    }
 
 };
 // =========================

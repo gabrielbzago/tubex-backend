@@ -1677,6 +1677,37 @@ const keywordMatchScore = Math.min(
     )
 
 );
+
+// =========================
+// 🔥 KEYWORD DIFFICULTY
+// =========================
+
+const keywordLength =
+    keywordTokens.length;
+
+// quanto menor a keyword,
+// maior a dificuldade
+
+const keywordDifficulty =
+
+keywordLength <= 1 ? 100 :
+
+keywordLength == 2 ? 90 :
+
+keywordLength == 3 ? 75 :
+
+keywordLength == 4 ? 60 :
+
+keywordLength == 5 ? 45 :
+
+keywordLength == 6 ? 35 :
+
+25;
+
+console.log({
+    keywordDifficulty
+});
+
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
 // =========================

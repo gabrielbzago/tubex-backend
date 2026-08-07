@@ -2532,40 +2532,42 @@ console.log({
 // --------------------------------
 
 const authorityWeight =
-
-    authorityScore * 0.30;
+    authorityScore * 0.22;
 
 // --------------------------------
-// DOMINÂNCIA DA SERP
+// DOMINÂNCIA
 // --------------------------------
 
 const dominanceWeight =
-
-    dominanceScore * 0.20;
+    dominanceScore * 0.16;
 
 // --------------------------------
-// CONSISTÊNCIA DOS RESULTADOS
+// CONSISTÊNCIA
 // --------------------------------
 
 const intentWeight =
-
-    consistencyScore * 0.15;
+    consistencyScore * 0.12;
 
 // --------------------------------
-// VELOCIDADE DE CRESCIMENTO
+// VELOCIDADE
 // --------------------------------
 
 const speedWeight =
-
-    viewsPerDayScore * 0.15;
+    viewsPerDayScore * 0.12;
 
 // --------------------------------
-// CONCORRÊNCIA BRUTA
+// CONCORRÊNCIA DA SERP
 // --------------------------------
 
 const rawWeight =
+    rawCompetition * 0.18;
 
-    rawCompetition * 0.20;
+// --------------------------------
+// DIFICULDADE DA KEYWORD
+// --------------------------------
+
+const keywordWeight =
+    keywordDifficulty * 0.20;
 
 // --------------------------------
 // SCORE FINAL DA SERP
@@ -2583,8 +2585,9 @@ const competitionScore = Math.round(
 
     + rawWeight
 
-);
+    + keywordWeight
 
+);
 // --------------------------------
 // LIMITES
 // --------------------------------

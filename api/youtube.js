@@ -1641,95 +1641,186 @@ items.forEach(video=>{
 
 });
 
- // =========================
-// 🚀 TUBEX COMPETITION V3
+
+// =========================
+// 🚀 TUBEX COMPETITION V4
 // =========================
 
-// Quanto maior a média de views/dia,
-// mais difícil competir.
+// keyword normalizada
+const normalizedKeyword =
+    keyword.toLowerCase().trim();
+
+let exactMatches = 0;
+let partialMatches = 0;
+let recentVideos = 0;
+
+// -------------------------
+// Analisa todos os títulos
+// -------------------------
+
+items.forEach(video=>{
+
+    const title =
+        String(video.snippet?.title || "")
+        .toLowerCase();
+
+    const ageDays =
+        (
+            Date.now() -
+            new Date(video.snippet.publishedAt).getTime()
+        ) / 86400000;
+
+    // LONG TAIL
+    if(keywordWords.length >= 3){
+
+        if(title.startsWith(normalizedKeyword)){
+
+            exactMatches++;
+
+        }
+        else if(title.includes(normalizedKeyword)){
+
+            exactMatches += 0.7;
+
+        }
+
+    }
+
+    // SHORT TAIL
+    else{
+
+        const matched =
+            keywordWords.filter(word=>
+                title.includes(word)
+            ).length;
+
+        partialMatches +=
+            matched / keywordWords.length;
+
+    }
+
+    // vídeo recente aumenta concorrência
+
+    if(ageDays <= 365){
+
+        recentVideos++;
+
+    }
+
+});
 
 
-const velocityDifficulty = Math.min(
+// -------------------------
+// Percentual de títulos
+// -------------------------
 
-    100,
+const titleCoverage =
 
-    Math.round(
+    keywordWords.length >= 3
 
-        Math.log10(
+        ? exactMatches / items.length
 
-            averageViewsPerDay + 1
+        : partialMatches / items.length;
 
-        ) * 22
 
-    )
+// -------------------------
+// Dificuldade natural
+// -------------------------
 
-);
+let marketDifficulty = 0;
 
-// Muitos vídeos fortes = difícil
+switch(keywordWords.length){
 
-const strengthDifficulty = Math.round(
+    case 1:
 
-    (
+        marketDifficulty = 100;
+        break;
 
-        strongVideos /
+    case 2:
 
-        Math.max(items.length,1)
+        marketDifficulty = 85;
+        break;
 
-    ) * 100
+    case 3:
 
-);
+        marketDifficulty = 65;
+        break;
 
-// Palavra curta costuma ser mais concorrida
+    case 4:
 
-const keywordDifficulty =
+        marketDifficulty = 45;
+        break;
 
-    100 - keywordScore;
+    case 5:
 
-// SERP muito concentrada
+        marketDifficulty = 30;
+        break;
 
-const dominanceRatio =
-    top / Math.max(median, 1);
+    default:
 
-let dominanceDifficulty = 15;
-
-if (dominanceRatio >= 100)
-    dominanceDifficulty = 100;
-
-else if (dominanceRatio >= 50)
-    dominanceDifficulty = 90;
-
-else if (dominanceRatio >= 20)
-    dominanceDifficulty = 75;
-
-else if (dominanceRatio >= 10)
-    dominanceDifficulty = 60;
-
-else if (dominanceRatio >= 5)
-    dominanceDifficulty = 40;
-
-else if (dominanceRatio >= 2)
-    dominanceDifficulty = 25;
-
-let competition = 0;
-
-if(keywordWords.length >= 3){
-
-    competition += exactMatches * 4;
-
-}else{
-
-    competition += partialMatches * 4;
+        marketDifficulty = 15;
 
 }
 
-competition += recentVideos * 1.5;
 
-competition = Math.min(
-    100,
-    Math.round(competition)
+// -------------------------
+// Vídeos recentes
+// -------------------------
+
+const freshnessDifficulty =
+
+    Math.round(
+
+        (recentVideos / items.length) * 100
+
+    );
+
+
+// -------------------------
+// Cobertura dos títulos
+// -------------------------
+
+const coverageDifficulty =
+
+    Math.round(
+
+        titleCoverage * 100
+
+    );
+
+
+// -------------------------
+// Competição Final
+// -------------------------
+
+const competition = Math.round(
+
+      marketDifficulty * 0.50
+    + coverageDifficulty * 0.35
+    + freshnessDifficulty * 0.15
+
 );
 
+
+// garante faixa
+
+const finalCompetition =
+
+    Math.max(
+        5,
+        Math.min(100, competition)
+    );
+
+
+// detalhes
+
 const competitionDetails = {
+
+    marketDifficulty,
+
+    coverageDifficulty,
+
+    freshnessDifficulty,
 
     exactMatches,
 

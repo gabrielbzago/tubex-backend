@@ -1746,12 +1746,17 @@ const coverageDifficulty = Math.round(
 // -------------------------
 // Competição Final
 // -------------------------
-const competition = Math.round(
+competition = Math.max(
 
-      competitionMarketDifficulty * 0.40
-    + coverageDifficulty * 0.25
-    + freshnessDifficulty * 0.10
-    + totalResultsScore * 0.25
+    competitionMarketDifficulty,
+
+    Math.round(
+
+          coverageDifficulty * 0.40
+        + freshnessDifficulty * 0.20
+        + totalResultsScore * 0.40
+
+    )
 
 );
 

@@ -1280,6 +1280,51 @@ const strongVideosScore = Math.min(
 
 );
 
+// =========================
+// 🔍 KEYWORD SCORE
+// =========================
+
+const keywordWords =
+    keyword
+        .toLowerCase()
+        .trim()
+        .split(/\s+/);
+
+const keywordWordCount =
+    keywordWords.length;
+
+let keywordScore = 50;
+
+// Long Tail
+if (keywordWordCount >= 4)
+    keywordScore += 15;
+
+// Muito específica
+if (keywordWordCount >= 6)
+    keywordScore += 10;
+
+// Ano
+if (/(2025|2026|2027)/.test(keyword))
+    keywordScore += 10;
+
+// Pergunta
+if (/^(como|how|what|qual|porque|why)/i.test(keyword))
+    keywordScore += 8;
+
+// Muito curta costuma ser extremamente concorrida
+if (keywordWordCount === 1)
+    keywordScore -= 20;
+
+if (keywordWordCount === 2)
+    keywordScore -= 10;
+
+keywordScore = Math.max(
+    10,
+    Math.min(
+        100,
+        keywordScore
+    )
+);
 
 
 // =========================
@@ -1312,17 +1357,15 @@ const medianScore = Math.min(
 
 const volume = Math.round(
 
-    (
+      topScore * 0.18
 
-        topScore * 0.20 +
+    + medianScore * 0.18
 
-        medianScore * 0.20 +
+    + viewsPerDayScore * 0.30
 
-        viewsPerDayScore * 0.35 +
+    + strongVideosScore * 0.18
 
-        strongVideosScore * 0.25
-
-    )
+    + keywordScore * 0.16
 
 );
     const dominance = top / (median || 1);
@@ -1930,6 +1973,8 @@ const youtubeMetrics = {
     videoCount: items.length,
 
     averageViews,
+
+keywordScore,
 
     averageAgeDays,
 

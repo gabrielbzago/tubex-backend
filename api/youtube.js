@@ -1682,31 +1682,50 @@ const keywordMatchScore = Math.min(
 // 🔥 KEYWORD DIFFICULTY
 // =========================
 
-const keywordLength =
-    keywordTokens.length;
-
-// quanto menor a keyword,
-// maior a dificuldade
-
-const keywordDifficulty =
+let keywordDifficulty =
 
 keywordLength <= 1 ? 100 :
 
-keywordLength == 2 ? 90 :
+keywordLength == 2 ? 88 :
 
-keywordLength == 3 ? 75 :
+keywordLength == 3 ? 72 :
 
-keywordLength == 4 ? 60 :
+keywordLength == 4 ? 58 :
 
-keywordLength == 5 ? 45 :
+keywordLength == 5 ? 46 :
 
 keywordLength == 6 ? 35 :
 
 25;
 
-console.log({
-    keywordDifficulty
-});
+
+// ajuste pelo tamanho da SERP
+
+if(items.length >= 45){
+
+    keywordDifficulty += 10;
+
+}
+
+else if(items.length <= 20){
+
+    keywordDifficulty -= 10;
+
+}
+
+keywordDifficulty = Math.max(
+
+20,
+
+Math.min(
+
+100,
+
+keywordDifficulty
+
+)
+
+);
 
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
@@ -2629,40 +2648,27 @@ const trend =
 
 // =========================
 // 📊 YOUTUBE METRICS
+// Apenas métricas de alto impacto
 // =========================
 
 const youtubeMetrics = {
-
-    // Quantidade de vídeos analisados
-    videoCount: items.length,
 
     // Performance da SERP
     averageViews,
     medianViews: median,
     averageViewsPerDay,
 
-    // Autoridade
+    // Competição
     authorityScore,
-    avgSubscribers,
-
-    // Competitividade
     dominanceScore,
-    dominanceIndex,
-
-    // Intenção da busca
-    intentConsistency,
 
     // Oportunidade
     opportunityScore,
 
-    // Tendência
-    trend,
-
-    // Vídeos fortes
+    // Força da SERP
     strongVideos
 
 };
-
 
 const responseData = {
 
@@ -2670,16 +2676,12 @@ const responseData = {
 
     items,
 
-    // Scores finais
+    // Scores oficiais
     volume: finalVolume,
-
     competition,
-
     competitionScore: finalCompetition,
 
     interest: 0,
-
-    trend,
 
     tags: rankedTags,
 
@@ -2687,23 +2689,12 @@ const responseData = {
 
     metrics: {
 
-        // Apenas métricas finais utilizadas pelo frontend
-
         averageViews,
-
         medianViews: median,
-
         averageViewsPerDay,
 
         authorityScore,
-
         dominanceScore,
-
-        dominanceIndex,
-
-        avgSubscribers,
-
-        intentConsistency,
 
         opportunityScore,
 
@@ -2712,6 +2703,8 @@ const responseData = {
     }
 
 };
+
+
 // =========================
 // 💾 CACHE SAVE
 // =========================

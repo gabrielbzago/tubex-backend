@@ -1421,6 +1421,41 @@ const strongVideos = items.filter(video => {
 
 }).length;
 
+// =========================
+// OPPORTUNITY
+// =========================
+
+const weakVideos =
+
+items.length - strongVideos;
+
+const opportunityRatio =
+
+weakVideos /
+
+Math.max(
+
+items.length,
+
+1
+
+);
+
+const opportunityScore = Math.round(
+
+opportunityRatio * 100
+
+);
+
+console.log({
+
+strongVideos,
+
+weakVideos,
+
+opportunityScore
+
+});
 
 // =========================
 // 🎯 KEYWORD MATCH
@@ -1583,17 +1618,19 @@ const volume = Math.round(
 
 (
 
-topScore * 0.16 +
+topScore * 0.14 +
 
-medianScore * 0.16 +
+medianScore * 0.14 +
 
-viewsPerDayScore * 0.25 +
+viewsPerDayScore * 0.22 +
 
-strongVideosScore * 0.18 +
+strongVideosScore * 0.16 +
 
-keywordMatchScore * 0.12 +
+keywordMatchScore * 0.10 +
 
-freshScore * 0.13
+freshScore * 0.10 +
+
+opportunityScore * 0.14
 
 )
 
@@ -2246,6 +2283,8 @@ const youtubeMetrics = {
     videoCount: items.length,
 
     averageViews,
+weakVideos,
+opportunityScore,
 
     averageAgeDays,
 exactTitleMatches,
@@ -2299,6 +2338,9 @@ freshScore,
     maxViewsPerDay,
 exactTitleMatches,
     strongVideos,
+
+weakVideos,
+opportunityScore,
 
     freshVideos,
 

@@ -1422,23 +1422,124 @@ const strengthScore = Math.round(
 // Long Tail
 const longTailBonus = keywordScore;
 
-const volume = Math.round(
+// =========================
+// 🔥 DEMAND SCORE
+// Mede a força natural da palavra
+// =========================
 
-      topScore * 0.22
+let demandScore = 0;
 
-    + medianScore * 0.20
+// Palavra curta costuma ter enorme procura
+if(keywordWordCount === 1){
 
-    + velocityScore * 0.22
+    demandScore += 45;
 
-    + strengthScore * 0.08
+}
 
-    + longTailBonus * 0.08
+else if(keywordWordCount === 2){
 
-    + relevanceScore * 0.20
+    demandScore += 30;
+
+}
+
+else if(keywordWordCount === 3){
+
+    demandScore += 18;
+
+}
+
+else if(keywordWordCount === 4){
+
+    demandScore += 10;
+
+}
+
+else{
+
+    demandScore += 5;
+
+}
+
+// Muitos vídeos realmente relevantes
+
+demandScore += relevanceScore * 0.25;
+
+// Vídeos extremamente fortes
+
+if(top > 10000000){
+
+    demandScore += 20;
+
+}
+
+else if(top > 1000000){
+
+    demandScore += 15;
+
+}
+
+else if(top > 100000){
+
+    demandScore += 10;
+
+}
+
+// Mediana forte
+
+if(median > 1000000){
+
+    demandScore += 10;
+
+}
+
+else if(median > 100000){
+
+    demandScore += 5;
+
+}
+
+// Limite
+
+demandScore = Math.min(
+
+    100,
+
+    Math.round(demandScore)
 
 );
 
-    // =========================
+
+const volume = Math.round(
+
+      demandScore * 0.45
+
+    + topScore * 0.15
+
+    + medianScore * 0.15
+
+    + velocityScore * 0.10
+
+    + strengthScore * 0.05
+
+    + relevanceScore * 0.10
+
+);
+
+const finalVolume = Math.max(
+
+    5,
+
+    Math.min(
+
+        100,
+
+        volume
+
+    )
+
+);
+
+ // =========================
 // 🚀 TUBEX COMPETITION V3
 // =========================
 
@@ -2088,7 +2189,7 @@ ageScore
 const trend =
     generateEstimatedTrend(
 
-        volume,
+       volume: finalVolume,
 
         competition
 

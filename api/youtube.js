@@ -1396,15 +1396,25 @@ const viewsPerDayScore = Math.min(
 
 );
 
+// Mapa de inscritos por canal
+const subscriberMap = new Map();
+
+channels.forEach(channel => {
+
+    subscriberMap.set(
+        channel.id,
+        Number(channel.statistics?.subscriberCount || 0)
+    );
+
+});
+
 // =========================
 // 💪 VÍDEOS FORTES
 // =========================
 
 const strongVideos = items.filter(video => {
 
-    const views = Number(
-        video.statistics?.viewCount || 0
-    );
+    const views = Number(video.statistics?.viewCount || 0);
 
     const published = new Date(
         video.snippet?.publishedAt
@@ -1417,13 +1427,22 @@ const strongVideos = items.filter(video => {
 
     const viewsPerDay = views / ageDays;
 
+    const subscribers =
+        subscriberMap.get(video.snippet.channelId) || 1;
+
+    const viewRatio = views / subscribers;
+
     return (
+
         views >= median &&
-        viewsPerDay >= averageViewsPerDay
+
+        viewsPerDay >= averageViewsPerDay &&
+
+        viewRatio >= 0.25
+
     );
 
 }).length;
-
 // =========================
 // OPPORTUNITY
 // =========================

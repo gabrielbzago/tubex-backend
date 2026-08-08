@@ -111,6 +111,10 @@ let items = [];
 let success = false;
 let activeKey = keys[0] || null;
 
+// Indica que o YouTube respondeu normalmente.
+// É diferente de quota/API failure.
+let youtubeSearchSucceeded = false;
+
 // NOVO
 let totalResults = 0;
 
@@ -152,6 +156,9 @@ if (body?.plan === "pro")
           }
 
           const searchJson = await searchRes.json();
+// O YouTube respondeu corretamente,
+// mesmo que a busca não tenha retornado vídeos.
+youtubeSearchSucceeded = true;
 if (pageCount === 0) {
 
     totalResults = Number(
@@ -239,11 +246,29 @@ if (pageCount === 0) {
 }
         }
 
-        if (items.length) {
-          success = true;
-          activeKey = key;
-          break;
-        }
+      if (items.length) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
+
+
+// ------------------------------------
+// YOUTUBE RESPONDEU,
+// MAS NÃO ENCONTROU RESULTADOS
+// ------------------------------------
+
+if (youtubeSearchSucceeded) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
 
       } catch (e) {
         console.warn("🔁 tentando próxima key...");
@@ -251,17 +276,33 @@ if (pageCount === 0) {
       }
     }
 
-    // =========================
-    // 🚫 FALHA TOTAL
-    // =========================
-    if (!success) {
-      return res.status(200).json({
-        success: true,
+ // =========================
+// 🚫 FALHA TOTAL DA API
+// =========================
+//
+// IMPORTANTE:
+// Isso NÃO significa "keyword sem volume".
+// Significa que o YouTube API não respondeu
+// corretamente após tentar as chaves disponíveis.
+//
+
+if (!success) {
+
+    return res.status(200).json({
+
+        success: false,
+
         items: [],
+
         volume: 0,
-        competition: 0
-      });
-    }
+
+        competition: null,
+
+        error: "youtube_api_unavailable"
+
+    });
+
+}
 
 // =========================
 // 🎬 VIDEO DATA
@@ -1830,9 +1871,22 @@ demandScore = Math.min(
 );
 
 
-const volume = Math.round(
+// =========================
+// 🚀 FINAL VOLUME SCORE V4
+// =========================
+//
+// Volume mede DEMANDA.
+//
+// Não deve ser penalizado fortemente
+// pela relevância textual da SERP.
+//
+// 100 = demanda extremamente alta
+// 0   = nenhuma demanda
+//
 
-      demandScore * 0.45
+const rawVolume = Math.round(
+
+      demandScore * 0.60
 
     + topScore * 0.15
 
@@ -1840,25 +1894,57 @@ const volume = Math.round(
 
     + velocityScore * 0.10
 
-    + strengthScore * 0.05
-
-    + relevanceScore * 0.10
-
 );
 
-const finalVolume = Math.max(
 
-    5,
+// ------------------------------------
+// 🔥 SATURAÇÃO DE ALTA DEMANDA
+// ------------------------------------
+//
+// Quando temos simultaneamente:
+//
+// - demanda muito alta
+// - vídeos extremamente grandes
+// - mediana muito forte
+//
+// estamos diante de uma keyword
+// de demanda máxima.
+//
+// Exemplo clássico:
+// "youtube"
+//
+
+const maximumDemandSignal =
+
+    demandScore >= 95 &&
+
+    topScore >= 95 &&
+
+    medianScore >= 90;
+
+
+// ------------------------------------
+// VOLUME FINAL
+// ------------------------------------
+
+let finalVolume = Math.max(
+
+    0,
 
     Math.min(
 
         100,
 
-        volume
+        maximumDemandSignal
+
+            ? 100
+
+            : rawVolume
 
     )
 
 );
+
 
 
 

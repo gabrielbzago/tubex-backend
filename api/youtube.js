@@ -1324,6 +1324,59 @@ const strongVideosScore = Math.min(
 );
 
 // =========================
+// 📈 DESVIO PADRÃO DAS VIEWS
+// =========================
+
+const variance = items.reduce((acc, video) => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    return acc + Math.pow(
+        views - avgViews,
+        2
+    );
+
+}, 0) / Math.max(items.length, 1);
+
+const standardDeviation =
+    Math.sqrt(variance);
+
+// =========================
+// 📊 COEFICIENTE DE VARIAÇÃO
+// =========================
+
+const coefficientVariation =
+    avgViews > 0
+        ? standardDeviation / avgViews
+        : 0;
+
+
+// =========================
+// 📊 CONSISTÊNCIA DA SERP
+// =========================
+
+const consistencyScore = Math.max(
+
+    0,
+
+    Math.min(
+
+        100,
+
+        Math.round(
+
+            100 -
+
+            (coefficientVariation * 35)
+
+        )
+
+    )
+
+);
+
+// =========================
 // 🔍 KEYWORD SCORE
 // =========================
 
@@ -1626,17 +1679,19 @@ demandScore = Math.min(
 
 const volume = Math.round(
 
-      demandScore * 0.45
+      demandScore * 0.40
 
-    + topScore * 0.15
+    + topScore * 0.12
 
-    + medianScore * 0.15
+    + medianScore * 0.12
 
     + velocityScore * 0.10
 
     + strengthScore * 0.05
 
     + relevanceScore * 0.10
+
+    + consistencyScore * 0.11
 
 );
 
@@ -2501,7 +2556,11 @@ youtubeMetrics,
 strongVideos,
 relevanceScore,
     averageLikes,
+standardDeviation,
 
+coefficientVariation,
+
+consistencyScore,
     averageComments,
 
     maxViews,

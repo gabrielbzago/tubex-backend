@@ -128,9 +128,13 @@ for (const key of shuffledKeys) {
         let nextPageToken = "";
         let pageCount = 0;
 
-        let maxPages = 2;
-        if (body?.plan === "free") maxPages = 1;
-        if (body?.plan === "pro") maxPages = 3;
+       let maxPages = 4;
+
+if (body?.plan === "free")
+    maxPages = 2;
+
+if (body?.plan === "pro")
+    maxPages = 6;
 
         while (pageCount < maxPages) {
 
@@ -1283,6 +1287,7 @@ Math.round(
 Math.log10(
 
 averageViewsPerDay *
+
 Math.max(median,1)
 
 +1
@@ -1292,6 +1297,7 @@ Math.max(median,1)
 )
 
 );
+
 
 // =========================
 // 📊 SCORE DE VIEWS/DIA
@@ -1344,6 +1350,40 @@ const strongVideos =
 }).length;
 
 
+let viralVideos=0;
+
+velocitySource.forEach(video=>{
+
+const views=
+Number(video.statistics.viewCount||0);
+
+const age=Math.max(
+
+1,
+
+(Date.now()-new Date(video.snippet.publishedAt))/86400000
+
+);
+
+const velocity=views/age;
+
+if(velocity>=100000){
+
+viralVideos++;
+
+}
+
+});
+
+const viralScore=Math.round(
+
+viralVideos/
+
+Math.max(velocitySource.length,1)
+
+*100
+
+);
 
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
@@ -2003,22 +2043,142 @@ const channelDominance = Math.round(
 
 );
 
+let giantChannels = 0;
+
+items.forEach(video=>{
+
+const subs =
+Number(video.channelSubscribers || 0);
+
+if(subs>=1000000){
+
+giantChannels++;
+
+}
+
+});
+
+const giantChannelScore = Math.round(
+
+(giantChannels/items.length)*100
+
+);
+
+const repeatedChannels=
+
+Object.values(channelCount)
+
+.filter(v=>v>=2)
+
+.length;
+
+const repetitionScore=Math.round(
+
+repeatedChannels/
+
+Math.max(Object.keys(channelCount).length,1)
+
+*100
+
+);
+
+// =========================
+// FRESHNESS SCORE
+// =========================
+
+const freshnessScore = Math.round(
+
+    Math.max(
+
+        0,
+
+        100 - (averageAgeDays / 12)
+
+    )
+
+);
+
+// =========================
+// AUTHORITY SCORE
+// =========================
+
+const authorityScore = Math.round(
+
+(
+
+channelDominance +
+
+competitionMarketDifficulty
+
+)
+
+/
+
+2
+
+);
+
+
+// =========================
+// STRENGTH SCORE
+// =========================
+
+const strengthScore = Math.round(
+
+(
+
+serpPower +
+
+viewsPerDayScore +
+
+distributionScore +
+
+consistencyScore
+
+)
+
+/
+
+4
+
+);
+
+// =========================
+// SEO DIFFICULTY
+// =========================
+
+const seoDifficulty = Math.round(
+
+(
+
+coverageDifficulty +
+
+relevanceScore +
+
+totalResultsScore
+
+)
+
+/
+
+3
+
+);
+
 // -------------------------
 // Competição Final
 // -------------------------
 const competition = Math.round(
 
-serpPower *0.30 +
+strengthScore * 0.35 +
 
-coverageDifficulty *0.15 +
+authorityScore * 0.25 +
 
-channelDominance *0.20 +
+seoDifficulty * 0.20 +
 
-freshnessDifficulty *0.15 +
+freshnessScore * 0.10 +
 
-competitionMarketDifficulty *0.20 +
-
-totalResultsScore *0.10
+competitionMarketDifficulty * 0.10
 
 );
 
@@ -2028,13 +2188,23 @@ const finalCompetition = Math.max(
 
     5,
 
-    Math.min(
+   Math.min(
 
-        100,
+100,
 
-        competition
+Math.round(
 
-    )
+Math.pow(
+
+competition / 100,
+
+0.82
+
+) * 100
+
+)
+
+)
 
 );
 

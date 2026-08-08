@@ -1745,187 +1745,201 @@ const relevanceScore = Math.round(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V3
+// 🚀 TUBEX VOLUME SCORE V5
+// =========================
+//
+// Volume = DEMANDA ESTIMADA.
+//
+// O score usa:
+// 1. Demanda estrutural da keyword
+// 2. Força do vídeo líder
+// 3. Mediana da SERP
+// 4. Velocidade de views
+//
+// 100 = demanda excepcional
+// 0   = demanda praticamente inexistente
+//
+
+// =========================
+// 1. FORÇA DO VÍDEO LÍDER
 // =========================
 
-// Views do vídeo mais forte
 const topScore = Math.min(
     100,
-    Math.round(Math.log10(top + 1) * 14)
+    Math.round(
+        Math.log10(top + 1) * 16
+    )
 );
 
-// Mediana da SERP
-const medianScore = Math.min(
-    100,
-    Math.round(Math.log10(median + 1) * 14)
-);
-
-// Média de views por dia
-const velocityScore = Math.min(
-    100,
-    Math.round(Math.log10(averageViewsPerDay + 1) * 18)
-);
-
-// Quantidade de vídeos fortes
-const strengthScore = Math.round(
-
-    (
-
-        strongVideos /
-
-        Math.max(
-            (recentItems.length ? recentItems : items).length,
-            1
-        )
-
-    ) * 100
-
-);
-// Long Tail
-const longTailBonus = keywordScore;
 
 // =========================
-// 🔥 DEMAND SCORE
-// Mede a força natural da palavra
+// 2. FORÇA DA MEDIANA
+// =========================
+
+const medianScore = Math.min(
+    100,
+    Math.round(
+        Math.log10(median + 1) * 16
+    )
+);
+
+
+// =========================
+// 3. VELOCIDADE
+// =========================
+
+const velocityScore = Math.min(
+    100,
+    Math.round(
+        Math.log10(averageViewsPerDay + 1) * 20
+    )
+);
+
+
+// =========================
+// 4. DEMANDA ESTRUTURAL
 // =========================
 
 let demandScore = 0;
 
-// Palavra curta costuma ter enorme procura
-if(keywordWordCount === 1){
+
+// -------------------------
+// TAMANHO DA KEYWORD
+// -------------------------
+
+if (keywordWordCount === 1) {
 
     demandScore += 45;
 
 }
-
-else if(keywordWordCount === 2){
+else if (keywordWordCount === 2) {
 
     demandScore += 30;
 
 }
-
-else if(keywordWordCount === 3){
+else if (keywordWordCount === 3) {
 
     demandScore += 18;
 
 }
-
-else if(keywordWordCount === 4){
+else if (keywordWordCount === 4) {
 
     demandScore += 10;
 
 }
-
-else{
+else {
 
     demandScore += 5;
 
 }
 
-// Muitos vídeos realmente relevantes
 
-demandScore += totalResultsScore * 0.20;
+// -------------------------
+// QUANTIDADE DE RESULTADOS
+// -------------------------
 
-// Vídeos extremamente fortes
+demandScore +=
+    totalResultsScore * 0.20;
 
-if(top > 10000000){
+
+// -------------------------
+// VÍDEO LÍDER
+// -------------------------
+
+if (top > 10000000) {
 
     demandScore += 20;
 
 }
-
-else if(top > 1000000){
+else if (top > 1000000) {
 
     demandScore += 15;
 
 }
-
-else if(top > 100000){
-
-    demandScore += 10;
-
-}
-
-// Mediana forte
-
-if(median > 1000000){
+else if (top > 100000) {
 
     demandScore += 10;
 
 }
 
-else if(median > 100000){
+
+// -------------------------
+// MEDIANA
+// -------------------------
+
+if (median > 1000000) {
+
+    demandScore += 10;
+
+}
+else if (median > 100000) {
 
     demandScore += 5;
 
 }
 
-// Limite
 
-demandScore = Math.min(
+// -------------------------
+// LIMITE
+// -------------------------
 
-    100,
-
-    Math.round(demandScore)
-
+demandScore = Math.max(
+    0,
+    Math.min(
+        100,
+        Math.round(demandScore)
+    )
 );
 
 
 // =========================
-// 🚀 FINAL VOLUME SCORE V4
+// 5. VOLUME BRUTO
 // =========================
 //
-// Volume mede DEMANDA.
+// Agora os sinais de views têm
+// um pouco mais de peso.
 //
-// Não deve ser penalizado fortemente
-// pela relevância textual da SERP.
-//
-// 100 = demanda extremamente alta
-// 0   = nenhuma demanda
+// Isso permite que keywords
+// gigantes atinjam o topo naturalmente.
 //
 
 const rawVolume = Math.round(
 
-      demandScore * 0.60
+      demandScore * 0.50
 
-    + topScore * 0.15
+    + topScore * 0.20
 
-    + medianScore * 0.15
+    + medianScore * 0.20
 
     + velocityScore * 0.10
 
 );
 
 
-// ------------------------------------
-// 🔥 SATURAÇÃO DE ALTA DEMANDA
-// ------------------------------------
+// =========================
+// 6. SATURAÇÃO DE DEMANDA
+// =========================
 //
-// Quando temos simultaneamente:
+// Se a keyword apresenta:
+// - demanda estrutural muito alta
+// - líder extremamente forte
+// - mediana extremamente forte
 //
-// - demanda muito alta
-// - vídeos extremamente grandes
-// - mediana muito forte
-//
-// estamos diante de uma keyword
-// de demanda máxima.
-//
-// Exemplo clássico:
-// "youtube"
+// consideramos demanda máxima.
 //
 
 const maximumDemandSignal =
 
-    demandScore >= 95 &&
+    demandScore >= 90 &&
 
-    topScore >= 95 &&
+    topScore >= 90 &&
 
-    medianScore >= 90;
+    medianScore >= 85;
 
 
-// ------------------------------------
-// VOLUME FINAL
-// ------------------------------------
+// =========================
+// 7. VOLUME FINAL
+// =========================
 
 let finalVolume = Math.max(
 
@@ -1944,9 +1958,6 @@ let finalVolume = Math.max(
     )
 
 );
-
-
-
 
 // =========================
 // 🚀 TUBEX COMPETITION V7

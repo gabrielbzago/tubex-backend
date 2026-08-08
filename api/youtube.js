@@ -2176,7 +2176,6 @@ const marketDifficultyScore = Math.max(
 );
 
 // -------------------------
-// -------------------------
 // 🎯 COMPETITION FINAL V7
 // -------------------------
 //
@@ -2343,48 +2342,6 @@ const competitionDetails = {
     partialMatchScore,
 
     // VÍDEOS RECENTES
-    recentVideos
-
-};
-
-// -------------------------
-// DETALHES DA COMPETIÇÃO
-// -------------------------
-
-const competitionDetails = {
-
-    finalCompetition,
-
-    serpPower,
-
-    coverageDifficulty,
-
-    freshnessDifficulty,
-
-    channelDominance,
-
-    repetitionScore,
-
-    serpStructureScore,
-
-    marketDifficulty: marketDifficultyScore,
-
-    exactMatches,
-
-    startsWithMatches,
-
-    containsMatches,
-
-    partialMatches,
-
-    exactMatchScore,
-
-    prefixMatchScore,
-
-    containsMatchScore,
-
-    partialMatchScore,
-
     recentVideos
 
 };

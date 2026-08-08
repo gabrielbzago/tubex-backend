@@ -1989,19 +1989,15 @@ const channelDominance = Math.round(
 // -------------------------
 const competition = Math.round(
 
-      competitionMarketDifficulty * 0.25
+      competitionMarketDifficulty * 0.10
 
-    + (100 - coverageDifficulty) * 0.20
+    + coverageDifficulty * 0.40
 
-    + (100 - freshnessDifficulty) * 0.10
+    + freshnessDifficulty * 0.15
 
-    + (100 - totalResultsScore) * 0.10
+    + totalResultsScore * 0.10
 
-    + channelDominance * 0.15
-
-    + consistencyScore * 0.10
-
-    + distributionScore * 0.10
+    + channelDominance * 0.25
 
 );
 

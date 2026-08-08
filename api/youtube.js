@@ -2176,28 +2176,35 @@ const marketDifficultyScore = Math.max(
 );
 
 // -------------------------
-// COMPETITION FINAL V7
+// -------------------------
+// 🎯 COMPETITION FINAL V7
 // -------------------------
 //
-// UMA ÚNICA PONTUAÇÃO OFICIAL.
+// PRIMEIRO calculamos a DIFICULDADE REAL da SERP.
 //
-// 35% força real da SERP
-// 25% match/cobertura dos títulos
-// 15% freshness
-// 10% dominância
-// 5% repetição
-// 5% estrutura/distribuição
-// 5% mercado
+// Quanto maior:
+// - SERP mais forte
+// - mais matches
+// - mais vídeos recentes
+// - mais domínio de canais
+// - mais repetição
 //
-// O mercado permanece pequeno para não transformar
-// automaticamente qualquer keyword curta em 100.
+// = MAIS DIFÍCIL.
+//
+// Depois fazemos UMA ÚNICA INVERSÃO
+// para transformar dificuldade em
+// SCORE DE OPORTUNIDADE.
+//
+// Resultado oficial:
+// 100 = baixa competição / ótima oportunidade
+// 50  = competição média
+// 0   = competição muito alta
+//
 
-const finalCompetition = Math.max(
-
-    5,
+const finalCompetitionDifficulty = Math.max(
+    0,
 
     Math.min(
-
         100,
 
         Math.round(
@@ -2222,15 +2229,123 @@ const finalCompetition = Math.max(
 
 );
 
+
 // -------------------------
-// ALIAS OFICIAL
+// 🔄 INVERSÃO OFICIAL
 // -------------------------
 //
-// Não existe uma segunda engine.
-// competitionScore é exatamente o mesmo score.
+// Dificuldade alta
+//      ↓
+// oportunidade baixa
+//
+// Dificuldade baixa
+//      ↓
+// oportunidade alta
+//
+// Exemplo:
+//
+// dificuldade 90 → competição 10
+// dificuldade 70 → competição 30
+// dificuldade 50 → competição 50
+// dificuldade 30 → competição 70
+// dificuldade 10 → competição 90
+//
+
+const finalCompetition = Math.max(
+    0,
+
+    Math.min(
+        100,
+
+        100 - finalCompetitionDifficulty
+
+    )
+
+);
+
+
+// -------------------------
+// 🎯 ALIAS OFICIAL
+// -------------------------
+//
+// Existe UMA única pontuação oficial.
+//
+// competition
+// competitionScore
+//
+// apontam exatamente para
+// finalCompetition.
+//
+// O frontend continuará recebendo
+// o score de oportunidade.
+//
 
 const competition = finalCompetition;
+
 const competitionScore = finalCompetition;
+
+
+// -------------------------
+// 📊 DETALHES DA COMPETIÇÃO
+// -------------------------
+//
+// Mantemos os sinais individuais
+// disponíveis para o frontend/debug.
+//
+
+const competitionDetails = {
+
+    // SCORE OFICIAL
+    finalCompetition,
+
+    // DIFICULDADE BRUTA ANTES DA INVERSÃO
+    competitionDifficulty:
+        finalCompetitionDifficulty,
+
+    // FORÇA DA SERP
+    serpPower,
+
+    // COBERTURA DOS TÍTULOS
+    coverageDifficulty,
+
+    // FRESHNESS
+    freshnessDifficulty,
+
+    // DOMINÂNCIA
+    channelDominance,
+
+    // REPETIÇÃO
+    repetitionScore,
+
+    // ESTRUTURA DA SERP
+    serpStructureScore,
+
+    // MERCADO
+    marketDifficulty:
+        marketDifficultyScore,
+
+    // MATCHES
+    exactMatches,
+
+    startsWithMatches,
+
+    containsMatches,
+
+    partialMatches,
+
+    // SCORES DE MATCH
+    exactMatchScore,
+
+    prefixMatchScore,
+
+    containsMatchScore,
+
+    partialMatchScore,
+
+    // VÍDEOS RECENTES
+    recentVideos
+
+};
 
 // -------------------------
 // DETALHES DA COMPETIÇÃO

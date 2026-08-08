@@ -1823,65 +1823,83 @@ const titleDemandScore = Math.min(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V6
+// 🚀 TUBEX VOLUME SCORE V7
 // =========================
 //
-// Volume = DEMANDA ESTIMADA
-//
-// Sinais:
-//
-// 1. Presença da keyword nos títulos
-// 2. Mediana da SERP
-// 3. Força do líder
-// 4. Velocidade
-// 5. Vídeos fortes
+// Volume = DEMANDA RELATIVA DA SERP
 //
 // IMPORTANTE:
-// Tamanho da keyword NÃO é
-// usado como proxy de volume.
+// A API pública do YouTube NÃO entrega "buscas por mês".
+// Portanto este score é uma estimativa relativa baseada
+// exclusivamente nos sinais disponíveis na SERP.
 //
+// Sinais usados:
+// 1. Mediana REAL das views da SERP
+// 2. Força do vídeo líder
+// 3. Velocidade nos últimos 31 dias
+// 4. Quantidade de vídeos fortes
+// 5. Presença da keyword nos títulos
+// 6. Distribuição das views como ajuste secundário
+//
+// Não altera a Competition Engine.
+// =========================
 
-// =========================
-// 1. FORÇA DO VÍDEO LÍDER
-// =========================
+// -------------------------
+// 1. MEDIANA REAL DA SERP
+// -------------------------
+// O código antigo pegava items[Math.floor(...)] sem ordenar.
+// Isso NÃO era uma mediana matemática.
+
+const sortedViews = items
+    .map(video => Number(video.statistics?.viewCount || 0))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+
+const realMedian = sortedViews.length
+    ? (
+        sortedViews.length % 2 === 1
+            ? sortedViews[Math.floor(sortedViews.length / 2)]
+            : (
+                sortedViews[sortedViews.length / 2 - 1] +
+                sortedViews[sortedViews.length / 2]
+            ) / 2
+      )
+    : 0;
+
+// -------------------------
+// 2. FORÇA DO LÍDER
+// -------------------------
 
 const topScore = Math.min(
     100,
-    Math.round(
-        Math.log10(top + 1) * 16
-    )
+    Math.round(Math.log10(top + 1) * 16)
 );
 
-
-// =========================
-// 2. FORÇA DA MEDIANA
-// =========================
+// -------------------------
+// 3. FORÇA DA MEDIANA
+// -------------------------
 
 const medianScore = Math.min(
     100,
-    Math.round(
-        Math.log10(median + 1) * 16
-    )
+    Math.round(Math.log10(realMedian + 1) * 16)
 );
 
-
-// =========================
-// 3. VELOCIDADE
-// =========================
+// -------------------------
+// 4. VELOCIDADE — ÚLTIMOS 31 DIAS
+// -------------------------
 
 const velocityScore = Math.min(
     100,
     Math.round(
         Math.log10(
-            averageViewsPerDay + 1
+            Math.max(averageViewsPerDay, 0) + 1
         ) * 20
     )
 );
 
-
-// =========================
-// 4. VÍDEOS FORTES
-// =========================
+// -------------------------
+// 5. VÍDEOS FORTES
+// -------------------------
 
 const strengthScore = Math.min(
     100,
@@ -1893,44 +1911,134 @@ const strengthScore = Math.min(
     )
 );
 
+// -------------------------
+// 6. PRESENÇA DA KEYWORD
+// -------------------------
+// Para volume, match de título é evidência de demanda
+// específica, mas NÃO deve dominar o cálculo.
 
-// =========================
-// 6. DEMANDA DA SERP
-// =========================
-//
-// A mediana é mais importante
-// que apenas o vídeo líder.
-//
-// Um único vídeo gigante
-// não deve transformar uma
-// keyword pequena em "Muito Alta".
-//
-
-const serpDemandScore = Math.round(
-
-      medianScore * 0.40
-
-    + topScore * 0.20
-
-    + velocityScore * 0.20
-
-    + strengthScore * 0.10
-
-    + titleDemandScore * 0.10
-
+const titleDemandScoreV7 = Math.min(
+    100,
+    Math.round(
+        (
+            exactTitleMatches * 5 +
+            prefixTitleMatches * 4 +
+            phraseTitleMatches * 3 +
+            partialTitleMatches * 1
+        ) /
+        Math.max(items.length * 5, 1) * 100
+    )
 );
 
+// -------------------------
+// 7. DEMANDA BASE DA SERP
+// -------------------------
+// Mediana + líder representam a força acumulada da SERP.
+// Velocidade traz o componente recente.
+//
+// O título entra como confirmação, não como substituto
+// de demanda.
 
-// =========================
-// 7. VOLUME FINAL
-// =========================
+const serpDemandBase = Math.round(
+      medianScore * 0.35
+    + topScore * 0.25
+    + velocityScore * 0.20
+    + strengthScore * 0.10
+    + titleDemandScoreV7 * 0.10
+);
+
+// Compatibilidade com o frontend/metrics legado.
+// O nome oficial da demanda base nesta V7 é serpDemandBase,
+// mas a resposta pública continua expondo serpDemandScore.
+const serpDemandScore = serpDemandBase;
+
+// -------------------------
+// 8. AJUSTE DE DISTRIBUIÇÃO
+// -------------------------
+// Evita que um único vídeo gigante infle artificialmente
+// o volume de uma keyword pequena.
+
+const distributionAdjustment =
+    Math.max(
+        0.85,
+        Math.min(
+            1.10,
+            0.90 + (Number(distributionScore || 0) / 100) * 0.20
+        )
+    );
+
+// -------------------------
+// 9. VOLUME FINAL
+// -------------------------
+// Curva suave para ocupar melhor a faixa intermediária.
+// Não força 100 artificialmente.
+
+const calibratedDemand =
+    Math.pow(
+        Math.max(0, Math.min(100, serpDemandBase)) / 100,
+        0.88
+    ) * 100;
+
+// -------------------------
+// 10. DEMANDA ESTRUTURAL DA KEYWORD
+// -------------------------
+// A SERP sozinha pode subestimar termos de mercado muito grande.
+// Usamos somente sinais observáveis na própria SERP para calibrar
+// a escala; a API pública do YouTube não fornece buscas/mês.
+
+const queryLength = keywordWordCount;
+
+const resultBreadthScore = Math.min(
+    100,
+    Math.round(Math.log10(totalResults + 1) * 18)
+);
+
+const titleCoverageForVolume = Math.min(
+    100,
+    Math.round(
+        exactTitleMatches * 5 +
+        prefixTitleMatches * 3.5 +
+        phraseTitleMatches * 2 +
+        partialTitleMatches * 0.5
+    )
+);
+
+// Evidência de mercado amplo: tamanho da SERP + presença real da
+// keyword nos títulos + demanda já estimada pela SERP.
+const broadKeywordSignal = Math.min(
+    100,
+    Math.round(
+        resultBreadthScore * 0.40 +
+        titleCoverageForVolume * 0.35 +
+        serpDemandBase * 0.25
+    )
+);
+
+// Reforço progressivo para termos muito amplos, sem transformar
+// qualquer palavra de uma só palavra automaticamente em alto volume.
+const structuralDemandBoost =
+    queryLength === 1
+        ? (
+            broadKeywordSignal >= 90
+                ? 1.16
+                : broadKeywordSignal >= 75
+                    ? 1.10
+                    : 1.00
+        )
+        : (
+            queryLength === 2 && broadKeywordSignal >= 90
+                ? 1.06
+                : 1.00
+        );
 
 const finalVolume = Math.max(
     0,
     Math.min(
         100,
         Math.round(
-            serpDemandScore
+            calibratedDemand *
+            distributionAdjustment *
+            structuralDemandBoost
         )
     )
 );
@@ -2273,7 +2381,7 @@ const marketDifficultyScore = Math.max(
 // 0   = competição muito alta
 //
 
-const finalCompetitionDifficulty = Math.max(
+const rawCompetitionDifficulty = Math.max(
     0,
 
     Math.min(
@@ -2295,6 +2403,50 @@ const finalCompetitionDifficulty = Math.max(
 
             marketDifficultyScore * 0.05
 
+        )
+
+    )
+
+);
+
+// -----------------------------------------
+// RELEVÂNCIA DA DISPUTA PELA KEYWORD
+// -----------------------------------------
+// Uma SERP pode ser forte e ainda assim ter pouca competição REAL
+// pela frase pesquisada. Quando quase nenhum título disputa a query,
+// a força genérica da SERP não pode transformar a oportunidade em
+// "competição média/alta".
+
+const titleCompetitionSignal = Math.max(
+    0,
+    Math.min(
+        100,
+        Math.round(
+            exactMatchScore * 0.50 +
+            prefixMatchScore * 0.25 +
+            containsMatchScore * 0.20 +
+            partialMatchScore * 0.05
+        )
+    )
+);
+
+// 0% de disputa relevante -> no máximo 35% da dificuldade bruta.
+// 100% de disputa relevante -> mantém 100% da dificuldade bruta.
+// Assim, ausência de vídeos realmente competindo pela query passa a
+// ser um sinal forte de oportunidade, sem zerar a influência da SERP.
+const relevanceDifficultyMultiplier =
+    0.35 +
+    (titleCompetitionSignal / 100) * 0.65;
+
+const finalCompetitionDifficulty = Math.max(
+    0,
+
+    Math.min(
+        100,
+
+        Math.round(
+            rawCompetitionDifficulty *
+            relevanceDifficultyMultiplier
         )
 
     )
@@ -2376,6 +2528,11 @@ const competitionDetails = {
 
     // FORÇA DA SERP
     serpPower,
+
+    // RELEVÂNCIA DA DISPUTA PELA KEYWORD
+    titleCompetitionSignal,
+    rawCompetitionDifficulty,
+    relevanceDifficultyMultiplier,
 
     // COBERTURA DOS TÍTULOS
     coverageDifficulty,
@@ -2945,7 +3102,7 @@ topShare,
 
     minViews,
 
-    medianViews: median
+    medianViews: realMedian
 
 };
 
@@ -2997,13 +3154,16 @@ prefixTitleMatches,
 phraseTitleMatches,
 partialTitleMatches,
 titleDemandScore,
+titleCompetitionSignal,
+rawCompetitionDifficulty,
+relevanceDifficultyMultiplier,
 topScore,
 medianScore,
 velocityScore,
 strengthScore,
 serpDemandScore,
 
-    medianViews: median
+    medianViews: realMedian
 
 }
 

@@ -1192,10 +1192,19 @@ const averageAgeDays = Math.round(
 );
 
 // =========================
-// 🚀 VIEWS POR DIA
+// 🚀 VIEWS POR DIA (31 DIAS)
 // =========================
 
-const viewsPerDayList = items.map(video => {
+// Usa apenas vídeos recentes quando existirem.
+// Caso não existam vídeos dos últimos 31 dias,
+// utiliza toda a SERP como fallback.
+
+const velocitySource =
+    recentItems.length
+        ? recentItems
+        : items;
+
+const viewsPerDayList = velocitySource.map(video => {
 
     const views =
         Number(video.statistics?.viewCount || 0);
@@ -1218,9 +1227,11 @@ const viewsPerDayList = items.map(video => {
 const averageViewsPerDay = Math.round(
 
     viewsPerDayList.reduce(
-        (a, b) => a + b,
+        (acc, value) => acc + value,
         0
-    ) /
+    )
+
+    /
 
     Math.max(
         viewsPerDayList.length,
@@ -1237,7 +1248,6 @@ const maxViewsPerDay = Math.round(
     )
 
 );
-
 
 // =========================
 // 📊 SCORE DE VIEWS/DIA
@@ -1263,7 +1273,9 @@ const viewsPerDayScore = Math.min(
 // 💪 VÍDEOS FORTES
 // =========================
 
-const strongVideos = items.filter(video => {
+const strongVideos =
+(recentItems.length ? recentItems : items)
+.filter(video => {
 
     const views = Number(
         video.statistics?.viewCount || 0
@@ -1508,8 +1520,18 @@ const velocityScore = Math.min(
 
 // Quantidade de vídeos fortes
 const strengthScore = Math.round(
-    (strongVideos / Math.max(items.length,1)) * 100
-);
+
+    (
+
+        strongVideos /
+
+        Math.max(
+            (recentItems.length ? recentItems : items).length,
+            1
+        )
+
+    ) * 100
+
 
 // Long Tail
 const longTailBonus = keywordScore;

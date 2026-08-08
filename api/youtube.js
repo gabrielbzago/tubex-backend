@@ -1790,14 +1790,49 @@ const coverageDifficulty = Math.round(
 );
 
 // -------------------------
+// Dominância de canais
+// -------------------------
+
+const channelCount = {};
+
+items.forEach(video => {
+
+    const id = video.snippet?.channelId;
+
+    if(!id) return;
+
+    channelCount[id] = (channelCount[id] || 0) + 1;
+
+});
+
+const biggestChannel = Math.max(
+
+    ...Object.values(channelCount),
+
+    0
+
+);
+
+const channelDominance = Math.round(
+
+    (biggestChannel / Math.max(items.length,1)) * 100
+
+);
+
+// -------------------------
 // Competição Final
 // -------------------------
 const competition = Math.round(
 
-      competitionMarketDifficulty * 0.45
-    + (100 - coverageDifficulty) * 0.30
+      competitionMarketDifficulty * 0.35
+
+    + (100 - coverageDifficulty) * 0.25
+
     + (100 - freshnessDifficulty) * 0.10
+
     + (100 - totalResultsScore) * 0.15
+
+    + channelDominance * 0.15
 
 );
 // Garante faixa válida
@@ -1827,6 +1862,8 @@ const competitionDetails = {
     coverageDifficulty,
 
     freshnessDifficulty,
+
+    channelDominance,
 
     exactMatches,
 

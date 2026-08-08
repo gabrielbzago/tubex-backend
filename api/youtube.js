@@ -1146,9 +1146,58 @@ console.log("Vídeos encontrados:", items.length);
 console.log("Vídeos últimos 31 dias:", recentItems.length);
 console.log("================================");
 
-    const totalViews = items.reduce((acc, v) =>
-      acc + Number(v.statistics?.viewCount || 0), 0
-    );
+   // =========================
+// 📅 VIEWS PONDERADAS PELA IDADE
+// =========================
+
+const weightedViews = items.reduce((acc, video) => {
+
+    const views =
+        Number(video.statistics?.viewCount || 0);
+
+    const published =
+        new Date(
+            video.snippet?.publishedAt
+        ).getTime();
+
+    const ageDays =
+        Math.max(
+            1,
+            (Date.now() - published) / 86400000
+        );
+
+    let weight = 1;
+
+    if (ageDays <= 90) {
+
+        weight = 1.40;
+
+    } else if (ageDays <= 180) {
+
+        weight = 1.25;
+
+    } else if (ageDays <= 365) {
+
+        weight = 1.10;
+
+    } else if (ageDays <= 730) {
+
+        weight = 0.90;
+
+    } else {
+
+        weight = 0.70;
+
+    }
+
+    return acc + (views * weight);
+
+}, 0);
+
+const avgViews =
+    weightedViews /
+    Math.max(items.length, 1);
+
 
     const avgViews =
   totalViews /

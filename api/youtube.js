@@ -1278,25 +1278,7 @@ const maxViewsPerDay = Math.round(
 
 );
 
-const serpPower = Math.min(
 
-100,
-
-Math.round(
-
-Math.log10(
-
-averageViewsPerDay *
-
-Math.max(median,1)
-
-+1
-
-)*8
-
-)
-
-);
 
 
 // =========================
@@ -1881,22 +1863,39 @@ const finalVolume = Math.max(
 
 
 // =========================
-// 🚀 TUBEX COMPETITION V6
+// 🚀 TUBEX COMPETITION V7
 // =========================
-// A concorrência mede a dificuldade de disputar a SERP.
-// Não usa distribuição/consistência como substitutos de demanda.
-// A força da SERP vem de sinais públicos dos próprios vídeos.
+//
+// UMA ÚNICA ENGINE DE CONCORRÊNCIA.
+//
+// A pontuação oficial é finalCompetition.
+// competitionScore será apenas um alias desse mesmo valor.
+//
+// Sinais:
+// 1. Match exato
+// 2. Match no início do título
+// 3. Cobertura da keyword
+// 4. Força da SERP
+// 5. Freshness ponderado por idade
+// 6. Dominância/repetição de canais
+// 7. Distribuição/consistência como sinal secundário
+// 8. Market difficulty como sinal pequeno
+//
+// A janela de 31 dias NÃO limita a SERP.
+// Ela já é usada para velocidade/demanda.
+// Para competição, toda a SERP permanece válida,
+// com peso maior para vídeos recentes.
 
 let exactMatches = 0;
 let startsWithMatches = 0;
 let containsMatches = 0;
 let partialMatches = 0;
-let recentVideos = 0;
 
 let freshnessTotal = 0;
+let recentVideos = 0;
 
 // -------------------------
-// MATCH + FRESHNESS POR VÍDEO
+// MATCH + FRESHNESS
 // -------------------------
 
 items.forEach(video => {
@@ -1941,17 +1940,25 @@ items.forEach(video => {
         ).length;
 
         partialMatches +=
-            matchedWords / Math.max(keywordWords.length, 1);
+            matchedWords /
+            Math.max(keywordWords.length, 1);
 
     }
 
     // -------------------------
-    // FRESHNESS
-    // Usa toda a SERP, mas dá peso maior
-    // aos vídeos realmente recentes.
+    // FRESHNESS PONDERADO
     // -------------------------
+    //
+    // Não exclui vídeos antigos.
+    // Apenas reduz sua influência.
+    //
+    // 0-31   = 100
+    // 32-90  = 80
+    // 91-180 = 60
+    // 181-365= 40
+    // >365   = 20
 
-    let freshnessWeight = 10;
+    let freshnessWeight = 20;
 
     if (ageDays <= 31) {
 
@@ -1960,11 +1967,11 @@ items.forEach(video => {
 
     } else if (ageDays <= 90) {
 
-        freshnessWeight = 85;
+        freshnessWeight = 80;
 
     } else if (ageDays <= 180) {
 
-        freshnessWeight = 65;
+        freshnessWeight = 60;
 
     } else if (ageDays <= 365) {
 
@@ -1976,35 +1983,52 @@ items.forEach(video => {
 
 });
 
+const itemCount = Math.max(items.length, 1);
+
 // -------------------------
 // MATCH SCORE
 // -------------------------
+//
+// Cada nível é separado para que:
+// - match exato pese mais
+// - prefixo pese menos
+// - contains seja intermediário
+// - parcial tenha peso pequeno
+//
+// Isso evita transformar "contém a palavra" em
+// equivalente a "o título foi feito para aquela busca".
 
-const itemCount = Math.max(items.length, 1);
-
-const titleMatchScore = Math.round(
-
-    (
-        exactMatches * 100 +
-        startsWithMatches * 90 +
-        containsMatches * 70 +
-        partialMatches * 40
-    ) /
-    itemCount
-
+const exactMatchScore = Math.round(
+    (exactMatches / itemCount) * 100
 );
 
-const coverageDifficulty = Math.max(
+const prefixMatchScore = Math.round(
+    (startsWithMatches / itemCount) * 100
+);
 
-    0,
+const containsMatchScore = Math.round(
+    (containsMatches / itemCount) * 100
+);
 
+const partialMatchScore = Math.round(
     Math.min(
-
         100,
-
-        titleMatchScore
-
+        (partialMatches / itemCount) * 100
     )
+);
+
+// Cobertura final dos títulos.
+// É um sinal importante, mas não domina a competição.
+
+const coverageDifficulty = Math.round(
+
+    exactMatchScore * 0.45 +
+
+    prefixMatchScore * 0.30 +
+
+    containsMatchScore * 0.15 +
+
+    partialMatchScore * 0.10
 
 );
 
@@ -2013,14 +2037,20 @@ const coverageDifficulty = Math.max(
 // -------------------------
 
 const freshnessDifficulty = Math.round(
-
     freshnessTotal / itemCount
-
 );
 
 // -------------------------
 // DOMINÂNCIA DE CANAIS
 // -------------------------
+//
+// Sem fazer novas chamadas à API, usamos a própria SERP.
+// Um canal que ocupa vários resultados indica uma SERP
+// mais concentrada e difícil.
+//
+// Não confundimos isso com autoridade de inscritos,
+// porque subscriberCount não está disponível nos objetos
+// de pesquisa atuais.
 
 const channelCount = {};
 
@@ -2072,20 +2102,41 @@ const repetitionScore = Math.round(
 // -------------------------
 // SERP STRENGTH
 // -------------------------
-// Combina sinais de força que já existem
-// no backend, sem criar uma segunda métrica
-// baseada nos mesmos dados.
+//
+// Usa exclusivamente os quatro sinais pedidos:
+// - mediana
+// - top
+// - velocidade
+// - vídeos fortes
+//
+// serpPower é a única variável de força da SERP.
 
-const serpStrengthScore = Math.round(
+const serpPower = Math.round(
 
-    (
-        viewsPerDayScore * 0.40 +
-        Math.min(100, Math.round(
-            Math.log10(median + 1) * 14
-        )) * 0.35 +
-        Math.min(100, Math.round(
-            Math.log10(top + 1) * 14
-        )) * 0.25
+    Math.min(
+        100,
+
+        (
+            Math.min(
+                100,
+                Math.round(Math.log10(median + 1) * 14)
+            ) * 0.35
+
+            +
+
+            Math.min(
+                100,
+                Math.round(Math.log10(top + 1) * 14)
+            ) * 0.25
+
+            +
+
+            viewsPerDayScore * 0.25
+
+            +
+
+            strongVideosScore * 0.15
+        )
     )
 
 );
@@ -2093,12 +2144,14 @@ const serpStrengthScore = Math.round(
 // -------------------------
 // DISTRIBUIÇÃO / CONSISTÊNCIA
 // -------------------------
-// São sinais secundários. Eles não determinam
-// sozinhos a competição.
+//
+// Sinal secundário.
+// Não pode dominar a competição.
 
 const serpStructureScore = Math.round(
 
     distributionScore * 0.50 +
+
     consistencyScore * 0.50
 
 );
@@ -2106,46 +2159,38 @@ const serpStructureScore = Math.round(
 // -------------------------
 // MARKET DIFFICULTY
 // -------------------------
-// Usa o marketDifficulty já calculado acima.
-// 100 = mercado naturalmente amplo/competitivo.
+//
+// O marketDifficulty já foi calculado acima.
+// Ele é deliberadamente pequeno na fórmula final,
+// pois tamanho da keyword sozinho não prova competição.
 
 const marketDifficultyScore = Math.max(
 
     0,
 
     Math.min(
-
         100,
-
         Number(marketDifficulty) || 0
-
     )
 
 );
 
 // -------------------------
-// COMPETIÇÃO FINAL V6
+// COMPETITION FINAL V7
 // -------------------------
-// Peso maior para força real da SERP.
-// Títulos e canais ajudam a diferenciar a dificuldade.
-
-const competition = Math.round(
-
-      serpStrengthScore * 0.35
-
-    + coverageDifficulty * 0.20
-
-    + channelDominance * 0.10
-
-    + repetitionScore * 0.05
-
-    + freshnessDifficulty * 0.15
-
-    + serpStructureScore * 0.05
-
-    + marketDifficultyScore * 0.10
-
-);
+//
+// UMA ÚNICA PONTUAÇÃO OFICIAL.
+//
+// 35% força real da SERP
+// 25% match/cobertura dos títulos
+// 15% freshness
+// 10% dominância
+// 5% repetição
+// 5% estrutura/distribuição
+// 5% mercado
+//
+// O mercado permanece pequeno para não transformar
+// automaticamente qualquer keyword curta em 100.
 
 const finalCompetition = Math.max(
 
@@ -2155,11 +2200,37 @@ const finalCompetition = Math.max(
 
         100,
 
-        competition
+        Math.round(
+
+            serpPower * 0.35 +
+
+            coverageDifficulty * 0.25 +
+
+            freshnessDifficulty * 0.15 +
+
+            channelDominance * 0.10 +
+
+            repetitionScore * 0.05 +
+
+            serpStructureScore * 0.05 +
+
+            marketDifficultyScore * 0.05
+
+        )
 
     )
 
 );
+
+// -------------------------
+// ALIAS OFICIAL
+// -------------------------
+//
+// Não existe uma segunda engine.
+// competitionScore é exatamente o mesmo score.
+
+const competition = finalCompetition;
+const competitionScore = finalCompetition;
 
 // -------------------------
 // DETALHES DA COMPETIÇÃO
@@ -2167,8 +2238,9 @@ const finalCompetition = Math.max(
 
 const competitionDetails = {
 
-    marketDifficulty:
-        marketDifficultyScore,
+    finalCompetition,
+
+    serpPower,
 
     coverageDifficulty,
 
@@ -2178,9 +2250,9 @@ const competitionDetails = {
 
     repetitionScore,
 
-    serpStrengthScore,
-
     serpStructureScore,
+
+    marketDifficulty: marketDifficultyScore,
 
     exactMatches,
 
@@ -2189,6 +2261,14 @@ const competitionDetails = {
     containsMatches,
 
     partialMatches,
+
+    exactMatchScore,
+
+    prefixMatchScore,
+
+    containsMatchScore,
+
+    partialMatchScore,
 
     recentVideos
 
@@ -2680,89 +2760,20 @@ items.length
 : 0;
 
 // =========================
-// 🚀 TUBEX COMPETITION SCORE
+// 🚀 COMPETITION SCORE
 // =========================
+//
+// Não existe cálculo paralelo.
+// competitionScore já foi definido como alias
+// oficial de finalCompetition na Competition V7.
 
-// Score da quantidade de vídeos analisados
-
-const videoScore =
-
-    Math.min(
-
-        items.length / 50,
-
-        1
-
-    ) * 20;
-
-// Score da média de views
-
-const averageViewsScore =
-
-    Math.min(
-
-        Math.log10(averageViews + 1) / 8,
-
-        1
-
-    ) * 30;
-
-// Score do maior vídeo
-
-const maxViewsScore =
-
-    Math.min(
-
-        Math.log10(maxViews + 1) / 8,
-
-        1
-
-    ) * 20;
-
-// Score da concorrência
-
-const competitionBase =
-
-    competition * 0.30;
-
-// =========================
-// IDADE DOS VÍDEOS
-// =========================
-
-const ageScore =
-
-    Math.min(
-
-        averageAgeDays / 365,
-
-        5
-
-    ) * 6;
-
-// Resultado
-
-const competitionScore =
-
-    Math.round(
-
-        videoScore +
-
-averageViewsScore +
-
-maxViewsScore +
-
-competitionBase +
-
-ageScore
-
-    );
 // =========================
 // 📦 RESPONSE
 // =========================
 
 const trend = generateEstimatedTrend(
     finalVolume,
-    competition
+    finalCompetition
 );
 // =========================
 // 📊 YOUTUBE METRICS

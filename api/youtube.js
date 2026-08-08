@@ -1401,6 +1401,94 @@ const consistencyScore = Math.max(
 
 );
 
+
+// =========================
+// 📊 VIEW DISTRIBUTION SCORE
+// =========================
+
+// Soma total de views
+
+const totalViewCount =
+    items.reduce(
+
+        (acc, video)=>
+
+            acc +
+
+            Number(
+                video.statistics?.viewCount || 0
+            ),
+
+        0
+
+    );
+
+// Top 20% dos vídeos
+
+const topVideos =
+
+    items.slice(
+
+        0,
+
+        Math.max(
+            1,
+            Math.ceil(items.length * 0.20)
+        )
+
+    );
+
+// Views concentradas no topo
+
+const topViews =
+
+    topVideos.reduce(
+
+        (acc, video)=>
+
+            acc +
+
+            Number(
+                video.statistics?.viewCount || 0
+            ),
+
+        0
+
+    );
+
+// Percentual concentrado
+
+const topShare =
+
+    totalViewCount > 0
+
+        ? topViews / totalViewCount
+
+        : 1;
+
+// Score
+
+const distributionScore = Math.round(
+
+    Math.max(
+
+        0,
+
+        Math.min(
+
+            100,
+
+            100 -
+
+            ((topShare - 0.20) * 125)
+
+        )
+
+    )
+
+);
+
+
 // =========================
 // 🔍 KEYWORD SCORE
 // =========================
@@ -1704,11 +1792,11 @@ demandScore = Math.min(
 
 const volume = Math.round(
 
-      demandScore * 0.40
+      demandScore * 0.36
 
-    + topScore * 0.12
+    + topScore * 0.10
 
-    + medianScore * 0.12
+    + medianScore * 0.10
 
     + velocityScore * 0.10
 
@@ -1716,7 +1804,9 @@ const volume = Math.round(
 
     + relevanceScore * 0.10
 
-    + consistencyScore * 0.11
+    + consistencyScore * 0.10
+
+    + distributionScore * 0.09
 
 );
 
@@ -2539,6 +2629,8 @@ relevanceScore,
 
     averageViewsPerDay,
 strongVideos,
+distributionScore,
+topShare,
 
     maxViewsPerDay,
 
@@ -2576,7 +2668,9 @@ youtubeMetrics,
     averageViews,
 
     averageViewsPerDay,
+distributionScore,
 
+topShare,
     maxViewsPerDay,
 strongVideos,
 relevanceScore,

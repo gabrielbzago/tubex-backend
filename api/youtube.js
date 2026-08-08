@@ -1350,40 +1350,6 @@ const strongVideos =
 }).length;
 
 
-let viralVideos=0;
-
-velocitySource.forEach(video=>{
-
-const views=
-Number(video.statistics.viewCount||0);
-
-const age=Math.max(
-
-1,
-
-(Date.now()-new Date(video.snippet.publishedAt))/86400000
-
-);
-
-const velocity=views/age;
-
-if(velocity>=100000){
-
-viralVideos++;
-
-}
-
-});
-
-const viralScore=Math.round(
-
-viralVideos/
-
-Math.max(velocitySource.length,1)
-
-*100
-
-);
 
 // =========================
 // 💪 SCORE DE VÍDEOS FORTES
@@ -2064,121 +2030,22 @@ const giantChannelScore = Math.round(
 
 );
 
-const repeatedChannels=
-
-Object.values(channelCount)
-
-.filter(v=>v>=2)
-
-.length;
-
-const repetitionScore=Math.round(
-
-repeatedChannels/
-
-Math.max(Object.keys(channelCount).length,1)
-
-*100
-
-);
-
-// =========================
-// FRESHNESS SCORE
-// =========================
-
-const freshnessScore = Math.round(
-
-    Math.max(
-
-        0,
-
-        100 - (averageAgeDays / 12)
-
-    )
-
-);
-
-// =========================
-// AUTHORITY SCORE
-// =========================
-
-const authorityScore = Math.round(
-
-(
-
-channelDominance +
-
-competitionMarketDifficulty
-
-)
-
-/
-
-2
-
-);
-
-
-// =========================
-// STRENGTH SCORE
-// =========================
-
-const serpStrengthScore  = Math.round(
-
-(
-
-serpPower +
-
-viewsPerDayScore +
-
-distributionScore +
-
-consistencyScore
-
-)
-
-/
-
-4
-
-);
-
-// =========================
-// SEO DIFFICULTY
-// =========================
-
-const seoDifficulty = Math.round(
-
-(
-
-coverageDifficulty +
-
-relevanceScore +
-
-totalResultsScore
-
-)
-
-/
-
-3
-
-);
-
 // -------------------------
 // Competição Final
 // -------------------------
 const competition = Math.round(
 
-serpStrengthScore * 0.35
+serpPower *0.30 +
 
-authorityScore * 0.25 +
+coverageDifficulty *0.15 +
 
-seoDifficulty * 0.20 +
+channelDominance *0.20 +
 
-freshnessScore * 0.10 +
+freshnessDifficulty *0.15 +
 
-competitionMarketDifficulty * 0.10
+competitionMarketDifficulty *0.20 +
+
+totalResultsScore *0.10
 
 );
 
@@ -2188,23 +2055,13 @@ const finalCompetition = Math.max(
 
     5,
 
-   Math.min(
+    Math.min(
 
-100,
+        100,
 
-Math.round(
+        competition
 
-Math.pow(
-
-competition / 100,
-
-0.82
-
-) * 100
-
-)
-
-)
+    )
 
 );
 

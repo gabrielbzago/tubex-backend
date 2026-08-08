@@ -1895,45 +1895,6 @@ const strengthScore = Math.min(
 
 
 // =========================
-// 5. PRESENÇA DA KEYWORD
-// =========================
-//
-// Este é um sinal importante.
-//
-// Quanto mais títulos usam
-// exatamente a consulta,
-// maior a evidência de demanda
-// específica por aquele termo.
-//
-
-const titleDemandScore = Math.min(
-    100,
-    Math.round(
-
-        (
-            exactTitleMatches * 5 +
-
-            prefixTitleMatches * 4 +
-
-            phraseTitleMatches * 3 +
-
-            partialTitleMatches * 1
-        )
-
-        /
-
-        Math.max(
-            items.length * 5,
-            1
-        )
-
-        * 100
-
-    )
-);
-
-
-// =========================
 // 6. DEMANDA DA SERP
 // =========================
 //

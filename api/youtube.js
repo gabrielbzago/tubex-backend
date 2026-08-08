@@ -1876,11 +1876,11 @@ items.forEach(video=>{
 
     // vídeo recente aumenta concorrência
 
-    if(ageDays <= 365){
+  if (ageDays <= 90) {
 
-        recentVideos++;
+    recentVideos++;
 
-    }
+}
 
 });
 
@@ -1909,27 +1909,27 @@ let competitionMarketDifficulty = 100;
 switch (keywordWords.length){
 
     case 1:
-        competitionMarketDifficulty = 5;
+        competitionMarketDifficulty = 100;
         break;
 
     case 2:
-        competitionMarketDifficulty = 20;
+        competitionMarketDifficulty = 90;
         break;
 
     case 3:
-        competitionMarketDifficulty = 40;
+        competitionMarketDifficulty = 75;
         break;
 
     case 4:
-        competitionMarketDifficulty = 60;
+        competitionMarketDifficulty = 55;
         break;
 
     case 5:
-        competitionMarketDifficulty = 80;
+        competitionMarketDifficulty = 35;
         break;
 
     default:
-        competitionMarketDifficulty = 95;
+        competitionMarketDifficulty = 20;
         break;
 
 }

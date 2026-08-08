@@ -1745,19 +1745,100 @@ const relevanceScore = Math.round(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V5
+// 🎯 MATCHES DE TÍTULO
 // =========================
 //
-// Volume = DEMANDA ESTIMADA.
+// Mede quanto a SERP realmente
+// responde à keyword pesquisada.
 //
-// O score usa:
-// 1. Demanda estrutural da keyword
-// 2. Força do vídeo líder
-// 3. Mediana da SERP
-// 4. Velocidade de views
+
+let exactTitleMatches = 0;
+let prefixTitleMatches = 0;
+let phraseTitleMatches = 0;
+let partialTitleMatches = 0;
+
+items.forEach(video => {
+
+    const title =
+        String(video.snippet?.title || "")
+            .toLowerCase()
+            .trim();
+
+    if (title === normalizedKeyword) {
+
+        exactTitleMatches++;
+
+    }
+    else if (title.startsWith(normalizedKeyword)) {
+
+        prefixTitleMatches++;
+
+    }
+    else if (title.includes(normalizedKeyword)) {
+
+        phraseTitleMatches++;
+
+    }
+    else {
+
+        const matchedWords =
+            keywordWords.filter(word =>
+                title.includes(word)
+            ).length;
+
+        if (
+            matchedWords >=
+            Math.ceil(keywordWords.length * 0.5)
+        ) {
+
+            partialTitleMatches++;
+
+        }
+
+    }
+
+});
+
+const titleDemandScore = Math.min(
+    100,
+    Math.round(
+
+        (
+            exactTitleMatches * 5 +
+
+            prefixTitleMatches * 4 +
+
+            phraseTitleMatches * 3 +
+
+            partialTitleMatches * 1
+        )
+
+        /
+
+        Math.max(items.length * 5, 1)
+
+        * 100
+
+    )
+);
+
+// =========================
+// 🚀 TUBEX VOLUME SCORE V6
+// =========================
 //
-// 100 = demanda excepcional
-// 0   = demanda praticamente inexistente
+// Volume = DEMANDA ESTIMADA
+//
+// Sinais:
+//
+// 1. Presença da keyword nos títulos
+// 2. Mediana da SERP
+// 3. Força do líder
+// 4. Velocidade
+// 5. Vídeos fortes
+//
+// IMPORTANTE:
+// Tamanho da keyword NÃO é
+// usado como proxy de volume.
 //
 
 // =========================
@@ -1791,172 +1872,106 @@ const medianScore = Math.min(
 const velocityScore = Math.min(
     100,
     Math.round(
-        Math.log10(averageViewsPerDay + 1) * 20
+        Math.log10(
+            averageViewsPerDay + 1
+        ) * 20
     )
 );
 
 
 // =========================
-// 4. DEMANDA ESTRUTURAL
+// 4. VÍDEOS FORTES
 // =========================
 
-let demandScore = 0;
-
-
-// -------------------------
-// TAMANHO DA KEYWORD
-// -------------------------
-
-if (keywordWordCount === 1) {
-
-    demandScore += 45;
-
-}
-else if (keywordWordCount === 2) {
-
-    demandScore += 30;
-
-}
-else if (keywordWordCount === 3) {
-
-    demandScore += 18;
-
-}
-else if (keywordWordCount === 4) {
-
-    demandScore += 10;
-
-}
-else {
-
-    demandScore += 5;
-
-}
-
-
-// -------------------------
-// QUANTIDADE DE RESULTADOS
-// -------------------------
-
-demandScore +=
-    totalResultsScore * 0.20;
-
-
-// -------------------------
-// VÍDEO LÍDER
-// -------------------------
-
-if (top > 10000000) {
-
-    demandScore += 20;
-
-}
-else if (top > 1000000) {
-
-    demandScore += 15;
-
-}
-else if (top > 100000) {
-
-    demandScore += 10;
-
-}
-
-
-// -------------------------
-// MEDIANA
-// -------------------------
-
-if (median > 1000000) {
-
-    demandScore += 10;
-
-}
-else if (median > 100000) {
-
-    demandScore += 5;
-
-}
-
-
-// -------------------------
-// LIMITE
-// -------------------------
-
-demandScore = Math.max(
-    0,
-    Math.min(
-        100,
-        Math.round(demandScore)
+const strengthScore = Math.min(
+    100,
+    Math.round(
+        (
+            strongVideos /
+            Math.max(items.length, 1)
+        ) * 100
     )
 );
 
 
 // =========================
-// 5. VOLUME BRUTO
+// 5. PRESENÇA DA KEYWORD
 // =========================
 //
-// Agora os sinais de views têm
-// um pouco mais de peso.
+// Este é um sinal importante.
 //
-// Isso permite que keywords
-// gigantes atinjam o topo naturalmente.
+// Quanto mais títulos usam
+// exatamente a consulta,
+// maior a evidência de demanda
+// específica por aquele termo.
 //
 
-const rawVolume = Math.round(
+const titleDemandScore = Math.min(
+    100,
+    Math.round(
 
-      demandScore * 0.50
+        (
+            exactTitleMatches * 5 +
+
+            prefixTitleMatches * 4 +
+
+            phraseTitleMatches * 3 +
+
+            partialTitleMatches * 1
+        )
+
+        /
+
+        Math.max(
+            items.length * 5,
+            1
+        )
+
+        * 100
+
+    )
+);
+
+
+// =========================
+// 6. DEMANDA DA SERP
+// =========================
+//
+// A mediana é mais importante
+// que apenas o vídeo líder.
+//
+// Um único vídeo gigante
+// não deve transformar uma
+// keyword pequena em "Muito Alta".
+//
+
+const serpDemandScore = Math.round(
+
+      medianScore * 0.40
 
     + topScore * 0.20
 
-    + medianScore * 0.20
+    + velocityScore * 0.20
 
-    + velocityScore * 0.10
+    + strengthScore * 0.10
+
+    + titleDemandScore * 0.10
 
 );
-
-
-// =========================
-// 6. SATURAÇÃO DE DEMANDA
-// =========================
-//
-// Se a keyword apresenta:
-// - demanda estrutural muito alta
-// - líder extremamente forte
-// - mediana extremamente forte
-//
-// consideramos demanda máxima.
-//
-
-const maximumDemandSignal =
-
-    demandScore >= 90 &&
-
-    topScore >= 90 &&
-
-    medianScore >= 85;
 
 
 // =========================
 // 7. VOLUME FINAL
 // =========================
 
-let finalVolume = Math.max(
-
+const finalVolume = Math.max(
     0,
-
     Math.min(
-
         100,
-
-        maximumDemandSignal
-
-            ? 100
-
-            : rawVolume
-
+        Math.round(
+            serpDemandScore
+        )
     )
-
 );
 
 // =========================

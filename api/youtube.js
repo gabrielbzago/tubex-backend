@@ -1742,7 +1742,6 @@ else{
 
 // Muitos vídeos realmente relevantes
 
-demandScore += relevanceScore * 0.25;
 demandScore += totalResultsScore * 0.20;
 
 // Vídeos extremamente fortes
@@ -1792,21 +1791,17 @@ demandScore = Math.min(
 
 const volume = Math.round(
 
-      demandScore * 0.36
+      demandScore * 0.45
 
-    + topScore * 0.10
+    + topScore * 0.15
 
-    + medianScore * 0.10
+    + medianScore * 0.15
 
     + velocityScore * 0.10
 
     + strengthScore * 0.05
 
     + relevanceScore * 0.10
-
-    + consistencyScore * 0.10
-
-    + distributionScore * 0.09
 
 );
 
@@ -1994,17 +1989,22 @@ const channelDominance = Math.round(
 // -------------------------
 const competition = Math.round(
 
-      competitionMarketDifficulty * 0.35
+      competitionMarketDifficulty * 0.25
 
-    + (100 - coverageDifficulty) * 0.25
+    + (100 - coverageDifficulty) * 0.20
 
     + (100 - freshnessDifficulty) * 0.10
 
-    + (100 - totalResultsScore) * 0.15
+    + (100 - totalResultsScore) * 0.10
 
     + channelDominance * 0.15
 
+    + consistencyScore * 0.10
+
+    + distributionScore * 0.10
+
 );
+
 // Garante faixa válida
 
 const finalCompetition = Math.max(

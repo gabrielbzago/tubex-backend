@@ -2123,7 +2123,7 @@ competitionMarketDifficulty
 // STRENGTH SCORE
 // =========================
 
-const strengthScore = Math.round(
+const serpStrengthScore  = Math.round(
 
 (
 
@@ -2170,7 +2170,7 @@ totalResultsScore
 // -------------------------
 const competition = Math.round(
 
-strengthScore * 0.35 +
+serpStrengthScore * 0.35
 
 authorityScore * 0.25 +
 

@@ -3031,6 +3031,16 @@ consistencyScore,
     maxViews,
 
     minViews,
+exactTitleMatches,
+prefixTitleMatches,
+phraseTitleMatches,
+partialTitleMatches,
+titleDemandScore,
+topScore,
+medianScore,
+velocityScore,
+strengthScore,
+serpDemandScore,
 
     medianViews: median
 

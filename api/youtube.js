@@ -1146,68 +1146,44 @@ console.log("Vídeos encontrados:", items.length);
 console.log("Vídeos últimos 31 dias:", recentItems.length);
 console.log("================================");
 
-   // =========================
-// 📅 VIEWS PONDERADAS PELA IDADE
+// =========================
+// 📊 ESTATÍSTICAS DA SERP
 // =========================
 
-const weightedViews = items.reduce((acc, video) => {
+const totalViews = items.reduce((acc, video) => {
 
-    const views =
-        Number(video.statistics?.viewCount || 0);
+    return acc +
 
-    const published =
-        new Date(
-            video.snippet?.publishedAt
-        ).getTime();
-
-    const ageDays =
-        Math.max(
-            1,
-            (Date.now() - published) / 86400000
+        Number(
+            video.statistics?.viewCount || 0
         );
-
-    let weight = 1;
-
-    if (ageDays <= 90) {
-
-        weight = 1.40;
-
-    } else if (ageDays <= 180) {
-
-        weight = 1.25;
-
-    } else if (ageDays <= 365) {
-
-        weight = 1.10;
-
-    } else if (ageDays <= 730) {
-
-        weight = 0.90;
-
-    } else {
-
-        weight = 0.70;
-
-    }
-
-    return acc + (views * weight);
 
 }, 0);
 
 const avgViews =
-    weightedViews /
-    Math.max(items.length, 1);
 
+    totalViews /
 
-    const avgViews =
-  totalViews /
-  Math.max(items.length, 1);
+    Math.max(
+        items.length,
+        1
+    );
 
-    const top = Number(items[0]?.statistics?.viewCount || 0);
+const top =
+
+    Number(
+        items[0]?.statistics?.viewCount || 0
+    );
+
 const median =
-  Number(
-    items[Math.floor(items.length / 2)]?.statistics?.viewCount || 0
-  );
+
+    Number(
+
+        items[
+            Math.floor(items.length / 2)
+        ]?.statistics?.viewCount || 0
+
+    );
 
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS

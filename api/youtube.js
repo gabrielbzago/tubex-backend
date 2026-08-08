@@ -2044,7 +2044,7 @@ const finalVolume = Math.max(
 );
 
 // =========================
-// 🚀 TUBEX COMPETITION V7
+// 🚀 TUBEX COMPETITION V8 — BALANCED
 // =========================
 //
 // UMA ÚNICA ENGINE DE CONCORRÊNCIA.
@@ -2389,19 +2389,23 @@ const rawCompetitionDifficulty = Math.max(
 
         Math.round(
 
-            serpPower * 0.35 +
+            // SERP forte importa, mas não pode esmagar a oportunidade
+            // quando poucos vídeos realmente disputam a keyword.
+            serpPower * 0.27 +
 
-            coverageDifficulty * 0.25 +
+            // A presença da keyword nos títulos é o principal sinal
+            // de competição REAL pela busca.
+            coverageDifficulty * 0.34 +
 
-            freshnessDifficulty * 0.15 +
+            freshnessDifficulty * 0.10 +
 
-            channelDominance * 0.10 +
+            channelDominance * 0.08 +
 
-            repetitionScore * 0.05 +
+            repetitionScore * 0.06 +
 
             serpStructureScore * 0.05 +
 
-            marketDifficultyScore * 0.05
+            marketDifficultyScore * 0.10
 
         )
 
@@ -2412,33 +2416,44 @@ const rawCompetitionDifficulty = Math.max(
 // -----------------------------------------
 // RELEVÂNCIA DA DISPUTA PELA KEYWORD
 // -----------------------------------------
-// Uma SERP pode ser forte e ainda assim ter pouca competição REAL
-// pela frase pesquisada. Quando quase nenhum título disputa a query,
-// a força genérica da SERP não pode transformar a oportunidade em
-// "competição média/alta".
+// A força da SERP e a competição pela frase são coisas diferentes.
+// Se os resultados não usam a keyword no título, a oportunidade
+// deve subir. Porém, não podemos reduzir a dificuldade para quase
+// zero, porque ainda existe competição temática/indireta.
+//
+// Escala:
+// exact  = disputa mais forte
+// prefix = disputa forte
+// phrase = disputa moderada
+// partial= sinal fraco
 
 const titleCompetitionSignal = Math.max(
     0,
     Math.min(
         100,
         Math.round(
-            exactMatchScore * 0.50 +
+            exactMatchScore * 0.60 +
             prefixMatchScore * 0.25 +
-            containsMatchScore * 0.20 +
+            containsMatchScore * 0.10 +
             partialMatchScore * 0.05
         )
     )
 );
 
-// 0% de disputa relevante -> no máximo 35% da dificuldade bruta.
-// 100% de disputa relevante -> mantém 100% da dificuldade bruta.
-// Assim, ausência de vídeos realmente competindo pela query passa a
-// ser um sinal forte de oportunidade, sem zerar a influência da SERP.
+// O multiplicador agora é deliberadamente mais equilibrado.
+//
+// 0% de disputa pela keyword  -> 55% da dificuldade bruta
+// 50% de disputa               -> 77,5%
+// 100% de disputa              -> 100%
+//
+// Isso evita os dois extremos:
+// - keyword sem títulos iguais não vira automaticamente 100;
+// - keyword com vários concorrentes não despenca para 0.
 const relevanceDifficultyMultiplier =
-    0.35 +
-    (titleCompetitionSignal / 100) * 0.65;
+    0.55 +
+    (titleCompetitionSignal / 100) * 0.45;
 
-const finalCompetitionDifficulty = Math.max(
+let finalCompetitionDifficulty = Math.max(
     0,
 
     Math.min(
@@ -2452,6 +2467,31 @@ const finalCompetitionDifficulty = Math.max(
     )
 
 );
+
+// -----------------------------------------
+// AJUSTE DE OPORTUNIDADE SEM MATCH
+// -----------------------------------------
+// Quando praticamente ninguém usa a keyword no título, isso é uma
+// evidência forte de que a SERP não está saturada pela frase exata.
+// Aplicamos um bônus moderado de oportunidade, sem ignorar a força
+// geral dos resultados.
+//
+// Importante: isso NÃO altera o volume.
+if (titleCompetitionSignal <= 5) {
+
+    finalCompetitionDifficulty = Math.max(
+        0,
+        finalCompetitionDifficulty - 10
+    );
+
+} else if (titleCompetitionSignal <= 15) {
+
+    finalCompetitionDifficulty = Math.max(
+        0,
+        finalCompetitionDifficulty - 5
+    );
+
+}
 
 
 // -------------------------

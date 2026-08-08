@@ -1823,65 +1823,83 @@ const titleDemandScore = Math.min(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V6
+// 🚀 TUBEX VOLUME SCORE V7
 // =========================
 //
-// Volume = DEMANDA ESTIMADA
-//
-// Sinais:
-//
-// 1. Presença da keyword nos títulos
-// 2. Mediana da SERP
-// 3. Força do líder
-// 4. Velocidade
-// 5. Vídeos fortes
+// Volume = DEMANDA RELATIVA DA SERP
 //
 // IMPORTANTE:
-// Tamanho da keyword NÃO é
-// usado como proxy de volume.
+// A API pública do YouTube NÃO entrega "buscas por mês".
+// Portanto este score é uma estimativa relativa baseada
+// exclusivamente nos sinais disponíveis na SERP.
 //
+// Sinais usados:
+// 1. Mediana REAL das views da SERP
+// 2. Força do vídeo líder
+// 3. Velocidade nos últimos 31 dias
+// 4. Quantidade de vídeos fortes
+// 5. Presença da keyword nos títulos
+// 6. Distribuição das views como ajuste secundário
+//
+// Não altera a Competition Engine.
+// =========================
 
-// =========================
-// 1. FORÇA DO VÍDEO LÍDER
-// =========================
+// -------------------------
+// 1. MEDIANA REAL DA SERP
+// -------------------------
+// O código antigo pegava items[Math.floor(...)] sem ordenar.
+// Isso NÃO era uma mediana matemática.
+
+const sortedViews = items
+    .map(video => Number(video.statistics?.viewCount || 0))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+
+const realMedian = sortedViews.length
+    ? (
+        sortedViews.length % 2 === 1
+            ? sortedViews[Math.floor(sortedViews.length / 2)]
+            : (
+                sortedViews[sortedViews.length / 2 - 1] +
+                sortedViews[sortedViews.length / 2]
+            ) / 2
+      )
+    : 0;
+
+// -------------------------
+// 2. FORÇA DO LÍDER
+// -------------------------
 
 const topScore = Math.min(
     100,
-    Math.round(
-        Math.log10(top + 1) * 16
-    )
+    Math.round(Math.log10(top + 1) * 16)
 );
 
-
-// =========================
-// 2. FORÇA DA MEDIANA
-// =========================
+// -------------------------
+// 3. FORÇA DA MEDIANA
+// -------------------------
 
 const medianScore = Math.min(
     100,
-    Math.round(
-        Math.log10(median + 1) * 16
-    )
+    Math.round(Math.log10(realMedian + 1) * 16)
 );
 
-
-// =========================
-// 3. VELOCIDADE
-// =========================
+// -------------------------
+// 4. VELOCIDADE — ÚLTIMOS 31 DIAS
+// -------------------------
 
 const velocityScore = Math.min(
     100,
     Math.round(
         Math.log10(
-            averageViewsPerDay + 1
+            Math.max(averageViewsPerDay, 0) + 1
         ) * 20
     )
 );
 
-
-// =========================
-// 4. VÍDEOS FORTES
-// =========================
+// -------------------------
+// 5. VÍDEOS FORTES
+// -------------------------
 
 const strengthScore = Math.min(
     100,
@@ -1893,44 +1911,75 @@ const strengthScore = Math.min(
     )
 );
 
+// -------------------------
+// 6. PRESENÇA DA KEYWORD
+// -------------------------
+// Para volume, match de título é evidência de demanda
+// específica, mas NÃO deve dominar o cálculo.
 
-// =========================
-// 6. DEMANDA DA SERP
-// =========================
-//
-// A mediana é mais importante
-// que apenas o vídeo líder.
-//
-// Um único vídeo gigante
-// não deve transformar uma
-// keyword pequena em "Muito Alta".
-//
-
-const serpDemandScore = Math.round(
-
-      medianScore * 0.40
-
-    + topScore * 0.20
-
-    + velocityScore * 0.20
-
-    + strengthScore * 0.10
-
-    + titleDemandScore * 0.10
-
+const titleDemandScoreV7 = Math.min(
+    100,
+    Math.round(
+        (
+            exactTitleMatches * 5 +
+            prefixTitleMatches * 4 +
+            phraseTitleMatches * 3 +
+            partialTitleMatches * 1
+        ) /
+        Math.max(items.length * 5, 1) * 100
+    )
 );
 
+// -------------------------
+// 7. DEMANDA BASE DA SERP
+// -------------------------
+// Mediana + líder representam a força acumulada da SERP.
+// Velocidade traz o componente recente.
+//
+// O título entra como confirmação, não como substituto
+// de demanda.
 
-// =========================
-// 7. VOLUME FINAL
-// =========================
+const serpDemandBase = Math.round(
+      medianScore * 0.35
+    + topScore * 0.25
+    + velocityScore * 0.20
+    + strengthScore * 0.10
+    + titleDemandScoreV7 * 0.10
+);
+
+// -------------------------
+// 8. AJUSTE DE DISTRIBUIÇÃO
+// -------------------------
+// Evita que um único vídeo gigante infle artificialmente
+// o volume de uma keyword pequena.
+
+const distributionAdjustment =
+    Math.max(
+        0.85,
+        Math.min(
+            1.10,
+            0.90 + (Number(distributionScore || 0) / 100) * 0.20
+        )
+    );
+
+// -------------------------
+// 9. VOLUME FINAL
+// -------------------------
+// Curva suave para ocupar melhor a faixa intermediária.
+// Não força 100 artificialmente.
+
+const calibratedDemand =
+    Math.pow(
+        Math.max(0, Math.min(100, serpDemandBase)) / 100,
+        0.88
+    ) * 100;
 
 const finalVolume = Math.max(
     0,
     Math.min(
         100,
         Math.round(
-            serpDemandScore
+            calibratedDemand * distributionAdjustment
         )
     )
 );
@@ -2945,7 +2994,7 @@ topShare,
 
     minViews,
 
-    medianViews: median
+    medianViews: realMedian
 
 };
 
@@ -3003,7 +3052,7 @@ velocityScore,
 strengthScore,
 serpDemandScore,
 
-    medianViews: median
+    medianViews: realMedian
 
 }
 

@@ -1947,6 +1947,11 @@ const serpDemandBase = Math.round(
     + titleDemandScoreV7 * 0.10
 );
 
+// Compatibilidade com o frontend/metrics legado.
+// O nome oficial da demanda base nesta V7 é serpDemandBase,
+// mas a resposta pública continua expondo serpDemandScore.
+const serpDemandScore = serpDemandBase;
+
 // -------------------------
 // 8. AJUSTE DE DISTRIBUIÇÃO
 // -------------------------

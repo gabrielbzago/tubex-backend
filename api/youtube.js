@@ -1274,6 +1274,25 @@ const maxViewsPerDay = Math.round(
 
 );
 
+const serpPower = Math.min(
+
+100,
+
+Math.round(
+
+Math.log10(
+
+averageViewsPerDay *
+Math.max(median,1)
+
++1
+
+)*8
+
+)
+
+);
+
 // =========================
 // 📊 SCORE DE VIEWS/DIA
 // =========================
@@ -1989,15 +2008,17 @@ const channelDominance = Math.round(
 // -------------------------
 const competition = Math.round(
 
-      competitionMarketDifficulty * 0.10
+serpPower *0.30 +
 
-    + coverageDifficulty * 0.40
+coverageDifficulty *0.15 +
 
-    + freshnessDifficulty * 0.15
+channelDominance *0.20 +
 
-    + totalResultsScore * 0.10
+freshnessDifficulty *0.15 +
 
-    + channelDominance * 0.25
+competitionMarketDifficulty *0.20 +
+
+totalResultsScore *0.10
 
 );
 

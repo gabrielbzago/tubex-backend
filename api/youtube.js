@@ -1532,7 +1532,7 @@ const strengthScore = Math.round(
 
     ) * 100
 
-
+);
 // Long Tail
 const longTailBonus = keywordScore;
 

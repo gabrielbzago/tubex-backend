@@ -1440,9 +1440,6 @@ const normalizedKeyword =
         .toLowerCase()
         .trim();
 
-const keywordWords =
-    normalizedKeyword.split(/\s+/);
-
 let relevancePoints = 0;
 
 items.forEach(video=>{

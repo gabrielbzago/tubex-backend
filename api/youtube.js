@@ -1431,7 +1431,8 @@ const totalResultsScore = Math.min(
 
 
 // =========================
-// 🎯 TITLE MATCH ENGINE V2
+// 🎯 RELEVANCE SCORE
+// Quanto os títulos realmente respondem à busca
 // =========================
 
 const normalizedKeyword =
@@ -1439,87 +1440,62 @@ const normalizedKeyword =
         .toLowerCase()
         .trim();
 
-let exactStartMatches = 0;
-let exactPhraseMatches = 0;
-let allWordsMatches = 0;
-let partialMatches = 0;
+const keywordWords =
+    normalizedKeyword.split(/\s+/);
+
+let relevancePoints = 0;
 
 items.forEach(video=>{
 
     const title =
-        String(
-            video.snippet?.title || ""
-        )
-        .toLowerCase()
-        .trim();
+        String(video.snippet?.title || "")
+            .toLowerCase()
+            .trim();
 
-    const words =
-        normalizedKeyword.split(/\s+/);
+    if(title === normalizedKeyword){
 
-    // começa exatamente igual
-    if(title.startsWith(normalizedKeyword)){
-
-        exactStartMatches++;
+        relevancePoints += 5;
+        return;
 
     }
 
-    // contém frase exata
+    if(title.startsWith(normalizedKeyword)){
+
+        relevancePoints += 4;
+        return;
+
+    }
+
     if(title.includes(normalizedKeyword)){
 
-        exactPhraseMatches++;
+        relevancePoints += 3;
+        return;
 
     }
 
     const matchedWords =
-        words.filter(word=>
+        keywordWords.filter(word=>
             title.includes(word)
         ).length;
 
-    // contém todas palavras
-    if(matchedWords === words.length){
-
-        allWordsMatches++;
-
-    }
-
-    // parcial
-    partialMatches +=
-        matchedWords / words.length;
+    relevancePoints +=
+        (matchedWords / keywordWords.length) * 2;
 
 });
 
-const exactStartScore =
-    Math.round(
-        (exactStartMatches / items.length) * 100
-    );
-
-const exactPhraseScore =
-    Math.round(
-        (exactPhraseMatches / items.length) * 100
-    );
-
-const allWordsScore =
-    Math.round(
-        (allWordsMatches / items.length) * 100
-    );
-
-const partialScore =
-    Math.round(
-        (
-            partialMatches /
-            items.length
-        ) * 100
-    );
-
 const relevanceScore = Math.round(
 
-      exactStartScore * 0.40
+    Math.min(
 
-    + exactPhraseScore * 0.30
+        100,
 
-    + allWordsScore * 0.20
+        (relevancePoints /
 
-    + partialScore * 0.10
+        (items.length * 5))
+
+        *100
+
+    )
 
 );
 
@@ -1859,21 +1835,7 @@ const competitionDetails = {
 
     partialMatches,
 
-    recentVideos,
-
-    exactStartMatches,
-
-    exactPhraseMatches,
-
-    allWordsMatches,
-
-    exactStartScore,
-
-    exactPhraseScore,
-
-    allWordsScore,
-
-    relevanceScore
+    recentVideos
 
 };
 

@@ -247,19 +247,6 @@ if (pageCount === 0) {
       }
     }
 
-const recentItems = items.filter(video=>{
-
-    const ageDays =
-
-        (Date.now()-
-        new Date(video.snippet.publishedAt))
-
-        /86400000;
-
-    return ageDays<=31;
-
-});
-
     // =========================
     // 🚫 FALHA TOTAL
     // =========================
@@ -1136,6 +1123,7 @@ analytics.estimatedMinutesWatched,
       Number(b.statistics.viewCount || 0) -
       Number(a.statistics.viewCount || 0)
     );
+
 
 // =========================
 // 📅 VÍDEOS DOS ÚLTIMOS 31 DIAS

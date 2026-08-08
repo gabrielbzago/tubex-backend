@@ -1881,343 +1881,294 @@ const finalVolume = Math.max(
 
 
 // =========================
-// 🚀 TUBEX COMPETITION V4
+// 🚀 TUBEX COMPETITION V6
 // =========================
+// A concorrência mede a dificuldade de disputar a SERP.
+// Não usa distribuição/consistência como substitutos de demanda.
+// A força da SERP vem de sinais públicos dos próprios vídeos.
 
 let exactMatches = 0;
+let startsWithMatches = 0;
+let containsMatches = 0;
 let partialMatches = 0;
 let recentVideos = 0;
 
+let freshnessTotal = 0;
+
 // -------------------------
-// Analisa todos os títulos
+// MATCH + FRESHNESS POR VÍDEO
 // -------------------------
 
-items.forEach(video=>{
+items.forEach(video => {
 
-    const title =
-        String(video.snippet?.title || "")
-        .toLowerCase();
+    const title = String(
+        video.snippet?.title || ""
+    )
+        .toLowerCase()
+        .trim();
 
-    const ageDays =
-        (
-            Date.now() -
-            new Date(video.snippet.publishedAt).getTime()
-        ) / 86400000;
+    const publishedAt = new Date(
+        video.snippet?.publishedAt
+    ).getTime();
 
-    // LONG TAIL
-    if(keywordWords.length >= 3){
+    const ageDays = Number.isFinite(publishedAt)
+        ? Math.max(
+            0,
+            (Date.now() - publishedAt) / 86400000
+        )
+        : 9999;
 
-        if(title.startsWith(normalizedKeyword)){
+    // -------------------------
+    // MATCH DO TÍTULO
+    // -------------------------
 
-            exactMatches++;
+    if (title === normalizedKeyword) {
 
-        }
-        else if(title.includes(normalizedKeyword)){
+        exactMatches++;
 
-            exactMatches += 0.7;
+    } else if (title.startsWith(normalizedKeyword)) {
 
-        }
+        startsWithMatches++;
 
-    }
+    } else if (title.includes(normalizedKeyword)) {
 
-    // SHORT TAIL
-    else{
+        containsMatches++;
 
-        const matched =
-            keywordWords.filter(word=>
-                title.includes(word)
-            ).length;
+    } else {
+
+        const matchedWords = keywordWords.filter(word =>
+            title.includes(word)
+        ).length;
 
         partialMatches +=
-            matched / keywordWords.length;
+            matchedWords / Math.max(keywordWords.length, 1);
 
     }
 
-    // vídeo recente aumenta concorrência
+    // -------------------------
+    // FRESHNESS
+    // Usa toda a SERP, mas dá peso maior
+    // aos vídeos realmente recentes.
+    // -------------------------
 
-  if (ageDays <= 90) {
+    let freshnessWeight = 10;
 
-    recentVideos++;
+    if (ageDays <= 31) {
 
-}
+        freshnessWeight = 100;
+        recentVideos++;
+
+    } else if (ageDays <= 90) {
+
+        freshnessWeight = 85;
+
+    } else if (ageDays <= 180) {
+
+        freshnessWeight = 65;
+
+    } else if (ageDays <= 365) {
+
+        freshnessWeight = 40;
+
+    }
+
+    freshnessTotal += freshnessWeight;
 
 });
 
-
 // -------------------------
-// Percentual de títulos
-// -------------------------
-
-const titleCoverage =
-
-    keywordWords.length >= 3
-
-        ? exactMatches / items.length
-
-        : partialMatches / items.length;
-
-
-// -------------------------
-// Facilidade natural
-// 100 = muito fácil
-// 0 = muito difícil
+// MATCH SCORE
 // -------------------------
 
-let competitionMarketDifficulty = 100;
+const itemCount = Math.max(items.length, 1);
 
-switch (keywordWords.length){
+const titleMatchScore = Math.round(
 
-    case 1:
-        competitionMarketDifficulty = 100;
-        break;
+    (
+        exactMatches * 100 +
+        startsWithMatches * 90 +
+        containsMatches * 70 +
+        partialMatches * 40
+    ) /
+    itemCount
 
-    case 2:
-        competitionMarketDifficulty = 90;
-        break;
+);
 
-    case 3:
-        competitionMarketDifficulty = 75;
-        break;
+const coverageDifficulty = Math.max(
 
-    case 4:
-        competitionMarketDifficulty = 55;
-        break;
+    0,
 
-    case 5:
-        competitionMarketDifficulty = 35;
-        break;
+    Math.min(
 
-    default:
-        competitionMarketDifficulty = 20;
-        break;
+        100,
 
-}
+        titleMatchScore
+
+    )
+
+);
 
 // -------------------------
-// Vídeos recentes
+// FRESHNESS SCORE
 // -------------------------
 
 const freshnessDifficulty = Math.round(
 
-    (recentVideos / Math.max(items.length, 1)) * 100
+    freshnessTotal / itemCount
 
 );
 
 // -------------------------
-// Cobertura dos títulos
-// -------------------------
-
-const coverageDifficulty = Math.round(
-
-    titleCoverage * 100
-
-);
-
-// -------------------------
-// Dominância de canais
+// DOMINÂNCIA DE CANAIS
 // -------------------------
 
 const channelCount = {};
 
 items.forEach(video => {
 
-    const id = video.snippet?.channelId;
+    const channelId =
+        video.snippet?.channelId;
 
-    if(!id) return;
+    if (!channelId) return;
 
-    channelCount[id] = (channelCount[id] || 0) + 1;
+    channelCount[channelId] =
+        (channelCount[channelId] || 0) + 1;
 
 });
 
+const channelValues =
+    Object.values(channelCount);
+
 const biggestChannel = Math.max(
-
-    ...Object.values(channelCount),
-
+    ...channelValues,
     0
-
 );
 
 const channelDominance = Math.round(
 
-    (biggestChannel / Math.max(items.length,1)) * 100
+    (
+        biggestChannel /
+        itemCount
+    ) * 100
 
 );
 
-let giantChannels = 0;
+const repeatedChannelVideos =
+    channelValues.reduce(
+        (total, count) =>
+            total + Math.max(count - 1, 0),
+        0
+    );
 
-items.forEach(video=>{
+const repetitionScore = Math.round(
 
-const subs =
-Number(video.channelSubscribers || 0);
-
-if(subs>=1000000){
-
-giantChannels++;
-
-}
-
-});
-
-const giantChannelScore = Math.round(
-
-(giantChannels/items.length)*100
+    (
+        repeatedChannelVideos /
+        itemCount
+    ) * 100
 
 );
 
-const repeatedChannels=
+// -------------------------
+// SERP STRENGTH
+// -------------------------
+// Combina sinais de força que já existem
+// no backend, sem criar uma segunda métrica
+// baseada nos mesmos dados.
 
-Object.values(channelCount)
+const serpStrengthScore = Math.round(
 
-.filter(v=>v>=2)
-
-.length;
-
-const repetitionScore=Math.round(
-
-repeatedChannels/
-
-Math.max(Object.keys(channelCount).length,1)
-
-*100
+    (
+        viewsPerDayScore * 0.40 +
+        Math.min(100, Math.round(
+            Math.log10(median + 1) * 14
+        )) * 0.35 +
+        Math.min(100, Math.round(
+            Math.log10(top + 1) * 14
+        )) * 0.25
+    )
 
 );
 
-// =========================
-// FRESHNESS SCORE
-// =========================
+// -------------------------
+// DISTRIBUIÇÃO / CONSISTÊNCIA
+// -------------------------
+// São sinais secundários. Eles não determinam
+// sozinhos a competição.
 
-const freshnessScore = Math.round(
+const serpStructureScore = Math.round(
 
-    Math.max(
+    distributionScore * 0.50 +
+    consistencyScore * 0.50
 
-        0,
+);
 
-        100 - (averageAgeDays / 12)
+// -------------------------
+// MARKET DIFFICULTY
+// -------------------------
+// Usa o marketDifficulty já calculado acima.
+// 100 = mercado naturalmente amplo/competitivo.
+
+const marketDifficultyScore = Math.max(
+
+    0,
+
+    Math.min(
+
+        100,
+
+        Number(marketDifficulty) || 0
 
     )
 
 );
 
-// =========================
-// AUTHORITY SCORE
-// =========================
-
-const authorityScore = Math.round(
-
-(
-
-channelDominance +
-
-competitionMarketDifficulty
-
-)
-
-/
-
-2
-
-);
-
-
-// =========================
-// STRENGTH SCORE
-// =========================
-
-const serpStrengthScore  = Math.round(
-
-(
-
-serpPower +
-
-viewsPerDayScore +
-
-distributionScore +
-
-consistencyScore
-
-)
-
-/
-
-4
-
-);
-
-// =========================
-// SEO DIFFICULTY
-// =========================
-
-const seoDifficulty = Math.round(
-
-(
-
-coverageDifficulty +
-
-relevanceScore +
-
-totalResultsScore
-
-)
-
-/
-
-3
-
-);
-
 // -------------------------
-// Competição Final
+// COMPETIÇÃO FINAL V6
 // -------------------------
-// =========================
-// 🚀 TUBEX COMPETITION V5
-// =========================
+// Peso maior para força real da SERP.
+// Títulos e canais ajudam a diferenciar a dificuldade.
+
 const competition = Math.round(
 
-    serpPower * 0.35 +
+      serpStrengthScore * 0.35
 
-    coverageDifficulty * 0.25 +
+    + coverageDifficulty * 0.20
 
-    channelDominance * 0.20 +
+    + channelDominance * 0.10
 
-    freshnessDifficulty * 0.10 +
+    + repetitionScore * 0.05
 
-    marketDifficulty * 0.10
+    + freshnessDifficulty * 0.15
+
+    + serpStructureScore * 0.05
+
+    + marketDifficultyScore * 0.10
 
 );
-
-// Garante faixa válida
 
 const finalCompetition = Math.max(
 
     5,
 
-   Math.min(
+    Math.min(
 
-100,
+        100,
 
-Math.round(
+        competition
 
-Math.pow(
-
-competition / 100,
-
-0.82
-
-) * 100
-
-)
-
-)
+    )
 
 );
 
 // -------------------------
-// Detalhes
+// DETALHES DA COMPETIÇÃO
 // -------------------------
 
 const competitionDetails = {
 
-    marketDifficulty: competitionMarketDifficulty,
+    marketDifficulty:
+        marketDifficultyScore,
 
     coverageDifficulty,
 
@@ -2225,7 +2176,17 @@ const competitionDetails = {
 
     channelDominance,
 
+    repetitionScore,
+
+    serpStrengthScore,
+
+    serpStructureScore,
+
     exactMatches,
+
+    startsWithMatches,
+
+    containsMatches,
 
     partialMatches,
 

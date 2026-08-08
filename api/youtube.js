@@ -1431,8 +1431,7 @@ const totalResultsScore = Math.min(
 
 
 // =========================
-// 🎯 RELEVANCE SCORE
-// Quanto os títulos realmente respondem à busca
+// 🎯 TITLE MATCH ENGINE V2
 // =========================
 
 const normalizedKeyword =
@@ -1440,59 +1439,87 @@ const normalizedKeyword =
         .toLowerCase()
         .trim();
 
-let relevancePoints = 0;
+let exactStartMatches = 0;
+let exactPhraseMatches = 0;
+let allWordsMatches = 0;
+let partialMatches = 0;
 
-items.forEach(video => {
+items.forEach(video=>{
 
     const title =
-        String(video.snippet?.title || "")
-        .toLowerCase();
+        String(
+            video.snippet?.title || ""
+        )
+        .toLowerCase()
+        .trim();
 
-    // título começa exatamente igual
-    if (title.startsWith(normalizedKeyword)) {
+    const words =
+        normalizedKeyword.split(/\s+/);
 
-        relevancePoints += 3;
+    // começa exatamente igual
+    if(title.startsWith(normalizedKeyword)){
+
+        exactStartMatches++;
+
+    }
+
+    // contém frase exata
+    if(title.includes(normalizedKeyword)){
+
+        exactPhraseMatches++;
 
     }
 
-    // contém exatamente a frase
-    else if (title.includes(normalizedKeyword)) {
+    const matchedWords =
+        words.filter(word=>
+            title.includes(word)
+        ).length;
 
-        relevancePoints += 2;
+    // contém todas palavras
+    if(matchedWords === words.length){
 
-    }
-
-    // contém todas as palavras
-    else {
-
-        const words =
-            normalizedKeyword.split(/\s+/);
-
-        const matched =
-            words.filter(w =>
-                title.includes(w)
-            ).length;
-
-        relevancePoints +=
-            matched / words.length;
+        allWordsMatches++;
 
     }
+
+    // parcial
+    partialMatches +=
+        matchedWords / words.length;
 
 });
 
+const exactStartScore =
+    Math.round(
+        (exactStartMatches / items.length) * 100
+    );
+
+const exactPhraseScore =
+    Math.round(
+        (exactPhraseMatches / items.length) * 100
+    );
+
+const allWordsScore =
+    Math.round(
+        (allWordsMatches / items.length) * 100
+    );
+
+const partialScore =
+    Math.round(
+        (
+            partialMatches /
+            items.length
+        ) * 100
+    );
+
 const relevanceScore = Math.round(
 
-    Math.min(
+      exactStartScore * 0.40
 
-        100,
+    + exactPhraseScore * 0.30
 
-        relevancePoints /
+    + allWordsScore * 0.20
 
-        (items.length * 3)
-
-        * 100
-
-    )
+    + partialScore * 0.10
 
 );
 
@@ -1832,7 +1859,21 @@ const competitionDetails = {
 
     partialMatches,
 
-    recentVideos
+    recentVideos,
+
+    exactStartMatches,
+
+    exactPhraseMatches,
+
+    allWordsMatches,
+
+    exactStartScore,
+
+    exactPhraseScore,
+
+    allWordsScore,
+
+    relevanceScore
 
 };
 

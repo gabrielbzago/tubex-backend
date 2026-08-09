@@ -132,30 +132,13 @@ for (const key of shuffledKeys) {
         let nextPageToken = "";
         let pageCount = 0;
 
-        let requestPlan = String(
-          body?.plan || "free"
-        )
-        .trim()
-        .toLowerCase();
+       let maxPages = 4;
 
-        if(requestPlan === "basic" || requestPlan === "starter"){
-          requestPlan = "start";
-        }
+if (body?.plan === "free")
+    maxPages = 2;
 
-        let maxPages = 4;
-
-        if(requestPlan === "free"){
-          maxPages = 2;
-        }
-        else if(requestPlan === "pro"){
-          maxPages = 6;
-        }
-        else if(
-          requestPlan === "expert" ||
-          requestPlan === "owner"
-        ){
-          maxPages = 8;
-        }
+if (body?.plan === "pro")
+    maxPages = 6;
 
         while (pageCount < maxPages) {
 
@@ -3201,8 +3184,6 @@ topShare,
 const responseData = {
 
     success: true,
-
-    plan: requestPlan,
 
     // TubeBuddy's exact monthly-search-volume provider is not exposed
     // by the YouTube Data API. Never present the SERP estimate as a

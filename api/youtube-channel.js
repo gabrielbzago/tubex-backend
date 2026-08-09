@@ -30,11 +30,25 @@ console.log(
 );
 
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
-    return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
+    return res.status(200).json({
+      success:false,
+      error:"unauthorized",
+      channel:null,
+      metrics:null,
+      items:[],
+      data:{channel:null,videos:[],metrics:null}
+    });
   }
 
   if (req.method !== "POST") {
-    return res.status(200).json({ success:false, error:"invalid_method", items:[], data:{channel:null,videos:[]} });
+    return res.status(200).json({
+      success:false,
+      error:"invalid_method",
+      channel:null,
+      metrics:null,
+      items:[],
+      data:{channel:null,videos:[],metrics:null}
+    });
   }
 
   try {
@@ -53,7 +67,14 @@ console.log(
 
 
     if (!channelId) {
-      return res.status(200).json({ success:false, error:"channelId_required", items:[], data:{channel:null,videos:[]} });
+      return res.status(200).json({
+        success:false,
+        error:"channelId_required",
+        channel:null,
+        metrics:null,
+        items:[],
+        data:{channel:null,videos:[],metrics:null}
+      });
     }
 
 global.tubexChannelCache = global.tubexChannelCache || {};
@@ -74,6 +95,18 @@ if(cached){
       .split(",")
       .map(k => k.trim())
       .filter(Boolean);
+
+    if (!keys.length) {
+      console.error("❌ YOUTUBE_API_KEY não configurada");
+      return res.status(200).json({
+        success:false,
+        error:"youtube_api_key_missing",
+        channel:null,
+        metrics:null,
+        items:[],
+        data:{channel:null,videos:[],metrics:null}
+      });
+    }
 
     let channel = null;
     let videos = [];
@@ -198,38 +231,33 @@ if (!Array.isArray(videos) || videos.length === 0) {
 
   console.warn("⚠️ canal sem vídeos — retornando vazio controlado");
 
+  const subscribers = Number(channel?.statistics?.subscriberCount || 0);
+  const totalVideos = Number(channel?.statistics?.videoCount || 0);
+  const totalChannelViews = Number(channel?.statistics?.viewCount || 0);
+
+  const metrics = {
+    totalViews: 0,
+    avgViews: 0,
+    views7: 0,
+    uploads7: 0,
+    subscribers,
+    totalVideos,
+    totalChannelViews,
+    views30: 0,
+    uploads30: 0
+  };
+
   const finalData = {
-      success: true,
+    success: true,
+    channelId,
+    channel,
+    metrics,
+    items: [],
+    data: {
       channelId,
-      items: [],
-      data: {
-        channelId,
-        channel,
-        videos: [],
-     metrics: {
-  totalViews: 0,
-  avgViews: 0,
-  views7: 0,
-  uploads7: 0,
-
-  subscribers:
-    Number(
-      channel?.statistics?.subscriberCount || 0
-    ),
-
-  totalVideos:
-    Number(
-      channel?.statistics?.videoCount || 0
-    ),
-
-  totalChannelViews:
-    Number(
-      channel?.statistics?.viewCount || 0
-    ),
-
-  views30:0,
-  uploads30:0
-}
+      channel,
+      videos: [],
+      metrics
     }
   };
 
@@ -297,27 +325,31 @@ const uploads30 = videos
 })
 .length;
 
+const metrics = {
+  totalViews,
+  avgViews,
+  views7,
+  uploads7,
+  subscribers,
+  totalVideos,
+  totalChannelViews,
+  views30,
+  uploads30
+};
+
+// Expose the same normalized contract at both the top level and
+// inside `data`, so the extension UI can consume either shape.
 const finalData = {
-  success:true,
+  success: true,
   channelId,
-  items:videos,
-  data:{
+  channel,
+  metrics,
+  items: videos,
+  data: {
     channelId,
     channel,
     videos,
-    metrics:{
-      totalViews,
-      avgViews,
-      views7,
-      uploads7,
-
-      subscribers,
-      totalVideos,
-      totalChannelViews,
-
-      views30,
-      uploads30
-    }
+    metrics
   }
 };
 
@@ -337,8 +369,10 @@ return res.status(200).json(finalData);
     return res.status(200).json({
       success:false,
       error:"internal_error",
+      channel:null,
+      metrics:null,
       items:[],
-      data:{channel:null,videos:[]}
+      data:{channel:null,videos:[],metrics:null}
     });
   }
 }

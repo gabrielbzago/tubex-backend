@@ -42,6 +42,23 @@ const accessToken =
     const keyword = body?.keyword?.trim();
     const mode = body?.mode || "seo";
     const videoId = body?.videoId;
+    const requestedPlan = String(body?.plan || "free").trim().toLowerCase();
+    let requestPlan = requestedPlan === "basic" || requestedPlan === "starter" ? "start" : requestedPlan;
+    if(!["free","start","member","pro","expert","owner"].includes(requestPlan)) requestPlan="free";
+    const requestUserKey = String(body?.userEmail || body?.userId || req.headers["x-user-id"] || req.headers.origin || "anonymous").trim().toLowerCase();
+
+    const QUERY_LIMITS = { free:3, start:10, member:15, pro:50, expert:Infinity, owner:Infinity };
+    function consumeKeywordQuota(){
+      const limit=QUERY_LIMITS[requestPlan] ?? 3;
+      if(!Number.isFinite(limit)) return {allowed:true,limit,used:0,remaining:Infinity};
+      global.tubexKeywordQuota = global.tubexKeywordQuota || {};
+      const day=new Date().toISOString().slice(0,10);
+      const key=`${requestUserKey}:${day}`;
+      const used=Number(global.tubexKeywordQuota[key]||0);
+      if(used>=limit) return {allowed:false,limit,used,remaining:0};
+      global.tubexKeywordQuota[key]=used+1;
+      return {allowed:true,limit,used:used+1,remaining:Math.max(0,limit-used-1)};
+    }
 
     if (
 
@@ -84,11 +101,27 @@ if(
 }
 
     // =========================
+    // 📊 DAILY KEYWORD QUOTA
+    // =========================
+    let quota = {allowed:true,limit:Infinity,used:0,remaining:Infinity};
+    if(mode !== "video_ai" && mode !== "summary" && keyword){
+      quota = consumeKeywordQuota();
+      if(!quota.allowed){
+        return res.status(429).json({
+          success:false,
+          error:"daily_query_limit_reached",
+          plan:requestPlan,
+          quota
+        });
+      }
+    }
+
+    // =========================
     // 📦 CACHE SEO
     // =========================
     global.tubexSeoCache = global.tubexSeoCache || {};
 
-    const cacheKey = keyword ? `seo_${keyword.toLowerCase()}` : null;
+    const cacheKey = keyword ? `seo_${keyword.toLowerCase()}_${requestPlan}_${String(body?.scoreMode||"unweighted")}_${String(body?.channelId||"")}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -117,192 +150,6 @@ let youtubeSearchSucceeded = false;
 
 // NOVO
 let totalResults = 0;
-
-    // =========================
-    // 🔁 MULTI KEY FETCH
-    // =========================
-   const shuffledKeys = [...keys]
-  .sort(() => Math.random() - 0.5);
-
-for (const key of shuffledKeys) {
-
-      try {
-
-        let allIds = [];
-        let nextPageToken = "";
-        let pageCount = 0;
-
-       let maxPages = 4;
-
-if (body?.plan === "free")
-    maxPages = 2;
-
-if (body?.plan === "pro")
-    maxPages = 6;
-
-        while (pageCount < maxPages) {
-
-          const searchUrl =
-            `https://www.googleapis.com/youtube/v3/search` +
-            `?part=snippet&type=video&order=relevance&maxResults=25` +
-            `&q=${encodeURIComponent(keyword)}` +
-            `&pageToken=${nextPageToken}` +
-            `&key=${key}`;
-
-          const searchRes = await fetch(searchUrl);
-
-          if (searchRes.status === 403 || searchRes.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-
-          const searchJson = await searchRes.json();
-// O YouTube respondeu corretamente,
-// mesmo que a busca não tenha retornado vídeos.
-youtubeSearchSucceeded = true;
-if (pageCount === 0) {
-
-    totalResults = Number(
-        searchJson.pageInfo?.totalResults || 0
-    );
-
-}
-          const ids = searchJson.items
-            ?.map(v => v.id?.videoId)
-            .filter(Boolean) || [];
-
-          allIds.push(...ids);
-
-          nextPageToken = searchJson.nextPageToken || "";
-          pageCount++;
-
-          if (!nextPageToken) break;
-        }
-
-        const uniqueIds = [...new Set(allIds)];
-
-        for (let i = 0; i < uniqueIds.length; i += 50) {
-
-          const chunk = uniqueIds.slice(i, i + 50).join(",");
-
-          const videosUrl =
-            `https://www.googleapis.com/youtube/v3/videos` +
-            `?part=snippet,statistics&id=${chunk}&key=${key}`;
-
-          const resVideos = await fetch(videosUrl);
-
-          if (resVideos.status === 403 || resVideos.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-
-          const jsonVideos = await resVideos.json();
-
-          if (Array.isArray(jsonVideos.items)) {
-
-  const filtered = jsonVideos.items.filter(v => {
-
-    const title =
-      String(
-        v?.snippet?.title || ""
-      ).toLowerCase();
-
-    // remove shorts
-    if(title.includes("#shorts")){
-      return false;
-    }
-
-    const videoViews =
-      Number(
-        v?.statistics?.viewCount || 0
-      );
-
-    const published =
-      new Date(
-        v?.snippet?.publishedAt
-      ).getTime();
-
-    const ageDays =
-
-      (
-        Date.now() - published
-      )
-
-      / (1000 * 60 * 60 * 24);
-
-    // remove vídeo morto
-    if(
-      ageDays > 900
-      &&
-      videoViews < 5000
-    ){
-      return false;
-    }
-
-    return true;
-
-  });
-
-  items.push(...filtered);
-
-}
-        }
-
-      if (items.length) {
-
-    success = true;
-    activeKey = key;
-
-    break;
-
-}
-
-
-// ------------------------------------
-// YOUTUBE RESPONDEU,
-// MAS NÃO ENCONTROU RESULTADOS
-// ------------------------------------
-
-if (youtubeSearchSucceeded) {
-
-    success = true;
-    activeKey = key;
-
-    break;
-
-}
-
-      } catch (e) {
-        console.warn("🔁 tentando próxima key...");
-        continue;
-      }
-    }
-
- // =========================
-// 🚫 FALHA TOTAL DA API
-// =========================
-//
-// IMPORTANTE:
-// Isso NÃO significa "keyword sem volume".
-// Significa que o YouTube API não respondeu
-// corretamente após tentar as chaves disponíveis.
-//
-
-if (!success) {
-
-    return res.status(200).json({
-
-        success: false,
-
-        items: [],
-
-        volume: 0,
-
-        competition: null,
-
-        error: "youtube_api_unavailable"
-
-    });
-
-}
 
 // =========================
 // 🎬 VIDEO DATA
@@ -1127,6 +974,8 @@ analytics.estimatedMinutesWatched,
 
 }
 
+
+
     // =========================
     // 📊 SUMMARY MODE
     // =========================
@@ -1160,6 +1009,201 @@ analytics.estimatedMinutesWatched,
         subscribers: Number(stats?.subscriberCount || 0)
       });
     }
+
+
+
+    // =========================
+    // 🔁 MULTI KEY FETCH
+    // =========================
+   const shuffledKeys = [...keys]
+  .sort(() => Math.random() - 0.5);
+
+for (const key of shuffledKeys) {
+
+      try {
+
+        let allIds = [];
+        let nextPageToken = "";
+        let pageCount = 0;
+
+        let maxPages = 4;
+
+        if(requestPlan === "free"){
+          maxPages = 2;
+        }
+        else if(requestPlan === "pro"){
+          maxPages = 6;
+        }
+        else if(
+          requestPlan === "expert" ||
+          requestPlan === "owner"
+        ){
+          maxPages = 8;
+        }
+
+        while (pageCount < maxPages) {
+
+          const searchUrl =
+            `https://www.googleapis.com/youtube/v3/search` +
+            `?part=snippet&type=video&order=relevance&maxResults=25` +
+            `&q=${encodeURIComponent(keyword)}` +
+            `&pageToken=${nextPageToken}` +
+            `&key=${key}`;
+
+          const searchRes = await fetch(searchUrl);
+
+          if (searchRes.status === 403 || searchRes.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const searchJson = await searchRes.json();
+// O YouTube respondeu corretamente,
+// mesmo que a busca não tenha retornado vídeos.
+youtubeSearchSucceeded = true;
+if (pageCount === 0) {
+
+    totalResults = Number(
+        searchJson.pageInfo?.totalResults || 0
+    );
+
+}
+          const ids = searchJson.items
+            ?.map(v => v.id?.videoId)
+            .filter(Boolean) || [];
+
+          allIds.push(...ids);
+
+          nextPageToken = searchJson.nextPageToken || "";
+          pageCount++;
+
+          if (!nextPageToken) break;
+        }
+
+        const uniqueIds = [...new Set(allIds)];
+
+        for (let i = 0; i < uniqueIds.length; i += 50) {
+
+          const chunk = uniqueIds.slice(i, i + 50).join(",");
+
+          const videosUrl =
+            `https://www.googleapis.com/youtube/v3/videos` +
+            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+
+          const resVideos = await fetch(videosUrl);
+
+          if (resVideos.status === 403 || resVideos.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const jsonVideos = await resVideos.json();
+
+          if (Array.isArray(jsonVideos.items)) {
+
+  const filtered = jsonVideos.items.filter(v => {
+
+    const title =
+      String(
+        v?.snippet?.title || ""
+      ).toLowerCase();
+
+    // remove shorts
+    if(title.includes("#shorts")){
+      return false;
+    }
+
+    const videoViews =
+      Number(
+        v?.statistics?.viewCount || 0
+      );
+
+    const published =
+      new Date(
+        v?.snippet?.publishedAt
+      ).getTime();
+
+    const ageDays =
+
+      (
+        Date.now() - published
+      )
+
+      / (1000 * 60 * 60 * 24);
+
+    // remove vídeo morto
+    if(
+      ageDays > 900
+      &&
+      videoViews < 5000
+    ){
+      return false;
+    }
+
+    return true;
+
+  });
+
+  items.push(...filtered);
+
+}
+        }
+
+      if (items.length) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
+
+
+// ------------------------------------
+// YOUTUBE RESPONDEU,
+// MAS NÃO ENCONTROU RESULTADOS
+// ------------------------------------
+
+if (youtubeSearchSucceeded) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
+
+      } catch (e) {
+        console.warn("🔁 tentando próxima key...");
+        continue;
+      }
+    }
+
+ // =========================
+// 🚫 FALHA TOTAL DA API
+// =========================
+//
+// IMPORTANTE:
+// Isso NÃO significa "keyword sem volume".
+// Significa que o YouTube API não respondeu
+// corretamente após tentar as chaves disponíveis.
+//
+
+if (!success) {
+
+    return res.status(200).json({
+
+        success: false,
+
+        items: [],
+
+        volume: 0,
+
+        competition: null,
+
+        error: "youtube_api_unavailable"
+
+    });
+
+}
 
     // =========================
     // 🧠 SERP CHANNEL AUTHORITY
@@ -2645,6 +2689,22 @@ const competitionDetails = {
 };
 
 // =========================
+// 🎯 OPTIMIZATION OPPORTUNITY
+// =========================
+// Higher = more room to optimize the keyword. This is intentionally
+// derived from observable SEO signals instead of a fixed placeholder.
+const titleRoomScore = Math.max(0,100-searchTermInTitleScore);
+const descriptionRoomScore = Math.max(0,100-searchTermInDescriptionScore);
+const tagsRoomScore = Math.max(0,100-searchTermInTagsScore);
+const optimizationStrength = Math.max(0,Math.min(100,Math.round(
+    titleRoomScore*0.45 +
+    descriptionRoomScore*0.15 +
+    tagsRoomScore*0.15 +
+    finalCompetition*0.25
+)));
+const opportunityScore = optimizationStrength;
+
+// =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================
 
@@ -2806,6 +2866,33 @@ current -=
 
     return trend;
 
+}
+
+function generateEstimatedTrend12m(volume, competition){
+    const seedBase=hashString(`${keyword}:12m`);
+    let seed=seedBase;
+    const monthlyBase=Math.max(100,Math.round((400 + Math.pow(volume,1.35)*18)*30));
+    const trend=[];
+    let current=monthlyBase*(0.78+((seed%18)/100));
+    const tendency=competition>=70?1.018:competition>=40?1.002:0.988;
+    for(let i=0;i<12;i++){
+      seed=(seed*9301+49297)%233280;
+      const random=seed/233280;
+      current*=tendency;
+      current-=(current-monthlyBase)*0.12;
+      current+=Math.round((random-0.5)*monthlyBase*0.08);
+      current=Math.max(monthlyBase*0.55,Math.min(monthlyBase*1.55,current));
+      trend.push({month:i+1,value:Math.round(current)});
+    }
+    return trend;
+}
+
+function estimateMonthlySearches(volume, competition, totalResults, recentCount, itemCount){
+    const demand=Math.max(0,Math.min(100,Number(volume)||0));
+    const serpFactor=0.85+Math.min(0.25,Math.log10(Math.max(10,Number(totalResults)||10))/40);
+    const freshnessFactor=0.85+((Number(recentCount)||0)/Math.max(Number(itemCount)||1,1))*0.3;
+    const daily=Math.round(60*Math.pow(1.055,demand)*serpFactor*freshnessFactor);
+    return Math.max(100,Math.round(daily*30));
 }
 
 function normalizeText(text = ""){
@@ -3185,11 +3272,17 @@ const responseData = {
 
     success: true,
 
-    // TubeBuddy's exact monthly-search-volume provider is not exposed
-    // by the YouTube Data API. Never present the SERP estimate as a
-    // monthly-search count.
-    monthlySearches: null,
-    volumeDataSource: "youtube_serp_estimate",
+    plan: requestPlan,
+
+    // The YouTube Data API does not expose an official monthly-search count.
+    // TubeX therefore returns an explicitly labelled estimate derived from
+    // observable SERP demand signals.
+    monthlySearches: estimateMonthlySearches(finalVolume,finalCompetition,totalResults,recentVideos,items.length),
+    monthlySearchesEstimated: true,
+    volumeDataSource: "tubex_serp_estimate",
+    optimizationStrength,
+    opportunityScore,
+    quota,
     totalResults,
     searchTermAnalysis: {
         searchTermInTitle,
@@ -3214,6 +3307,8 @@ competitionScore,
 youtubeMetrics,
 
     trend,
+    trend30d: trend,
+    trend12m: generateEstimatedTrend12m(finalVolume,finalCompetition),
 
     tags: rankedTags,
 
@@ -3265,6 +3360,8 @@ serpDemandScore,
     searchTermInDescriptionScore,
     searchTermInTagsScore,
     titleCompetitionSignal,
+    optimizationStrength,
+    opportunityScore,
 
     medianViews: median
 

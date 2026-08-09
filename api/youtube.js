@@ -1162,6 +1162,89 @@ analytics.estimatedMinutesWatched,
     }
 
     // =========================
+    // 🧠 SERP CHANNEL AUTHORITY
+    // =========================
+    // TubeBuddy's Search Term Analysis exposes channel/subscriber
+    // pressure as part of the competitive landscape. YouTube's
+    // video search objects do not contain subscriberCount, so we
+    // enrich the unique SERP channels here with one channels.list
+    // request per 50 channels. This is intentionally separate from
+    // totalResults: result count is NOT treated as search volume.
+    // =========================
+
+    const serpChannelIds = [...new Set(
+      items
+        .map(video => video?.snippet?.channelId)
+        .filter(Boolean)
+    )];
+
+    const channelAuthorityMap = new Map();
+
+    for (let i = 0; i < serpChannelIds.length; i += 50) {
+
+      const channelChunk =
+        serpChannelIds.slice(i, i + 50).join(",");
+
+      if (!channelChunk) continue;
+
+      try {
+
+        const serpChannelsUrl =
+          `https://www.googleapis.com/youtube/v3/channels` +
+          `?part=statistics&id=${channelChunk}&key=${activeKey}`;
+
+        const serpChannelsRes =
+          await fetch(serpChannelsUrl);
+
+        if (serpChannelsRes.status === 403 || serpChannelsRes.status === 429) {
+          console.warn("⚠️ SERP channel authority unavailable: quota");
+          break;
+        }
+
+        const serpChannelsJson =
+          await serpChannelsRes.json();
+
+        (serpChannelsJson.items || []).forEach(channel => {
+
+          const subscribers = Number(
+            channel?.statistics?.subscriberCount || 0
+          );
+
+          channelAuthorityMap.set(
+            channel.id,
+            subscribers
+          );
+
+        });
+
+      } catch (e) {
+
+        console.warn(
+          "⚠️ Falha ao enriquecer autoridade dos canais da SERP:",
+          e?.message || e
+        );
+
+        break;
+
+      }
+
+    }
+
+    items.forEach(video => {
+
+      const channelId = video?.snippet?.channelId;
+
+      const subscribers = Number(
+        channelAuthorityMap.get(channelId) || 0
+      );
+
+      // Internal field. It is also exposed in the response below
+      // so the frontend/debugger can inspect the SERP evidence.
+      video.channelSubscribers = subscribers;
+
+    });
+
+    // =========================
     // 📈 MÉTRICAS SEO
     // =========================
     items.sort((a, b) =>
@@ -1220,15 +1303,29 @@ const top =
         items[0]?.statistics?.viewCount || 0
     );
 
-const median =
+const sortedViewCounts = items
+    .map(video =>
+        Number(video.statistics?.viewCount || 0)
+    )
+    .sort((a, b) => a - b);
 
-    Number(
-
-        items[
-            Math.floor(items.length / 2)
-        ]?.statistics?.viewCount || 0
-
-    );
+const median = sortedViewCounts.length
+    ? (
+        sortedViewCounts.length % 2
+            ? sortedViewCounts[
+                Math.floor(sortedViewCounts.length / 2)
+              ]
+            : (
+                sortedViewCounts[
+                    sortedViewCounts.length / 2 - 1
+                ]
+                +
+                sortedViewCounts[
+                    sortedViewCounts.length / 2
+                ]
+              ) / 2
+      )
+    : 0;
 
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
@@ -1823,7 +1920,72 @@ const titleDemandScore = Math.min(
 );
 
 // =========================
-// 🚀 TUBEX VOLUME SCORE V6
+// 🔎 SEARCH TERM ANALYSIS
+// =========================
+// These are the closest observable equivalents to TubeBuddy's
+// searchtermintitle / searchtermindesc / searchtermintags signals.
+// They are diagnostic signals, not search-volume estimates.
+
+let searchTermInTitle = 0;
+let searchTermInDescription = 0;
+let searchTermInTags = 0;
+
+items.forEach(video => {
+
+    const videoTitle = normalizeText(
+        video?.snippet?.title || ""
+    );
+
+    const videoDescription = normalizeText(
+        video?.snippet?.description || ""
+    );
+
+    const videoTags = (video?.snippet?.tags || [])
+        .map(tag => normalizeText(tag))
+        .filter(Boolean);
+
+    if (videoTitle.includes(normalizedKeyword)) {
+        searchTermInTitle++;
+    }
+
+    if (videoDescription.includes(normalizedKeyword)) {
+        searchTermInDescription++;
+    }
+
+    if (videoTags.some(tag =>
+        tag === normalizedKeyword ||
+        tag.includes(normalizedKeyword) ||
+        normalizedKeyword.includes(tag)
+    )) {
+        searchTermInTags++;
+    }
+
+});
+
+const searchTermInTitleScore = Math.round(
+    (searchTermInTitle / Math.max(items.length, 1)) * 100
+);
+
+const searchTermInDescriptionScore = Math.round(
+    (searchTermInDescription / Math.max(items.length, 1)) * 100
+);
+
+const searchTermInTagsScore = Math.round(
+    (searchTermInTags / Math.max(items.length, 1)) * 100
+);
+
+// Exact-title coverage is deliberately stronger than generic title
+// containment, matching the distinction visible in TubeBuddy's UI.
+const titleCompetitionSignal = Math.round(
+    exactTitleMatches * 5 +
+    prefixTitleMatches * 4 +
+    phraseTitleMatches * 3 +
+    partialTitleMatches
+);
+
+
+// =========================
+// 🚀 TUBEX VOLUME SCORE V7 — SERP DEMAND
 // =========================
 //
 // Volume = DEMANDA ESTIMADA
@@ -1936,7 +2098,7 @@ const finalVolume = Math.max(
 );
 
 // =========================
-// 🚀 TUBEX COMPETITION V7
+// 🚀 TUBEX COMPETITION V8 — TUBEBUDDY SIGNALS
 // =========================
 //
 // UMA ÚNICA ENGINE DE CONCORRÊNCIA.
@@ -2172,6 +2334,52 @@ const repetitionScore = Math.round(
 
 );
 
+// =========================
+// 👑 CHANNEL AUTHORITY PRESSURE
+// =========================
+// Subscriber count is a secondary competition signal. It is
+// logarithmic so one giant channel cannot overwhelm the entire
+// SERP by itself. We weight it more when that channel also uses
+// the keyword in its title.
+
+let authorityWeightedTotal = 0;
+let authorityMatchedTotal = 0;
+
+items.forEach(video => {
+
+    const subscribers = Number(
+        video.channelSubscribers || 0
+    );
+
+    const title = normalizeText(
+        video?.snippet?.title || ""
+    );
+
+    const hasKeywordInTitle =
+        title.includes(normalizedKeyword);
+
+    const authority = Math.min(100,
+        Math.round(
+            Math.log10(subscribers + 1) * 10
+        )
+    );
+
+    authorityWeightedTotal += authority;
+
+    if (hasKeywordInTitle) {
+        authorityMatchedTotal += authority;
+    }
+
+});
+
+const authorityDifficulty = Math.round(
+    authorityWeightedTotal / itemCount
+);
+
+const matchedAuthorityDifficulty = Math.round(
+    authorityMatchedTotal / itemCount
+);
+
 // -------------------------
 // SERP STRENGTH
 // -------------------------
@@ -2249,7 +2457,7 @@ const marketDifficultyScore = Math.max(
 );
 
 // -------------------------
-// 🎯 COMPETITION FINAL V7
+// 🎯 COMPETITION FINAL V8
 // -------------------------
 //
 // PRIMEIRO calculamos a DIFICULDADE REAL da SERP.
@@ -2281,19 +2489,23 @@ const finalCompetitionDifficulty = Math.max(
 
         Math.round(
 
-            serpPower * 0.35 +
+            serpPower * 0.30 +
 
-            coverageDifficulty * 0.25 +
+            coverageDifficulty * 0.22 +
 
-            freshnessDifficulty * 0.15 +
+            freshnessDifficulty * 0.13 +
 
-            channelDominance * 0.10 +
+            authorityDifficulty * 0.08 +
 
-            repetitionScore * 0.05 +
+            matchedAuthorityDifficulty * 0.07 +
+
+            channelDominance * 0.07 +
+
+            repetitionScore * 0.04 +
 
             serpStructureScore * 0.05 +
 
-            marketDifficultyScore * 0.05
+            marketDifficultyScore * 0.04
 
         )
 
@@ -2386,6 +2598,10 @@ const competitionDetails = {
     // DOMINÂNCIA
     channelDominance,
 
+    // AUTORIDADE DOS CANAIS
+    authorityDifficulty,
+    matchedAuthorityDifficulty,
+
     // REPETIÇÃO
     repetitionScore,
 
@@ -2413,6 +2629,15 @@ const competitionDetails = {
     containsMatchScore,
 
     partialMatchScore,
+
+    // SEARCH TERM ANALYSIS
+    searchTermInTitle,
+    searchTermInDescription,
+    searchTermInTags,
+    searchTermInTitleScore,
+    searchTermInDescriptionScore,
+    searchTermInTagsScore,
+    titleCompetitionSignal,
 
     // VÍDEOS RECENTES
     recentVideos
@@ -2910,7 +3135,7 @@ items.length
 //
 // Não existe cálculo paralelo.
 // competitionScore já foi definido como alias
-// oficial de finalCompetition na Competition V7.
+// oficial de finalCompetition na Competition V8.
 
 // =========================
 // 📦 RESPONSE
@@ -2945,13 +3170,35 @@ topShare,
 
     minViews,
 
-    medianViews: median
+    medianViews: median,
+    totalResults,
+    searchTermInTitle,
+    searchTermInDescription,
+    searchTermInTags,
+    searchTermInTitleScore,
+    searchTermInDescriptionScore,
+    searchTermInTagsScore
 
 };
 
 const responseData = {
 
     success: true,
+
+    // TubeBuddy's exact monthly-search-volume provider is not exposed
+    // by the YouTube Data API. Never present the SERP estimate as a
+    // monthly-search count.
+    monthlySearches: null,
+    volumeDataSource: "youtube_serp_estimate",
+    totalResults,
+    searchTermAnalysis: {
+        searchTermInTitle,
+        searchTermInDescription,
+        searchTermInTags,
+        searchTermInTitleScore,
+        searchTermInDescriptionScore,
+        searchTermInTagsScore
+    },
 
     items,
 
@@ -3002,6 +3249,22 @@ medianScore,
 velocityScore,
 strengthScore,
 serpDemandScore,
+    serpPower,
+    coverageDifficulty,
+    freshnessDifficulty,
+    authorityDifficulty,
+    matchedAuthorityDifficulty,
+    channelDominance,
+    repetitionScore,
+    serpStructureScore,
+    marketDifficultyScore,
+    searchTermInTitle,
+    searchTermInDescription,
+    searchTermInTags,
+    searchTermInTitleScore,
+    searchTermInDescriptionScore,
+    searchTermInTagsScore,
+    titleCompetitionSignal,
 
     medianViews: median
 

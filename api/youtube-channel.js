@@ -54,28 +54,37 @@ console.log(
   try {
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const channelId = String(
+    let channelId = String(
       body?.channelId ||
       body?.currentChannelId ||
       body?.youtubeChannelId ||
       ""
     ).trim();
 
+    // Accept a channel URL as well as a raw channel ID.
+    const channelUrl = String(
+      body?.channelUrl ||
+      body?.youtubeChannelUrl ||
+      ""
+    ).trim();
+
+    const urlId = channelUrl.match(/(?:youtube\.com\/channel\/)(UC[a-zA-Z0-9_-]{10,})/i);
+    if(!channelId && urlId?.[1]) channelId = urlId[1];
+
+    // Accept @handle when the caller has not resolved the channel ID yet.
+    const handle = String(
+      body?.handle ||
+      body?.youtubeHandle ||
+      ""
+    ).trim().replace(/^@/,"");
+
+    // Resolve a handle with the same YouTube API key below.
+    // The normal ID path remains the preferred/cheapest path.
+
 // =====================================
 // 🔥 CACHE GLOBAL CHANNEL
 // =====================================
 
-
-    if (!channelId) {
-      return res.status(200).json({
-        success:false,
-        error:"channelId_required",
-        channel:null,
-        metrics:null,
-        items:[],
-        data:{channel:null,videos:[],metrics:null}
-      });
-    }
 
 global.tubexChannelCache = global.tubexChannelCache || {};
 
@@ -101,6 +110,38 @@ if(cached){
       return res.status(200).json({
         success:false,
         error:"youtube_api_key_missing",
+        channel:null,
+        metrics:null,
+        items:[],
+        data:{channel:null,videos:[],metrics:null}
+      });
+    }
+
+    // Resolve @handle only when an ID was not supplied.
+    if(!channelId && handle){
+      for(const key of keys){
+        try{
+          const handleRes=await fetch(
+            `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${key}`
+          );
+          if(handleRes.ok){
+            const handleJson=await handleRes.json();
+            const resolved=handleJson?.items?.[0]?.id;
+            if(resolved){
+              channelId=String(resolved).trim();
+              break;
+            }
+          }
+        }catch(e){
+          console.warn("⚠️ erro ao resolver handle:",e);
+        }
+      }
+    }
+
+    if(!channelId){
+      return res.status(200).json({
+        success:false,
+        error:"channelId_required",
         channel:null,
         metrics:null,
         items:[],
@@ -229,7 +270,7 @@ continue;
     // ======================================================
 if (!Array.isArray(videos) || videos.length === 0) {
 
-  console.warn("⚠️ canal sem vídeos — retornando vazio controlado");
+  console.warn("⚠️ vídeos do canal indisponíveis; mantendo os metadados reais do canal");
 
   const subscribers = Number(channel?.statistics?.subscriberCount || 0);
   const totalVideos = Number(channel?.statistics?.videoCount || 0);
@@ -243,12 +284,13 @@ if (!Array.isArray(videos) || videos.length === 0) {
     subscribers,
     totalVideos,
     totalChannelViews,
-    views30: 0,
-    uploads30: 0
+    views30: null,
+    uploads30: 0,
+    channelDataOnly: true
   };
 
   const finalData = {
-    success: true,
+    success: Boolean(channel),
     channelId,
     channel,
     metrics,
@@ -259,6 +301,13 @@ if (!Array.isArray(videos) || videos.length === 0) {
       videos: [],
       metrics
     }
+  };
+
+  // Cache even a metadata-only response, so a temporary playlist quota
+  // failure does not cause repeated requests on every render.
+  global.tubexChannelCache[cacheKey] = {
+    data: finalData,
+    expires: Date.now() + (2 * 60 * 1000)
   };
 
   return res.status(200).json(finalData);

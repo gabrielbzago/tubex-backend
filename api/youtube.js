@@ -42,17 +42,72 @@ const accessToken =
     const keyword = body?.keyword?.trim();
     const mode = body?.mode || "seo";
     const videoId = body?.videoId;
-    const requestedPlan = String(body?.plan || "free").trim().toLowerCase();
-    let requestPlan = requestedPlan === "basic" || requestedPlan === "starter" ? "start" : requestedPlan;
+    const requestedPlan = String(
+      body?.plan ??
+      body?.userPlan ??
+      body?.subscriptionPlan ??
+      body?.plano ??
+      "free"
+    ).trim().toLowerCase();
+
+    let requestPlan =
+      requestedPlan === "basic" || requestedPlan === "starter"
+        ? "start"
+        : requestedPlan;
     if(!["free","start","member","pro","expert","owner"].includes(requestPlan)) requestPlan="free";
-    const requestUserKey = String(body?.userEmail || body?.userId || req.headers["x-user-id"] || req.headers.origin || "anonymous").trim().toLowerCase();
+    const requestUserKey = String(
+      body?.userEmail ||
+      body?.userId ||
+      req.headers["x-user-id"] ||
+      req.headers.origin ||
+      "anonymous"
+    ).trim().toLowerCase();
+
+    // Weighted analysis is available only to Expert/Owner accounts.
+    // The extension sends the already authenticated channel context so
+    // this endpoint does not need to spend additional YouTube API quota
+    // fetching the creator's own videos again.
+    const requestedScoreMode =
+      String(body?.scoreMode || "unweighted").trim().toLowerCase();
+
+    const channelContext =
+      body?.channelContext &&
+      typeof body.channelContext === "object"
+        ? body.channelContext
+        : null;
+
+    const weightedRequested =
+      (body?.weighted === true || requestedScoreMode === "weighted") &&
+      (requestPlan === "expert" || requestPlan === "owner") &&
+      Boolean(String(body?.channelId || channelContext?.channelId || "").trim());
 
     const QUERY_LIMITS = { free:3, start:10, member:15, pro:50, expert:Infinity, owner:Infinity };
     function consumeKeywordQuota(){
       const limit=QUERY_LIMITS[requestPlan] ?? 3;
       if(!Number.isFinite(limit)) return {allowed:true,limit,used:0,remaining:Infinity};
       global.tubexKeywordQuota = global.tubexKeywordQuota || {};
-      const day=new Date().toISOString().slice(0,10);
+      const quotaTimeZone =
+        String(
+          body?.quotaTimeZone ||
+          process.env.TUBEX_QUOTA_TIMEZONE ||
+          "America/Sao_Paulo"
+        ).trim();
+
+      let day;
+      try{
+        day = new Intl.DateTimeFormat(
+          "en-CA",
+          {
+            timeZone:quotaTimeZone,
+            year:"numeric",
+            month:"2-digit",
+            day:"2-digit"
+          }
+        ).format(new Date());
+      }catch{
+        day = new Date().toISOString().slice(0,10);
+      }
+
       const key=`${requestUserKey}:${day}`;
       const used=Number(global.tubexKeywordQuota[key]||0);
       if(used>=limit) return {allowed:false,limit,used,remaining:0};
@@ -2704,6 +2759,160 @@ const optimizationStrength = Math.max(0,Math.min(100,Math.round(
 )));
 const opportunityScore = optimizationStrength;
 
+// ==========================================================
+// 🧠 TUBEX EXPERT — CHANNEL-WEIGHTED ANALYSIS
+// ==========================================================
+// The unweighted engine above is always calculated for every plan.
+// Expert only adds a second layer using the creator's own channel
+// performance. This guarantees FREE/START/MEMBER/PRO never depend
+// on channel data to calculate their normal score.
+
+let weightedScore = null;
+let weightedAnalysis = null;
+
+if (weightedRequested) {
+  const channelItems = Array.isArray(channelContext?.items)
+    ? channelContext.items
+    : [];
+
+  const keywordViews = items
+    .map(v => Number(v?.statistics?.viewCount || 0))
+    .filter(v => Number.isFinite(v) && v > 0);
+
+  const channelViews = channelItems
+    .map(v => Number(v?.views ?? v?.statistics?.viewCount ?? 0))
+    .filter(v => Number.isFinite(v) && v > 0);
+
+  const medianOf = values => {
+    const arr = [...values].sort((a,b) => a-b);
+    if (!arr.length) return 0;
+    const mid = Math.floor(arr.length / 2);
+    return arr.length % 2
+      ? arr[mid]
+      : (arr[mid - 1] + arr[mid]) / 2;
+  };
+
+  const keywordMedian = medianOf(keywordViews);
+  const channelMedian = medianOf(channelViews);
+
+  let channelAverage =
+    channelViews.length
+      ? channelViews.reduce((a,b) => a+b, 0) / channelViews.length
+      : 0;
+
+  if (!channelAverage) {
+    const channelViewsLifetime = Number(channelContext?.views || 0);
+    const channelVideosLifetime = Number(channelContext?.videos || 0);
+
+    if (channelViewsLifetime > 0 && channelVideosLifetime > 0) {
+      channelAverage =
+        channelViewsLifetime / channelVideosLifetime;
+    }
+  }
+
+  let performanceFit = 50;
+
+  if (keywordMedian > 0 && channelMedian > 0) {
+    const distance = Math.abs(
+      Math.log10(
+        (keywordMedian + 1) /
+        (channelMedian + 1)
+      )
+    );
+
+    performanceFit = Math.max(
+      0,
+      Math.min(100, 100 - distance * 38)
+    );
+  }
+  else if (keywordMedian > 0 && channelAverage > 0) {
+    const ratio =
+      keywordMedian /
+      (channelAverage + 1);
+
+    performanceFit = Math.max(
+      0,
+      Math.min(
+        100,
+        65 +
+        Math.log10(
+          Math.max(ratio, 0.1)
+        ) * 20
+      )
+    );
+  }
+
+  const analyzed =
+    Math.max(items.length, 1);
+
+  const exactPct =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        (exactTitleMatches / analyzed) * 100
+      )
+    );
+
+  const titleRoom =
+    Math.max(0, 100 - exactPct);
+
+  weightedScore =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          (
+            (
+              finalVolume * 0.60 +
+              finalCompetition * 0.40
+            ) * 0.35
+          ) +
+          (opportunityScore * 0.25) +
+          (performanceFit * 0.25) +
+          (titleRoom * 0.10) +
+          (finalCompetition * 0.05)
+        )
+      )
+    );
+
+  weightedAnalysis = {
+    enabled: true,
+    channelId:
+      String(
+        body?.channelId ||
+        channelContext?.channelId ||
+        ""
+      ).trim(),
+    channelName:
+      String(
+        channelContext?.name ||
+        ""
+      ).trim(),
+    subscribers:
+      Number(
+        channelContext?.subscribers || 0
+      ),
+    channelVideos:
+      Number(
+        channelContext?.videos || 0
+      ),
+    analyzedChannelVideos:
+      channelItems.length,
+    keywordMedianViews:
+      Math.round(keywordMedian),
+    channelMedianViews:
+      Math.round(channelMedian),
+    channelAverageViews:
+      Math.round(channelAverage),
+    performanceFit:
+      Math.round(performanceFit),
+    titleRoom:
+      Math.round(titleRoom)
+  };
+}
+
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
 // =========================
@@ -3264,8 +3473,8 @@ topShare,
     searchTermInTags,
     searchTermInTitleScore,
     searchTermInDescriptionScore,
-    searchTermInTagsScore
-
+    searchTermInTagsScore,
+    weightedScore
 };
 
 const responseData = {
@@ -3283,6 +3492,22 @@ const responseData = {
     optimizationStrength,
     opportunityScore,
     quota,
+
+    // Expert/Owner only. Unweighted score is still always present.
+    weightedScore,
+    channelWeightedScore: weightedScore,
+    weightedAnalysis,
+
+    calculation: {
+      mode: weightedRequested ? "weighted" : "unweighted",
+      ready: true,
+      baseSignals: {
+        volume: finalVolume,
+        competition: finalCompetition,
+        optimization: optimizationStrength
+      }
+    },
+
     totalResults,
     searchTermAnalysis: {
         searchTermInTitle,

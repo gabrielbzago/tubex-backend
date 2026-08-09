@@ -40,7 +40,12 @@ console.log(
   try {
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const channelId = body?.channelId;
+    const channelId = String(
+      body?.channelId ||
+      body?.currentChannelId ||
+      body?.youtubeChannelId ||
+      ""
+    ).trim();
 
 // =====================================
 // 🔥 CACHE GLOBAL CHANNEL
@@ -194,11 +199,13 @@ if (!Array.isArray(videos) || videos.length === 0) {
   console.warn("⚠️ canal sem vídeos — retornando vazio controlado");
 
   const finalData = {
-    success: true, // 🔥 MUITO IMPORTANTE
-    items: [],
-    data: {
-      channel,
-      videos: [],
+      success: true,
+      channelId,
+      items: [],
+      data: {
+        channelId,
+        channel,
+        videos: [],
      metrics: {
   totalViews: 0,
   avgViews: 0,
@@ -292,8 +299,10 @@ const uploads30 = videos
 
 const finalData = {
   success:true,
+  channelId,
   items:videos,
   data:{
+    channelId,
     channel,
     videos,
     metrics:{

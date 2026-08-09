@@ -226,6 +226,7 @@ if(!data){
     success:true,
 
     plan:"free",
+    plano:"free",
 
     fallback:false
 
@@ -236,11 +237,15 @@ if(!data){
     // ==================================================
     // 📦 DATA
     // ==================================================
-    const plan = String(
+    let plan = String(
       data.plan || "free"
     )
     .toLowerCase()
     .trim();
+
+    if(plan === "basic" || plan === "starter"){
+      plan = "start";
+    }
 
     const status = String(
       data.status || "inactive"
@@ -277,6 +282,7 @@ if(
       email:data.email,
 
       plan,
+      plano:plan,
 
       status,
 
@@ -301,6 +307,7 @@ if(
     return res.status(200).json({
       success:true,
       plan:"free",
+      plano:"free",
       fallback:true
     });
 

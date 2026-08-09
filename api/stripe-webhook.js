@@ -38,13 +38,113 @@ const PLAN_MAP = {
 };
 
 // ======================================================
+// 🧠 PLAN FROM STRIPE PRODUCT
+// ======================================================
+function getPlanFromProduct(productId){
+
+  if(!productId){
+
+    console.error(
+      "❌ Stripe sem Product ID"
+    );
+
+    return null;
+  }
+
+  const plan = PLAN_MAP[productId];
+
+  if(!plan){
+
+    console.error(
+      "🚨 PRODUTO STRIPE NÃO MAPEADO:",
+      productId
+    );
+
+    return null;
+  }
+
+  return plan;
+}
+
+// ======================================================
+// 🧹 NORMALIZE EMAIL
+// ======================================================
+function normalizeEmail(email){
+
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+}
+
+// ======================================================
+// 👤 NORMALIZE NAME
+// ======================================================
+function normalizeName(name){
+
+  const value = String(name || "")
+    .trim();
+
+  return value || null;
+}
+
+// ======================================================
+// 🚦 SUBSCRIPTION STATUS
+// ======================================================
+function getUserStatus(subscriptionStatus){
+
+  switch(subscriptionStatus){
+
+    case "past_due":
+      return "past_due";
+
+    case "unpaid":
+      return "unpaid";
+
+    case "incomplete":
+      return "incomplete";
+
+    case "incomplete_expired":
+      return "canceled";
+
+    case "canceled":
+      return "canceled";
+
+    case "trialing":
+      return "active";
+
+    case "active":
+    default:
+      return "active";
+
+  }
+}
+
+// ======================================================
+// 📦 GET PRODUCT FROM SUBSCRIPTION
+// ======================================================
+function getProductFromSubscription(subscription){
+
+  const product =
+    subscription
+      ?.items
+      ?.data?.[0]
+      ?.price
+      ?.product;
+
+  return typeof product === "string"
+    ? product
+    : product?.id || null;
+}
+
+// ======================================================
 // 🚀 SAVE USER
 // ======================================================
 async function saveUser({
 
   email,
-  plan = "free",
-  status = "active",
+  name = null,
+  plan = null,
+  status = null,
   stripe_customer_id = null,
   stripe_subscription_id = null
 
@@ -52,30 +152,33 @@ async function saveUser({
 
   try{
 
-    if(!email){
+    const normalizedEmail =
+      normalizeEmail(email);
+
+    if(!normalizedEmail){
 
       console.warn(
         "⚠ saveUser sem email"
       );
 
-      return;
-
+      throw new Error(
+        "saveUser: email ausente"
+      );
     }
 
-    email = String(email)
-      .trim()
-      .toLowerCase();
+    const normalizedName =
+      normalizeName(name);
 
-    // ================================================
+    // ==================================================
     // 🔍 EXISTE?
-    // ================================================
+    // ==================================================
     const {
       data: existingUser,
       error: findError
     } = await supabase
       .from("users")
       .select("id")
-      .eq("email", email)
+      .eq("email", normalizedEmail)
       .maybeSingle();
 
     if(findError){
@@ -85,42 +188,58 @@ async function saveUser({
         findError
       );
 
-      return;
-
+      throw findError;
     }
 
     let saveError = null;
 
-    // ================================================
+    // ==================================================
     // 🔄 UPDATE
-    // ================================================
+    // ==================================================
     if(existingUser){
+
+      const updateData = {
+
+        updated_at:
+          new Date().toISOString()
+
+      };
+
+      if(normalizedName !== null){
+        updateData.name = normalizedName;
+      }
+
+      if(plan !== null){
+        updateData.plan = plan;
+      }
+
+      if(status !== null){
+        updateData.status = status;
+      }
+
+      if(stripe_customer_id !== null){
+        updateData.stripe_customer_id =
+          stripe_customer_id;
+      }
+
+      if(stripe_subscription_id !== null){
+        updateData.stripe_subscription_id =
+          stripe_subscription_id;
+      }
 
       const { error } =
         await supabase
           .from("users")
-          .update({
-
-            plan,
-            status,
-
-            stripe_customer_id,
-
-            stripe_subscription_id,
-
-            updated_at:
-              new Date().toISOString()
-
-          })
-          .eq("email", email);
+          .update(updateData)
+          .eq("email", normalizedEmail);
 
       saveError = error;
 
     }
 
-    // ================================================
+    // ==================================================
     // ➕ INSERT
-    // ================================================
+    // ==================================================
     else{
 
       const { error } =
@@ -128,12 +247,16 @@ async function saveUser({
           .from("users")
           .insert({
 
-            email,
-            plan,
-            status,
+            email: normalizedEmail,
+            name: normalizedName,
+            plan: plan !== null
+              ? plan
+              : "free",
+            status: status !== null
+              ? status
+              : "active",
 
             stripe_customer_id,
-
             stripe_subscription_id,
 
             created_at:
@@ -148,9 +271,6 @@ async function saveUser({
 
     }
 
-    // ================================================
-    // 🚫 ERROR
-    // ================================================
     if(saveError){
 
       console.error(
@@ -158,16 +278,16 @@ async function saveUser({
         saveError
       );
 
-    }else{
-
-      console.log(
-        "✅ usuário salvo:",
-        email,
-        plan,
-        status
-      );
-
+      throw saveError;
     }
+
+    console.log(
+      "✅ usuário salvo:",
+      normalizedEmail,
+      normalizedName,
+      plan,
+      status
+    );
 
   }catch(err){
 
@@ -176,8 +296,8 @@ async function saveUser({
       err
     );
 
+    throw err;
   }
-
 }
 
 // ======================================================
@@ -198,7 +318,6 @@ export default async function handler(
       .json({
         success:false
       });
-
   }
 
   // ====================================================
@@ -206,6 +325,16 @@ export default async function handler(
   // ====================================================
   const signature =
     req.headers["stripe-signature"];
+
+  if(!signature){
+
+    return res
+      .status(400)
+      .json({
+        success:false,
+        error:"Missing Stripe signature"
+      });
+  }
 
   const rawBody =
     await buffer(req);
@@ -241,7 +370,6 @@ export default async function handler(
       .send(
         `Webhook Error: ${err.message}`
       );
-
   }
 
   // ====================================================
@@ -251,7 +379,8 @@ export default async function handler(
 
     console.log(
       "🔥 EVENT:",
-      event.type
+      event.type,
+      event.id
     );
 
     // ==================================================
@@ -265,17 +394,16 @@ export default async function handler(
       const session =
         event.data.object;
 
-      const email = String(
+      const email =
+        normalizeEmail(
+          session.customer_details?.email ||
+          session.customer_email
+        );
 
-        session.customer_details?.email ||
-
-        session.customer_email ||
-
-        ""
-
-      )
-      .trim()
-      .toLowerCase();
+      const name =
+        normalizeName(
+          session.customer_details?.name
+        );
 
       if(!email){
 
@@ -284,81 +412,108 @@ export default async function handler(
         );
 
         return res.json({
-          received:true
+          received:true,
+          ignored:true,
+          reason:"missing_email"
         });
-
       }
 
-      // ================================================
+      // ==================================================
       // 📦 SESSION COMPLETA
-      // ================================================
+      // ==================================================
       const fullSession =
         await stripe
           .checkout
           .sessions
           .retrieve(
-
             session.id,
-
             {
               expand:["line_items"]
             }
-
           );
 
-      // ================================================
-      // 💰 PRODUCT
-      // ================================================
-   const product =
+      const product =
+        fullSession
+          ?.line_items
+          ?.data?.[0]
+          ?.price
+          ?.product;
 
-  fullSession
-    ?.line_items
-    ?.data?.[0]
-    ?.price
-    ?.product;
-
-const productId =
-
-  typeof product === "string"
-    ? product
-    : product?.id;
+      const productId =
+        typeof product === "string"
+          ? product
+          : product?.id;
 
       console.log(
         "🔥 PRODUCT ID:",
         productId
       );
 
-      // ================================================
-      // 🔥 PLAN
-      // ================================================
       const plan =
+        getPlanFromProduct(productId);
 
-        PLAN_MAP[productId] ||
+      if(!plan){
 
-        "free";
+        console.error(
+          "🚨 CHECKOUT IGNORADO: produto Stripe não reconhecido",
+          {
+            email,
+            productId,
+            sessionId: session.id
+          }
+        );
 
-      console.log(
-        "🔥 PLAN:",
-        plan
-      );
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"unknown_product"
+        });
+      }
 
-      // ================================================
-      // 💾 SAVE
-      // ================================================
+      // ==================================================
+      // 👤 CUSTOMER NAME FALLBACK
+      // ==================================================
+      let customerName = name;
+
+      if(
+        !customerName &&
+        fullSession.customer
+      ){
+
+        const customer =
+          await stripe
+            .customers
+            .retrieve(
+              fullSession.customer
+            );
+
+        customerName =
+          normalizeName(
+            customer?.name
+          );
+      }
+
       await saveUser({
 
         email,
+        name: customerName,
         plan,
         status:"active",
 
         stripe_customer_id:
-          session.customer || null,
+          fullSession.customer || null,
 
         stripe_subscription_id:
-          session.subscription || null
+          fullSession.subscription || null
 
       });
 
+      console.log(
+        "✅ checkout processado:",
+        email,
+        customerName,
+        plan
+      );
     }
 
     // ==================================================
@@ -380,37 +535,67 @@ const productId =
           );
 
       const email =
-        String(
-          customer?.email || ""
-        )
-        .trim()
-        .toLowerCase();
+        normalizeEmail(
+          customer?.email
+        );
 
-      const product =
+      if(!email){
 
-  subscription
-    ?.items
-    ?.data?.[0]
-    ?.price
-    ?.product;
+        console.warn(
+          "⚠ subscription sem email:",
+          subscription.id
+        );
 
-const productId =
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"missing_email"
+        });
+      }
 
-  typeof product === "string"
-    ? product
-    : product?.id;
+      const name =
+        normalizeName(
+          customer?.name
+        );
+
+      const productId =
+        getProductFromSubscription(
+          subscription
+        );
 
       const plan =
+        getPlanFromProduct(productId);
 
-        PLAN_MAP[productId] ||
+      if(!plan){
 
-        "free";
+        console.error(
+          "🚨 SUBSCRIPTION UPDATE IGNORADO: produto Stripe não reconhecido",
+          {
+            email,
+            productId,
+            subscriptionId:
+              subscription.id
+          }
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"unknown_product"
+        });
+      }
+
+      const userStatus =
+        getUserStatus(
+          subscription.status
+        );
 
       await saveUser({
 
         email,
+        name,
         plan,
-        status:"active",
+        status:userStatus,
 
         stripe_customer_id:
           subscription.customer || null,
@@ -423,9 +608,10 @@ const productId =
       console.log(
         "🔄 assinatura atualizada:",
         email,
-        plan
+        name,
+        plan,
+        userStatus
       );
-
     }
 
     // ==================================================
@@ -447,15 +633,33 @@ const productId =
           );
 
       const email =
-        String(
-          customer?.email || ""
-        )
-        .trim()
-        .toLowerCase();
+        normalizeEmail(
+          customer?.email
+        );
+
+      if(!email){
+
+        console.warn(
+          "⚠ subscription cancelada sem email:",
+          subscription.id
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"missing_email"
+        });
+      }
+
+      const name =
+        normalizeName(
+          customer?.name
+        );
 
       await saveUser({
 
         email,
+        name,
         plan:"free",
         status:"canceled",
 
@@ -469,9 +673,9 @@ const productId =
 
       console.log(
         "❌ assinatura cancelada:",
-        email
+        email,
+        name
       );
-
     }
 
     // ==================================================
@@ -493,15 +697,35 @@ const productId =
           );
 
       const email =
-        String(
-          customer?.email || ""
-        )
-        .trim()
-        .toLowerCase();
+        normalizeEmail(
+          customer?.email
+        );
 
+      if(!email){
+
+        console.warn(
+          "⚠ pagamento falhou sem email:",
+          invoice.id
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"missing_email"
+        });
+      }
+
+      const name =
+        normalizeName(
+          customer?.name
+        );
+
+      // IMPORTANTE:
+      // não envia plan, então o plano atual é preservado.
       await saveUser({
 
         email,
+        name,
         status:"past_due",
 
         stripe_customer_id:
@@ -514,9 +738,9 @@ const productId =
 
       console.log(
         "⚠ pagamento falhou:",
-        email
+        email,
+        name
       );
-
     }
 
     // ==================================================
@@ -530,6 +754,22 @@ const productId =
       const invoice =
         event.data.object;
 
+      // O invoice.paid não decide o plano.
+      // O plano é controlado pelos eventos de assinatura.
+      // Aqui apenas confirmamos o pagamento e reativamos
+      // o status quando a assinatura realmente está ativa.
+      let subscription = null;
+
+      if(invoice.subscription){
+
+        subscription =
+          await stripe
+            .subscriptions
+            .retrieve(
+              invoice.subscription
+            );
+      }
+
       const customer =
         await stripe
           .customers
@@ -538,35 +778,109 @@ const productId =
           );
 
       const email =
-        String(
-          customer?.email || ""
-        )
-        .trim()
-        .toLowerCase();
+        normalizeEmail(
+          customer?.email
+        );
 
-   const product =
+      if(!email){
 
-  invoice
-    ?.lines
-    ?.data?.[0]
-    ?.price
-    ?.product;
+        console.warn(
+          "⚠ fatura paga sem email:",
+          invoice.id
+        );
 
-const productId =
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"missing_email"
+        });
+      }
 
-  typeof product === "string"
-    ? product
-    : product?.id;
+      const name =
+        normalizeName(
+          customer?.name
+        );
+
+      // Se não houver assinatura vinculada,
+      // não inventamos nem alteramos o plano.
+      if(!subscription){
+
+        console.warn(
+          "⚠ invoice.paid sem assinatura:",
+          invoice.id
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"missing_subscription"
+        });
+      }
+
+      const subscriptionStatus =
+        subscription.status;
+
+      // Apenas assinaturas realmente ativas/trialing
+      // podem voltar para active.
+      if(
+        subscriptionStatus !== "active" &&
+        subscriptionStatus !== "trialing"
+      ){
+
+        console.warn(
+          "⚠ invoice.paid não reativado: assinatura não está ativa",
+          {
+            email,
+            invoiceId: invoice.id,
+            subscriptionId:
+              subscription.id,
+            subscriptionStatus
+          }
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"subscription_not_active"
+        });
+      }
+
+      // Recupera o plano da assinatura ATUAL no Stripe.
+      // Isso permite corrigir o banco caso o checkout/session
+      // webhook tenha falhado anteriormente, sem usar dados
+      // antigos da invoice.
+      const productId =
+        getProductFromSubscription(
+          subscription
+        );
 
       const plan =
+        getPlanFromProduct(productId);
 
-        PLAN_MAP[productId] ||
+      if(!plan){
 
-        "free";
+        console.error(
+          "🚨 INVOICE PAID IGNORADO: produto da assinatura não reconhecido",
+          {
+            email,
+            productId,
+            invoiceId: invoice.id,
+            subscriptionId:
+              subscription.id
+          }
+        );
+
+        return res.json({
+          received:true,
+          ignored:true,
+          reason:"unknown_product"
+        });
+      }
 
       await saveUser({
 
         email,
+        name,
         plan,
         status:"active",
 
@@ -581,9 +895,9 @@ const productId =
       console.log(
         "💰 fatura paga:",
         email,
+        name,
         plan
       );
-
     }
 
   }catch(err){
@@ -593,6 +907,14 @@ const productId =
       err
     );
 
+    // Retornar 500 é importante para que o Stripe
+    // possa reenviar o webhook quando houver falha real.
+    return res
+      .status(500)
+      .json({
+        received:false,
+        error:"Webhook processing failed"
+      });
   }
 
   // ====================================================
@@ -601,5 +923,4 @@ const productId =
   return res.json({
     received:true
   });
-
 }

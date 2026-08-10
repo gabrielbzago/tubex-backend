@@ -15,6 +15,7 @@
 // ============================================================
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_VERSION = "v2";
 const REQUEST_TIMEOUT_MS = 15000;
 
 function setCors(res, origin) {
@@ -484,7 +485,7 @@ export default async function handler(
       {};
 
     const cacheKey =
-      JSON.stringify({
+      CACHE_VERSION + ":" + JSON.stringify({
         keyword: normalizeText(keyword),
         gl,
         hl,

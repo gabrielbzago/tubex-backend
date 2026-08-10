@@ -14,8 +14,8 @@
 // The SerpApi key NEVER reaches the Chrome extension.
 // ============================================================
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
-const CACHE_VERSION = "v3";
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_VERSION = "v4";
 const REQUEST_TIMEOUT_MS = 15000;
 
 function setCors(res, origin) {
@@ -409,10 +409,22 @@ export default async function handler(
     return res.status(200).end();
   }
 
-  if (
-    req.headers["x-api-key"] !==
-    process.env.API_KEY
-  ) {
+  const incomingApiKey =
+    String(req.headers["x-api-key"] || "").trim();
+
+  const validApiKeys = new Set(
+    [
+      process.env.API_KEY,
+      process.env.INTERNAL_API_KEY
+    ]
+      .map(value => String(value || "").trim())
+      .filter(Boolean)
+  );
+
+  if(
+    !incomingApiKey ||
+    !validApiKeys.has(incomingApiKey)
+  ){
     return res.status(403).json({
       success: false,
       error: "unauthorized"
@@ -485,7 +497,9 @@ export default async function handler(
       {};
 
     const cacheKey =
-      CACHE_VERSION + ":" + JSON.stringify({
+      CACHE_VERSION +
+      ":" +
+      JSON.stringify({
         keyword: normalizeText(keyword),
         gl,
         hl,

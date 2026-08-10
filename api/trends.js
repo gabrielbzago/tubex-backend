@@ -11,7 +11,7 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||

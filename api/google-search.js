@@ -15,7 +15,7 @@
 // ============================================================
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const REQUEST_TIMEOUT_MS = 15000;
 
 function setCors(res, origin) {

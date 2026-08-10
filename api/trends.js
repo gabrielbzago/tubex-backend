@@ -11,10 +11,11 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
+const CACHE_VERSION = "v4";
 
 const cache =
-  globalThis.__tubexGoogleTrendsCache ||
-  (globalThis.__tubexGoogleTrendsCache = new Map());
+  globalThis.__tubexGoogleTrendsCacheV2 ||
+  (globalThis.__tubexGoogleTrendsCacheV2 = new Map());
 
 function stripXssi(text) {
   return String(text || "")
@@ -302,7 +303,7 @@ async function requestJsonText(
   };
 }
 
-async function fetchGoogleTrend(
+async function fetchGoogleTrendOnce(
   keyword,
   range,
   geo,
@@ -427,7 +428,63 @@ async function fetchGoogleTrend(
     );
   }
 
+  const values = trend
+    .map(point => Number(point?.value))
+    .filter(Number.isFinite);
+
+  // Uma série inteira em 100 não representa demanda alta por si só.
+  // Em consultas malformadas/sem correspondência, o endpoint público
+  // pode devolver uma série degenerada. Nunca apresentá-la como alta.
+  if (
+    values.length >= 2 &&
+    values.every(value => Math.round(value) === 100)
+  ) {
+    throw new Error(
+      "Google Trends retornou uma série degenerada para esta palavra-chave"
+    );
+  }
+
   return trend;
+}
+
+
+async function fetchGoogleTrend(
+  keyword,
+  range,
+  geo,
+  property
+) {
+
+  try {
+
+    return await fetchGoogleTrendOnce(
+      keyword,
+      range,
+      geo,
+      property
+    );
+
+  } catch (firstError) {
+
+    console.warn(
+      "[TubeX] Google Trends primeira tentativa falhou:",
+      firstError?.message || firstError
+    );
+
+    // Google Trends can invalidate the short-lived widget token
+    // or session cookie. Rebuild the session once and retry the
+    // complete request. No synthetic data is generated.
+    await new Promise(resolve =>
+      setTimeout(resolve, 600)
+    );
+
+    return await fetchGoogleTrendOnce(
+      keyword,
+      range,
+      geo,
+      property
+    );
+  }
 }
 
 export default async function handler(req, res) {
@@ -513,7 +570,7 @@ export default async function handler(req, res) {
         : "";
 
     const cacheKey =
-      JSON.stringify({
+      CACHE_VERSION + ":" + JSON.stringify({
         keyword: keyword.toLowerCase(),
         range,
         geo,
@@ -579,12 +636,21 @@ export default async function handler(req, res) {
       error
     );
 
-    return res.status(502).json({
+    const message =
+      error?.message ||
+      "google_trends_failed";
+
+    const status =
+      message.includes("dados suficientes") ||
+      message.includes("série degenerada")
+        ? 422
+        : 502;
+
+    return res.status(status).json({
       success: false,
-      error:
-        error?.message ||
-        "google_trends_failed",
-      source: "google_trends"
+      error: message,
+      source: "google_trends",
+      noData: status === 422
     });
   }
 }

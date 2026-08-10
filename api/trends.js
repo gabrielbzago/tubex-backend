@@ -34,10 +34,27 @@ function normalizeRange(value) {
   return value === "12m" ? "12m" : "30d";
 }
 
-function trendsTime(range) {
-  return range === "12m"
-    ? "today 12-m"
-    : "today 1-m";
+function formatTrendDate(date) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function trendsTime(range, exact12m = false) {
+  if (range === "12m") {
+    if (!exact12m) return "today 12-m";
+
+    // Google Trends normally accepts "today 12-m". When the public
+    // widget returns an empty TIMESERIES for YouTube Search, an exact
+    // 365-day interval is a reliable second representation of the same
+    // requested period and avoids losing a real historical series.
+    const end = new Date();
+    const start = new Date(end.getTime() - (365 * 24 * 60 * 60 * 1000));
+    return `${formatTrendDate(start)} ${formatTrendDate(end)}`;
+  }
+
+  return "today 1-m";
 }
 
 function normalizePoint(point) {
@@ -137,7 +154,8 @@ function buildExploreRequest(
   keyword,
   range,
   geo,
-  property
+  property,
+  exact12m = false
 ) {
 
   return {
@@ -145,7 +163,7 @@ function buildExploreRequest(
       {
         keyword,
         geo,
-        time: trendsTime(range)
+        time: trendsTime(range, exact12m)
       }
     ],
     category: 0,
@@ -307,7 +325,8 @@ async function fetchGoogleTrendOnce(
   keyword,
   range,
   geo,
-  property
+  property,
+  exact12m = false
 ) {
 
   const exploreRequest =
@@ -315,7 +334,8 @@ async function fetchGoogleTrendOnce(
       keyword,
       range,
       geo,
-      property
+      property,
+      exact12m
     );
 
   const exploreUrl =
@@ -475,6 +495,32 @@ async function fetchGoogleTrend(
           : 900;
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }
+    }
+  }
+
+  // 12 months has a second real-data path. Google Trends can occasionally
+  // expose an empty TIMESERIES for the relative "today 12-m" selector,
+  // especially for YouTube Search. Retry the same source and keyword with
+  // an exact 365-day interval. This is not synthetic data: it is another
+  // Google Trends query for the same historical window.
+  if(range === "12m"){
+    try{
+      console.warn(
+        `[TubeX] Google Trends 12m: tentando intervalo exato de 365 dias para ${property || "Google Web"}`
+      );
+      return await fetchGoogleTrendOnce(
+        keyword,
+        range,
+        geo,
+        property,
+        true
+      );
+    }catch(error){
+      lastError = error;
+      console.warn(
+        "[TubeX] Google Trends 12m fallback exato falhou:",
+        error?.message || error
+      );
     }
   }
 

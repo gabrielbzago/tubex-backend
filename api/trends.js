@@ -83,6 +83,7 @@ async function requestJson(url, options = {}) {
   const response =
     await fetch(url, {
       ...options,
+      redirect: "follow",
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -92,6 +93,8 @@ async function requestJson(url, options = {}) {
           "application/json,text/plain,*/*",
         "Accept-Language":
           "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer":
+          "https://trends.google.com/trends/explore",
         ...(options.headers || {})
       }
     });
@@ -100,8 +103,13 @@ async function requestJson(url, options = {}) {
     await response.text();
 
   if (!response.ok) {
+    const detail = text
+      .replace(/^\\s+|\\s+$/g, "")
+      .slice(0, 300);
+
     throw new Error(
-      `Google Trends HTTP ${response.status}`
+      `Google Trends HTTP ${response.status}` +
+      (detail ? `: ${detail}` : "")
     );
   }
 
@@ -168,6 +176,132 @@ function findTimeseriesWidget(widgets) {
   );
 }
 
+function extractSetCookie(headers) {
+
+  if (!headers) {
+    return "";
+  }
+
+  // Node/Vercel may expose combined Set-Cookie values.
+  const raw =
+    typeof headers.getSetCookie === "function"
+      ? headers.getSetCookie()
+      : null;
+
+  if (Array.isArray(raw) && raw.length) {
+    return raw
+      .map(value => String(value).split(";")[0])
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  const combined =
+    headers.get("set-cookie") || "";
+
+  if (!combined) {
+    return "";
+  }
+
+  return String(combined)
+    .split(/,(?=[^;=]+=[^;]+)/g)
+    .map(value => value.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+function mergeCookies(...cookieValues) {
+
+  const jar = new Map();
+
+  for (const value of cookieValues) {
+
+    if (!value) {
+      continue;
+    }
+
+    String(value)
+      .split(";")
+      .map(part => part.trim())
+      .filter(Boolean)
+      .forEach(part => {
+
+        const separator =
+          part.indexOf("=");
+
+        if (separator <= 0) {
+          return;
+        }
+
+        const name =
+          part.slice(0, separator).trim();
+
+        const cookieValue =
+          part.slice(separator + 1).trim();
+
+        if (name) {
+          jar.set(name, `${name}=${cookieValue}`);
+        }
+      });
+  }
+
+  return [...jar.values()].join("; ");
+}
+
+async function warmGoogleTrendsSession() {
+
+  const warmupUrl =
+    "https://trends.google.com/trends/" +
+    "?hl=pt-BR&geo=BR";
+
+  const warmup =
+    await requestJsonText(
+      warmupUrl
+    );
+
+  return extractSetCookie(
+    warmup.headers
+  );
+}
+
+async function requestJsonText(
+  url,
+  options = {}
+) {
+
+  const response =
+    await fetch(url, {
+      ...options,
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+          "AppleWebKit/537.36 (KHTML, like Gecko) " +
+          "Chrome/151.0 Safari/537.36",
+        "Accept":
+          "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+        "Accept-Language":
+          "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer":
+          "https://trends.google.com/",
+        ...(options.headers || {})
+      }
+    });
+
+  const text =
+    await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `Google Trends warmup HTTP ${response.status}`
+    );
+  }
+
+  return {
+    text,
+    headers: response.headers
+  };
+}
+
 async function fetchGoogleTrend(
   keyword,
   range,
@@ -175,81 +309,121 @@ async function fetchGoogleTrend(
   property
 ) {
 
-  const apiKey = String(
-    process.env.SERPAPI_API_KEY || ""
-  ).trim();
+  const exploreRequest =
+    buildExploreRequest(
+      keyword,
+      range,
+      geo,
+      property
+    );
 
-  if (!apiKey) {
-    throw new Error("SERPAPI_API_KEY não configurada na Vercel");
-  }
+  const exploreUrl =
+    "https://trends.google.com/trends/api/explore" +
+    "?hl=pt-BR" +
+    "&tz=-180" +
+    "&req=" +
+    encodeURIComponent(
+      JSON.stringify(
+        exploreRequest
+      )
+    );
 
-  const url = new URL("https://serpapi.com/search.json");
+  // Google Trends currently expects a warmed session cookie
+  // (notably NID) before the /api/explore request. Vercel's
+  // serverless runtime does not keep browser cookies between requests,
+  // so we explicitly bootstrap the session and carry the cookie forward.
+  const sessionCookie =
+    await warmGoogleTrendsSession();
 
-  url.searchParams.set("engine", "google_trends");
-  url.searchParams.set("q", keyword);
-  url.searchParams.set("data_type", "TIMESERIES");
-  url.searchParams.set(
-    "date",
-    range === "12m" ? "today 12-m" : "today 1-m"
-  );
-  url.searchParams.set("gprop", property === "youtube" ? "youtube" : "youtube");
-  url.searchParams.set("tz", "-180");
-  url.searchParams.set("api_key", apiKey);
+  const explore =
+    await requestJson(
+      exploreUrl,
+      sessionCookie
+        ? {
+            headers: {
+              Cookie: sessionCookie
+            }
+          }
+        : {}
+    );
 
-  if (geo) {
-    url.searchParams.set("geo", geo);
-  }
-
-  const { json } = await requestJson(url.toString());
+  const widget =
+    findTimeseriesWidget(
+      explore.json?.widgets
+    );
 
   if (
-    json?.search_metadata?.status &&
-    json.search_metadata.status !== "Success"
+    !widget ||
+    !widget.request ||
+    !widget.token
   ) {
     throw new Error(
-      json?.error ||
-      `SerpApi status: ${json.search_metadata.status}`
+      "Widget TIMESERIES não encontrado no Google Trends"
     );
   }
 
-  if (json?.error) {
-    throw new Error(String(json.error));
-  }
+  const requestPayload = {
+    ...widget.request,
+    requestOptions: {
+      ...(widget.request.requestOptions || {}),
+      category: 0,
+      property
+    }
+  };
+
+  const cookie =
+    mergeCookies(
+      sessionCookie,
+      extractSetCookie(explore.headers)
+    );
+
+  const widgetUrl =
+    "https://trends.google.com/trends/api/widgetdata/multiline" +
+    "?hl=pt-BR" +
+    "&tz=-180" +
+    "&req=" +
+    encodeURIComponent(
+      JSON.stringify(
+        requestPayload
+      )
+    ) +
+    "&token=" +
+    encodeURIComponent(
+      widget.token
+    );
+
+  const result =
+    await requestJson(
+      widgetUrl,
+      cookie
+        ? {
+            headers: {
+              Cookie: cookie,
+              Referer:
+                "https://trends.google.com/trends/explore"
+            }
+          }
+        : {
+            headers: {
+              Referer:
+                "https://trends.google.com/trends/explore"
+            }
+          }
+    );
 
   const timeline =
-    json?.interest_over_time?.timeline_data || [];
+    result.json?.default?.timelineData ||
+    result.json?.timelineData ||
+    [];
 
-  const trend = timeline
-    .map(point => {
-      const first =
-        Array.isArray(point?.values)
-          ? point.values[0]
-          : null;
-
-      const value = Number(
-        first?.extracted_value ??
-        first?.value
-      );
-
-      if (!Number.isFinite(value)) return null;
-
-      const timestamp = Number(point?.timestamp || 0);
-
-      return {
-        time:
-          timestamp > 0
-            ? new Date(timestamp * 1000).toISOString()
-            : null,
-        label: String(point?.date || ""),
-        value: Math.max(0, Math.min(100, Math.round(value))),
-        isPartial: !!point?.is_partial
-      };
-    })
-    .filter(Boolean);
+  const trend =
+    timeline
+      .map(normalizePoint)
+      .filter(Boolean);
 
   if (trend.length < 2) {
     throw new Error(
-      "Google Trends não retornou dados suficientes para esta palavra-chave"
+      "Google Trends não retornou dados suficientes"
     );
   }
 
@@ -308,6 +482,12 @@ export default async function handler(req, res) {
       typeof req.body === "string"
         ? JSON.parse(req.body)
         : (req.body || {});
+
+    // Keep the response contract stable for the extension.
+    res.setHeader(
+      "Content-Type",
+      "application/json; charset=utf-8"
+    );
 
     const keyword =
       cleanKeyword(body.keyword);
@@ -403,7 +583,8 @@ export default async function handler(req, res) {
       success: false,
       error:
         error?.message ||
-        "google_trends_failed"
+        "google_trends_failed",
+      source: "google_trends"
     });
   }
 }

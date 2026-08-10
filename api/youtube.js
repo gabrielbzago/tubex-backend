@@ -31,6 +31,92 @@ export default async function handler(req, res) {
     });
   }
 
+
+
+async function fetchGoogleVerification(keyword) {
+  if (!process.env.SERPAPI_API_KEY) {
+    return {
+      verified: false,
+      appearing: null,
+      error: "serpapi_not_configured",
+      checkedAt: new Date().toISOString()
+    };
+  }
+
+  const normalizeYoutubeUrl = value => String(value || "").toLowerCase().includes("youtube.com/") || String(value || "").toLowerCase().includes("youtu.be/");
+
+  try {
+    const url = new URL("https://serpapi.com/search.json");
+    url.searchParams.set("engine", "google");
+    url.searchParams.set("q", keyword);
+    url.searchParams.set("gl", "br");
+    url.searchParams.set("hl", "pt-BR");
+    url.searchParams.set("google_domain", "google.com.br");
+    url.searchParams.set("num", "20");
+    url.searchParams.set("no_cache", "false");
+    url.searchParams.set("api_key", process.env.SERPAPI_API_KEY);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let payload;
+    try {
+      const response = await fetch(url.toString(), {
+        headers: { Accept: "application/json", "User-Agent": "TubeX/1.0" },
+        signal: controller.signal
+      });
+      const text = await response.text();
+      payload = JSON.parse(text);
+      if (!response.ok) throw new Error(payload?.error || `SerpApi HTTP ${response.status}`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    let youtube = [];
+    const organic = Array.isArray(payload?.organic_results) ? payload.organic_results : [];
+    const videos = Array.isArray(payload?.video_results) ? payload.video_results : [];
+    [...videos, ...organic].forEach((item, index) => {
+      const link = item?.link || item?.url || item?.original_link || "";
+      if (normalizeYoutubeUrl(link)) {
+        youtube.push({
+          position: Number(item?.position ?? item?.position_on_page ?? index + 1),
+          title: String(item?.title || item?.name || "").trim(),
+          url: String(link).trim()
+        });
+      }
+    });
+
+    const unique = [];
+    const seen = new Set();
+    for (const item of youtube) {
+      if (!item.url || seen.has(item.url)) continue;
+      seen.add(item.url);
+      unique.push(item);
+    }
+
+    return {
+      verified: true,
+      appearing: unique.length > 0,
+      source: "SerpApi / Google Search",
+      provider: "SerpApi",
+      checkedAt: new Date().toISOString(),
+      resultCount: unique.length,
+      youtubeResults: unique.length,
+      position: unique[0]?.position ?? null,
+      rank: unique[0]?.position ?? null,
+      results: unique
+    };
+  } catch (error) {
+    console.warn("[TubeX] Google verification failed:", error?.message || error);
+    return {
+      verified: false,
+      appearing: null,
+      error: "google_search_unavailable",
+      message: String(error?.message || error || "Google Search indisponível").slice(0, 180),
+      checkedAt: new Date().toISOString()
+    };
+  }
+}
+
   try {
 
     const body = typeof req.body === "string"
@@ -42,78 +128,6 @@ const accessToken =
     const keyword = body?.keyword?.trim();
     const mode = body?.mode || "seo";
     const videoId = body?.videoId;
-    const requestedPlan = String(
-      body?.plan ??
-      body?.userPlan ??
-      body?.subscriptionPlan ??
-      body?.plano ??
-      "free"
-    ).trim().toLowerCase();
-
-    let requestPlan =
-      requestedPlan === "basic" || requestedPlan === "starter"
-        ? "start"
-        : requestedPlan;
-    if(!["free","start","member","pro","expert","owner"].includes(requestPlan)) requestPlan="free";
-    const requestUserKey = String(
-      body?.userEmail ||
-      body?.userId ||
-      req.headers["x-user-id"] ||
-      req.headers.origin ||
-      "anonymous"
-    ).trim().toLowerCase();
-
-    // Weighted analysis is available only to Expert/Owner accounts.
-    // The extension sends the already authenticated channel context so
-    // this endpoint does not need to spend additional YouTube API quota
-    // fetching the creator's own videos again.
-    const requestedScoreMode =
-      String(body?.scoreMode || "unweighted").trim().toLowerCase();
-
-    const channelContext =
-      body?.channelContext &&
-      typeof body.channelContext === "object"
-        ? body.channelContext
-        : null;
-
-    const weightedRequested =
-      (body?.weighted === true || requestedScoreMode === "weighted") &&
-      (requestPlan === "expert" || requestPlan === "owner") &&
-      Boolean(String(body?.channelId || channelContext?.channelId || "").trim());
-
-    const QUERY_LIMITS = { free:3, start:10, member:15, pro:50, expert:Infinity, owner:Infinity };
-    function consumeKeywordQuota(){
-      const limit=QUERY_LIMITS[requestPlan] ?? 3;
-      if(!Number.isFinite(limit)) return {allowed:true,limit,used:0,remaining:Infinity};
-      global.tubexKeywordQuota = global.tubexKeywordQuota || {};
-      const quotaTimeZone =
-        String(
-          body?.quotaTimeZone ||
-          process.env.TUBEX_QUOTA_TIMEZONE ||
-          "America/Sao_Paulo"
-        ).trim();
-
-      let day;
-      try{
-        day = new Intl.DateTimeFormat(
-          "en-CA",
-          {
-            timeZone:quotaTimeZone,
-            year:"numeric",
-            month:"2-digit",
-            day:"2-digit"
-          }
-        ).format(new Date());
-      }catch{
-        day = new Date().toISOString().slice(0,10);
-      }
-
-      const key=`${requestUserKey}:${day}`;
-      const used=Number(global.tubexKeywordQuota[key]||0);
-      if(used>=limit) return {allowed:false,limit,used,remaining:0};
-      global.tubexKeywordQuota[key]=used+1;
-      return {allowed:true,limit,used:used+1,remaining:Math.max(0,limit-used-1)};
-    }
 
     if (
 
@@ -156,27 +170,11 @@ if(
 }
 
     // =========================
-    // 📊 DAILY KEYWORD QUOTA
-    // =========================
-    let quota = {allowed:true,limit:Infinity,used:0,remaining:Infinity};
-    if(mode !== "video_ai" && mode !== "summary" && keyword){
-      quota = consumeKeywordQuota();
-      if(!quota.allowed){
-        return res.status(429).json({
-          success:false,
-          error:"daily_query_limit_reached",
-          plan:requestPlan,
-          quota
-        });
-      }
-    }
-
-    // =========================
     // 📦 CACHE SEO
     // =========================
     global.tubexSeoCache = global.tubexSeoCache || {};
 
-    const cacheKey = keyword ? `seo_${keyword.toLowerCase()}_${requestPlan}_${String(body?.scoreMode||"unweighted")}_${String(body?.channelId||"")}` : null;
+    const cacheKey = keyword ? `seo_v2_google_${keyword.toLowerCase()}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -205,6 +203,192 @@ let youtubeSearchSucceeded = false;
 
 // NOVO
 let totalResults = 0;
+
+    // =========================
+    // 🔁 MULTI KEY FETCH
+    // =========================
+   const shuffledKeys = [...keys]
+  .sort(() => Math.random() - 0.5);
+
+for (const key of shuffledKeys) {
+
+      try {
+
+        let allIds = [];
+        let nextPageToken = "";
+        let pageCount = 0;
+
+       let maxPages = 4;
+
+if (body?.plan === "free")
+    maxPages = 2;
+
+if (body?.plan === "pro")
+    maxPages = 6;
+
+        while (pageCount < maxPages) {
+
+          const searchUrl =
+            `https://www.googleapis.com/youtube/v3/search` +
+            `?part=snippet&type=video&order=relevance&maxResults=25` +
+            `&q=${encodeURIComponent(keyword)}` +
+            `&pageToken=${nextPageToken}` +
+            `&key=${key}`;
+
+          const searchRes = await fetch(searchUrl);
+
+          if (searchRes.status === 403 || searchRes.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const searchJson = await searchRes.json();
+// O YouTube respondeu corretamente,
+// mesmo que a busca não tenha retornado vídeos.
+youtubeSearchSucceeded = true;
+if (pageCount === 0) {
+
+    totalResults = Number(
+        searchJson.pageInfo?.totalResults || 0
+    );
+
+}
+          const ids = searchJson.items
+            ?.map(v => v.id?.videoId)
+            .filter(Boolean) || [];
+
+          allIds.push(...ids);
+
+          nextPageToken = searchJson.nextPageToken || "";
+          pageCount++;
+
+          if (!nextPageToken) break;
+        }
+
+        const uniqueIds = [...new Set(allIds)];
+
+        for (let i = 0; i < uniqueIds.length; i += 50) {
+
+          const chunk = uniqueIds.slice(i, i + 50).join(",");
+
+          const videosUrl =
+            `https://www.googleapis.com/youtube/v3/videos` +
+            `?part=snippet,statistics&id=${chunk}&key=${key}`;
+
+          const resVideos = await fetch(videosUrl);
+
+          if (resVideos.status === 403 || resVideos.status === 429) {
+            throw new Error("quota_exceeded");
+          }
+
+          const jsonVideos = await resVideos.json();
+
+          if (Array.isArray(jsonVideos.items)) {
+
+  const filtered = jsonVideos.items.filter(v => {
+
+    const title =
+      String(
+        v?.snippet?.title || ""
+      ).toLowerCase();
+
+    // remove shorts
+    if(title.includes("#shorts")){
+      return false;
+    }
+
+    const videoViews =
+      Number(
+        v?.statistics?.viewCount || 0
+      );
+
+    const published =
+      new Date(
+        v?.snippet?.publishedAt
+      ).getTime();
+
+    const ageDays =
+
+      (
+        Date.now() - published
+      )
+
+      / (1000 * 60 * 60 * 24);
+
+    // remove vídeo morto
+    if(
+      ageDays > 900
+      &&
+      videoViews < 5000
+    ){
+      return false;
+    }
+
+    return true;
+
+  });
+
+  items.push(...filtered);
+
+}
+        }
+
+      if (items.length) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
+
+
+// ------------------------------------
+// YOUTUBE RESPONDEU,
+// MAS NÃO ENCONTROU RESULTADOS
+// ------------------------------------
+
+if (youtubeSearchSucceeded) {
+
+    success = true;
+    activeKey = key;
+
+    break;
+
+}
+
+      } catch (e) {
+        console.warn("🔁 tentando próxima key...");
+        continue;
+      }
+    }
+
+ // =========================
+// 🚫 FALHA TOTAL DA API
+// =========================
+//
+// IMPORTANTE:
+// Isso NÃO significa "keyword sem volume".
+// Significa que o YouTube API não respondeu
+// corretamente após tentar as chaves disponíveis.
+//
+
+if (!success) {
+
+    return res.status(200).json({
+
+        success: false,
+
+        items: [],
+
+        volume: 0,
+
+        competition: null,
+
+        error: "youtube_api_unavailable"
+
+    });
+
+}
 
 // =========================
 // 🎬 VIDEO DATA
@@ -1029,8 +1213,6 @@ analytics.estimatedMinutesWatched,
 
 }
 
-
-
     // =========================
     // 📊 SUMMARY MODE
     // =========================
@@ -1064,284 +1246,6 @@ analytics.estimatedMinutesWatched,
         subscribers: Number(stats?.subscriberCount || 0)
       });
     }
-
-
-
-    // =========================
-    // 🔁 MULTI KEY FETCH
-    // =========================
-   const shuffledKeys = [...keys]
-  .sort(() => Math.random() - 0.5);
-
-for (const key of shuffledKeys) {
-
-      try {
-
-        let allIds = [];
-        let nextPageToken = "";
-        let pageCount = 0;
-
-        let maxPages = 4;
-
-        if(requestPlan === "free"){
-          maxPages = 2;
-        }
-        else if(requestPlan === "pro"){
-          maxPages = 6;
-        }
-        else if(
-          requestPlan === "expert" ||
-          requestPlan === "owner"
-        ){
-          maxPages = 8;
-        }
-
-        while (pageCount < maxPages) {
-
-          const searchUrl =
-            `https://www.googleapis.com/youtube/v3/search` +
-            `?part=snippet&type=video&order=relevance&maxResults=25` +
-            `&q=${encodeURIComponent(keyword)}` +
-            `&pageToken=${nextPageToken}` +
-            `&key=${key}`;
-
-          const searchRes = await fetch(searchUrl);
-
-          if (searchRes.status === 403 || searchRes.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-
-          const searchJson = await searchRes.json();
-// O YouTube respondeu corretamente,
-// mesmo que a busca não tenha retornado vídeos.
-youtubeSearchSucceeded = true;
-if (pageCount === 0) {
-
-    totalResults = Number(
-        searchJson.pageInfo?.totalResults || 0
-    );
-
-}
-          const ids = searchJson.items
-            ?.map(v => v.id?.videoId)
-            .filter(Boolean) || [];
-
-          allIds.push(...ids);
-
-          nextPageToken = searchJson.nextPageToken || "";
-          pageCount++;
-
-          if (!nextPageToken) break;
-        }
-
-        const uniqueIds = [...new Set(allIds)];
-
-        for (let i = 0; i < uniqueIds.length; i += 50) {
-
-          const chunk = uniqueIds.slice(i, i + 50).join(",");
-
-          const videosUrl =
-            `https://www.googleapis.com/youtube/v3/videos` +
-            `?part=snippet,statistics&id=${chunk}&key=${key}`;
-
-          const resVideos = await fetch(videosUrl);
-
-          if (resVideos.status === 403 || resVideos.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-
-          const jsonVideos = await resVideos.json();
-
-          if (Array.isArray(jsonVideos.items)) {
-
-  const filtered = jsonVideos.items.filter(v => {
-
-    const title =
-      String(
-        v?.snippet?.title || ""
-      ).toLowerCase();
-
-    // remove shorts
-    if(title.includes("#shorts")){
-      return false;
-    }
-
-    const videoViews =
-      Number(
-        v?.statistics?.viewCount || 0
-      );
-
-    const published =
-      new Date(
-        v?.snippet?.publishedAt
-      ).getTime();
-
-    const ageDays =
-
-      (
-        Date.now() - published
-      )
-
-      / (1000 * 60 * 60 * 24);
-
-    // remove vídeo morto
-    if(
-      ageDays > 900
-      &&
-      videoViews < 5000
-    ){
-      return false;
-    }
-
-    return true;
-
-  });
-
-  items.push(...filtered);
-
-}
-        }
-
-      if (items.length) {
-
-    success = true;
-    activeKey = key;
-
-    break;
-
-}
-
-
-// ------------------------------------
-// YOUTUBE RESPONDEU,
-// MAS NÃO ENCONTROU RESULTADOS
-// ------------------------------------
-
-if (youtubeSearchSucceeded) {
-
-    success = true;
-    activeKey = key;
-
-    break;
-
-}
-
-      } catch (e) {
-        console.warn("🔁 tentando próxima key...");
-        continue;
-      }
-    }
-
- // =========================
-// 🚫 FALHA TOTAL DA API
-// =========================
-//
-// IMPORTANTE:
-// Isso NÃO significa "keyword sem volume".
-// Significa que o YouTube API não respondeu
-// corretamente após tentar as chaves disponíveis.
-//
-
-if (!success) {
-
-    return res.status(200).json({
-
-        success: false,
-
-        items: [],
-
-        volume: 0,
-
-        competition: null,
-
-        error: "youtube_api_unavailable"
-
-    });
-
-}
-
-    // =========================
-    // 🧠 SERP CHANNEL AUTHORITY
-    // =========================
-    // TubeBuddy's Search Term Analysis exposes channel/subscriber
-    // pressure as part of the competitive landscape. YouTube's
-    // video search objects do not contain subscriberCount, so we
-    // enrich the unique SERP channels here with one channels.list
-    // request per 50 channels. This is intentionally separate from
-    // totalResults: result count is NOT treated as search volume.
-    // =========================
-
-    const serpChannelIds = [...new Set(
-      items
-        .map(video => video?.snippet?.channelId)
-        .filter(Boolean)
-    )];
-
-    const channelAuthorityMap = new Map();
-
-    for (let i = 0; i < serpChannelIds.length; i += 50) {
-
-      const channelChunk =
-        serpChannelIds.slice(i, i + 50).join(",");
-
-      if (!channelChunk) continue;
-
-      try {
-
-        const serpChannelsUrl =
-          `https://www.googleapis.com/youtube/v3/channels` +
-          `?part=statistics&id=${channelChunk}&key=${activeKey}`;
-
-        const serpChannelsRes =
-          await fetch(serpChannelsUrl);
-
-        if (serpChannelsRes.status === 403 || serpChannelsRes.status === 429) {
-          console.warn("⚠️ SERP channel authority unavailable: quota");
-          break;
-        }
-
-        const serpChannelsJson =
-          await serpChannelsRes.json();
-
-        (serpChannelsJson.items || []).forEach(channel => {
-
-          const subscribers = Number(
-            channel?.statistics?.subscriberCount || 0
-          );
-
-          channelAuthorityMap.set(
-            channel.id,
-            subscribers
-          );
-
-        });
-
-      } catch (e) {
-
-        console.warn(
-          "⚠️ Falha ao enriquecer autoridade dos canais da SERP:",
-          e?.message || e
-        );
-
-        break;
-
-      }
-
-    }
-
-    items.forEach(video => {
-
-      const channelId = video?.snippet?.channelId;
-
-      const subscribers = Number(
-        channelAuthorityMap.get(channelId) || 0
-      );
-
-      // Internal field. It is also exposed in the response below
-      // so the frontend/debugger can inspect the SERP evidence.
-      video.channelSubscribers = subscribers;
-
-    });
 
     // =========================
     // 📈 MÉTRICAS SEO
@@ -1402,29 +1306,15 @@ const top =
         items[0]?.statistics?.viewCount || 0
     );
 
-const sortedViewCounts = items
-    .map(video =>
-        Number(video.statistics?.viewCount || 0)
-    )
-    .sort((a, b) => a - b);
+const median =
 
-const median = sortedViewCounts.length
-    ? (
-        sortedViewCounts.length % 2
-            ? sortedViewCounts[
-                Math.floor(sortedViewCounts.length / 2)
-              ]
-            : (
-                sortedViewCounts[
-                    sortedViewCounts.length / 2 - 1
-                ]
-                +
-                sortedViewCounts[
-                    sortedViewCounts.length / 2
-                ]
-              ) / 2
-      )
-    : 0;
+    Number(
+
+        items[
+            Math.floor(items.length / 2)
+        ]?.statistics?.viewCount || 0
+
+    );
 
 // =========================
 // 📅 IDADE MÉDIA DOS VÍDEOS
@@ -2019,72 +1909,7 @@ const titleDemandScore = Math.min(
 );
 
 // =========================
-// 🔎 SEARCH TERM ANALYSIS
-// =========================
-// These are the closest observable equivalents to TubeBuddy's
-// searchtermintitle / searchtermindesc / searchtermintags signals.
-// They are diagnostic signals, not search-volume estimates.
-
-let searchTermInTitle = 0;
-let searchTermInDescription = 0;
-let searchTermInTags = 0;
-
-items.forEach(video => {
-
-    const videoTitle = normalizeText(
-        video?.snippet?.title || ""
-    );
-
-    const videoDescription = normalizeText(
-        video?.snippet?.description || ""
-    );
-
-    const videoTags = (video?.snippet?.tags || [])
-        .map(tag => normalizeText(tag))
-        .filter(Boolean);
-
-    if (videoTitle.includes(normalizedKeyword)) {
-        searchTermInTitle++;
-    }
-
-    if (videoDescription.includes(normalizedKeyword)) {
-        searchTermInDescription++;
-    }
-
-    if (videoTags.some(tag =>
-        tag === normalizedKeyword ||
-        tag.includes(normalizedKeyword) ||
-        normalizedKeyword.includes(tag)
-    )) {
-        searchTermInTags++;
-    }
-
-});
-
-const searchTermInTitleScore = Math.round(
-    (searchTermInTitle / Math.max(items.length, 1)) * 100
-);
-
-const searchTermInDescriptionScore = Math.round(
-    (searchTermInDescription / Math.max(items.length, 1)) * 100
-);
-
-const searchTermInTagsScore = Math.round(
-    (searchTermInTags / Math.max(items.length, 1)) * 100
-);
-
-// Exact-title coverage is deliberately stronger than generic title
-// containment, matching the distinction visible in TubeBuddy's UI.
-const titleCompetitionSignal = Math.round(
-    exactTitleMatches * 5 +
-    prefixTitleMatches * 4 +
-    phraseTitleMatches * 3 +
-    partialTitleMatches
-);
-
-
-// =========================
-// 🚀 TUBEX VOLUME SCORE V7 — SERP DEMAND
+// 🚀 TUBEX VOLUME SCORE V6
 // =========================
 //
 // Volume = DEMANDA ESTIMADA
@@ -2197,7 +2022,7 @@ const finalVolume = Math.max(
 );
 
 // =========================
-// 🚀 TUBEX COMPETITION V8 — TUBEBUDDY SIGNALS
+// 🚀 TUBEX COMPETITION V7
 // =========================
 //
 // UMA ÚNICA ENGINE DE CONCORRÊNCIA.
@@ -2433,52 +2258,6 @@ const repetitionScore = Math.round(
 
 );
 
-// =========================
-// 👑 CHANNEL AUTHORITY PRESSURE
-// =========================
-// Subscriber count is a secondary competition signal. It is
-// logarithmic so one giant channel cannot overwhelm the entire
-// SERP by itself. We weight it more when that channel also uses
-// the keyword in its title.
-
-let authorityWeightedTotal = 0;
-let authorityMatchedTotal = 0;
-
-items.forEach(video => {
-
-    const subscribers = Number(
-        video.channelSubscribers || 0
-    );
-
-    const title = normalizeText(
-        video?.snippet?.title || ""
-    );
-
-    const hasKeywordInTitle =
-        title.includes(normalizedKeyword);
-
-    const authority = Math.min(100,
-        Math.round(
-            Math.log10(subscribers + 1) * 10
-        )
-    );
-
-    authorityWeightedTotal += authority;
-
-    if (hasKeywordInTitle) {
-        authorityMatchedTotal += authority;
-    }
-
-});
-
-const authorityDifficulty = Math.round(
-    authorityWeightedTotal / itemCount
-);
-
-const matchedAuthorityDifficulty = Math.round(
-    authorityMatchedTotal / itemCount
-);
-
 // -------------------------
 // SERP STRENGTH
 // -------------------------
@@ -2556,7 +2335,7 @@ const marketDifficultyScore = Math.max(
 );
 
 // -------------------------
-// 🎯 COMPETITION FINAL V8
+// 🎯 COMPETITION FINAL V7
 // -------------------------
 //
 // PRIMEIRO calculamos a DIFICULDADE REAL da SERP.
@@ -2588,23 +2367,19 @@ const finalCompetitionDifficulty = Math.max(
 
         Math.round(
 
-            serpPower * 0.30 +
+            serpPower * 0.35 +
 
-            coverageDifficulty * 0.22 +
+            coverageDifficulty * 0.25 +
 
-            freshnessDifficulty * 0.13 +
+            freshnessDifficulty * 0.15 +
 
-            authorityDifficulty * 0.08 +
+            channelDominance * 0.10 +
 
-            matchedAuthorityDifficulty * 0.07 +
-
-            channelDominance * 0.07 +
-
-            repetitionScore * 0.04 +
+            repetitionScore * 0.05 +
 
             serpStructureScore * 0.05 +
 
-            marketDifficultyScore * 0.04
+            marketDifficultyScore * 0.05
 
         )
 
@@ -2697,10 +2472,6 @@ const competitionDetails = {
     // DOMINÂNCIA
     channelDominance,
 
-    // AUTORIDADE DOS CANAIS
-    authorityDifficulty,
-    matchedAuthorityDifficulty,
-
     // REPETIÇÃO
     repetitionScore,
 
@@ -2729,189 +2500,10 @@ const competitionDetails = {
 
     partialMatchScore,
 
-    // SEARCH TERM ANALYSIS
-    searchTermInTitle,
-    searchTermInDescription,
-    searchTermInTags,
-    searchTermInTitleScore,
-    searchTermInDescriptionScore,
-    searchTermInTagsScore,
-    titleCompetitionSignal,
-
     // VÍDEOS RECENTES
     recentVideos
 
 };
-
-// =========================
-// 🎯 OPTIMIZATION OPPORTUNITY
-// =========================
-// Higher = more room to optimize the keyword. This is intentionally
-// derived from observable SEO signals instead of a fixed placeholder.
-const titleRoomScore = Math.max(0,100-searchTermInTitleScore);
-const descriptionRoomScore = Math.max(0,100-searchTermInDescriptionScore);
-const tagsRoomScore = Math.max(0,100-searchTermInTagsScore);
-const optimizationStrength = Math.max(0,Math.min(100,Math.round(
-    titleRoomScore*0.45 +
-    descriptionRoomScore*0.15 +
-    tagsRoomScore*0.15 +
-    finalCompetition*0.25
-)));
-const opportunityScore = optimizationStrength;
-
-// ==========================================================
-// 🧠 TUBEX EXPERT — CHANNEL-WEIGHTED ANALYSIS
-// ==========================================================
-// The unweighted engine above is always calculated for every plan.
-// Expert only adds a second layer using the creator's own channel
-// performance. This guarantees FREE/START/MEMBER/PRO never depend
-// on channel data to calculate their normal score.
-
-let weightedScore = null;
-let weightedAnalysis = null;
-
-if (weightedRequested) {
-  const channelItems = Array.isArray(channelContext?.items)
-    ? channelContext.items
-    : [];
-
-  const keywordViews = items
-    .map(v => Number(v?.statistics?.viewCount || 0))
-    .filter(v => Number.isFinite(v) && v > 0);
-
-  const channelViews = channelItems
-    .map(v => Number(v?.views ?? v?.statistics?.viewCount ?? 0))
-    .filter(v => Number.isFinite(v) && v > 0);
-
-  const medianOf = values => {
-    const arr = [...values].sort((a,b) => a-b);
-    if (!arr.length) return 0;
-    const mid = Math.floor(arr.length / 2);
-    return arr.length % 2
-      ? arr[mid]
-      : (arr[mid - 1] + arr[mid]) / 2;
-  };
-
-  const keywordMedian = medianOf(keywordViews);
-  const channelMedian = medianOf(channelViews);
-
-  let channelAverage =
-    channelViews.length
-      ? channelViews.reduce((a,b) => a+b, 0) / channelViews.length
-      : 0;
-
-  if (!channelAverage) {
-    const channelViewsLifetime = Number(channelContext?.views || 0);
-    const channelVideosLifetime = Number(channelContext?.videos || 0);
-
-    if (channelViewsLifetime > 0 && channelVideosLifetime > 0) {
-      channelAverage =
-        channelViewsLifetime / channelVideosLifetime;
-    }
-  }
-
-  let performanceFit = 50;
-
-  if (keywordMedian > 0 && channelMedian > 0) {
-    const distance = Math.abs(
-      Math.log10(
-        (keywordMedian + 1) /
-        (channelMedian + 1)
-      )
-    );
-
-    performanceFit = Math.max(
-      0,
-      Math.min(100, 100 - distance * 38)
-    );
-  }
-  else if (keywordMedian > 0 && channelAverage > 0) {
-    const ratio =
-      keywordMedian /
-      (channelAverage + 1);
-
-    performanceFit = Math.max(
-      0,
-      Math.min(
-        100,
-        65 +
-        Math.log10(
-          Math.max(ratio, 0.1)
-        ) * 20
-      )
-    );
-  }
-
-  const analyzed =
-    Math.max(items.length, 1);
-
-  const exactPct =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        (exactTitleMatches / analyzed) * 100
-      )
-    );
-
-  const titleRoom =
-    Math.max(0, 100 - exactPct);
-
-  weightedScore =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Math.round(
-          (
-            (
-              finalVolume * 0.60 +
-              finalCompetition * 0.40
-            ) * 0.35
-          ) +
-          (opportunityScore * 0.25) +
-          (performanceFit * 0.25) +
-          (titleRoom * 0.10) +
-          (finalCompetition * 0.05)
-        )
-      )
-    );
-
-  weightedAnalysis = {
-    enabled: true,
-    channelId:
-      String(
-        body?.channelId ||
-        channelContext?.channelId ||
-        ""
-      ).trim(),
-    channelName:
-      String(
-        channelContext?.name ||
-        ""
-      ).trim(),
-    subscribers:
-      Number(
-        channelContext?.subscribers || 0
-      ),
-    channelVideos:
-      Number(
-        channelContext?.videos || 0
-      ),
-    analyzedChannelVideos:
-      channelItems.length,
-    keywordMedianViews:
-      Math.round(keywordMedian),
-    channelMedianViews:
-      Math.round(channelMedian),
-    channelAverageViews:
-      Math.round(channelAverage),
-    performanceFit:
-      Math.round(performanceFit),
-    titleRoom:
-      Math.round(titleRoom)
-  };
-}
 
 // =========================
 // 🧠 UNIVERSAL SEO ENGINE
@@ -3075,33 +2667,6 @@ current -=
 
     return trend;
 
-}
-
-function generateEstimatedTrend12m(volume, competition){
-    const seedBase=hashString(`${keyword}:12m`);
-    let seed=seedBase;
-    const monthlyBase=Math.max(100,Math.round((400 + Math.pow(volume,1.35)*18)*30));
-    const trend=[];
-    let current=monthlyBase*(0.78+((seed%18)/100));
-    const tendency=competition>=70?1.018:competition>=40?1.002:0.988;
-    for(let i=0;i<12;i++){
-      seed=(seed*9301+49297)%233280;
-      const random=seed/233280;
-      current*=tendency;
-      current-=(current-monthlyBase)*0.12;
-      current+=Math.round((random-0.5)*monthlyBase*0.08);
-      current=Math.max(monthlyBase*0.55,Math.min(monthlyBase*1.55,current));
-      trend.push({month:i+1,value:Math.round(current)});
-    }
-    return trend;
-}
-
-function estimateMonthlySearches(volume, competition, totalResults, recentCount, itemCount){
-    const demand=Math.max(0,Math.min(100,Number(volume)||0));
-    const serpFactor=0.85+Math.min(0.25,Math.log10(Math.max(10,Number(totalResults)||10))/40);
-    const freshnessFactor=0.85+((Number(recentCount)||0)/Math.max(Number(itemCount)||1,1))*0.3;
-    const daily=Math.round(60*Math.pow(1.055,demand)*serpFactor*freshnessFactor);
-    return Math.max(100,Math.round(daily*30));
 }
 
 function normalizeText(text = ""){
@@ -3431,16 +2996,13 @@ items.length
 //
 // Não existe cálculo paralelo.
 // competitionScore já foi definido como alias
-// oficial de finalCompetition na Competition V8.
+// oficial de finalCompetition na Competition V7.
 
 // =========================
 // 📦 RESPONSE
 // =========================
 
-const trend = generateEstimatedTrend(
-    finalVolume,
-    finalCompetition
-);
+const trend = [];
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================
@@ -3466,57 +3028,15 @@ topShare,
 
     minViews,
 
-    medianViews: median,
-    totalResults,
-    searchTermInTitle,
-    searchTermInDescription,
-    searchTermInTags,
-    searchTermInTitleScore,
-    searchTermInDescriptionScore,
-    searchTermInTagsScore,
-    weightedScore
+    medianViews: median
+
 };
+
+const googleSearch = await fetchGoogleVerification(keyword);
 
 const responseData = {
 
     success: true,
-
-    plan: requestPlan,
-
-    // The YouTube Data API does not expose an official monthly-search count.
-    // TubeX therefore returns an explicitly labelled estimate derived from
-    // observable SERP demand signals.
-    monthlySearches: estimateMonthlySearches(finalVolume,finalCompetition,totalResults,recentVideos,items.length),
-    monthlySearchesEstimated: true,
-    volumeDataSource: "tubex_serp_estimate",
-    optimizationStrength,
-    opportunityScore,
-    quota,
-
-    // Expert/Owner only. Unweighted score is still always present.
-    weightedScore,
-    channelWeightedScore: weightedScore,
-    weightedAnalysis,
-
-    calculation: {
-      mode: weightedRequested ? "weighted" : "unweighted",
-      ready: true,
-      baseSignals: {
-        volume: finalVolume,
-        competition: finalCompetition,
-        optimization: optimizationStrength
-      }
-    },
-
-    totalResults,
-    searchTermAnalysis: {
-        searchTermInTitle,
-        searchTermInDescription,
-        searchTermInTags,
-        searchTermInTitleScore,
-        searchTermInDescriptionScore,
-        searchTermInTagsScore
-    },
 
     items,
 
@@ -3532,8 +3052,8 @@ competitionScore,
 youtubeMetrics,
 
     trend,
-    trend30d: trend,
-    trend12m: generateEstimatedTrend12m(finalVolume,finalCompetition),
+
+    googleSearch,
 
     tags: rankedTags,
 
@@ -3569,24 +3089,6 @@ medianScore,
 velocityScore,
 strengthScore,
 serpDemandScore,
-    serpPower,
-    coverageDifficulty,
-    freshnessDifficulty,
-    authorityDifficulty,
-    matchedAuthorityDifficulty,
-    channelDominance,
-    repetitionScore,
-    serpStructureScore,
-    marketDifficultyScore,
-    searchTermInTitle,
-    searchTermInDescription,
-    searchTermInTags,
-    searchTermInTitleScore,
-    searchTermInDescriptionScore,
-    searchTermInTagsScore,
-    titleCompetitionSignal,
-    optimizationStrength,
-    opportunityScore,
 
     medianViews: median
 

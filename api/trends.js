@@ -13,8 +13,8 @@
 const CACHE_TTL = 15 * 60 * 1000;
 
 const cache =
-  globalThis.__tubexGoogleTrendsCache ||
-  (globalThis.__tubexGoogleTrendsCache = new Map());
+  globalThis.__tubexGoogleTrendsCacheV2 ||
+  (globalThis.__tubexGoogleTrendsCacheV2 = new Map());
 
 function stripXssi(text) {
   return String(text || "")
@@ -302,7 +302,7 @@ async function requestJsonText(
   };
 }
 
-async function fetchGoogleTrend(
+async function fetchGoogleTrendOnce(
   keyword,
   range,
   geo,
@@ -428,6 +428,46 @@ async function fetchGoogleTrend(
   }
 
   return trend;
+}
+
+
+async function fetchGoogleTrend(
+  keyword,
+  range,
+  geo,
+  property
+) {
+
+  try {
+
+    return await fetchGoogleTrendOnce(
+      keyword,
+      range,
+      geo,
+      property
+    );
+
+  } catch (firstError) {
+
+    console.warn(
+      "[TubeX] Google Trends primeira tentativa falhou:",
+      firstError?.message || firstError
+    );
+
+    // Google Trends can invalidate the short-lived widget token
+    // or session cookie. Rebuild the session once and retry the
+    // complete request. No synthetic data is generated.
+    await new Promise(resolve =>
+      setTimeout(resolve, 600)
+    );
+
+    return await fetchGoogleTrendOnce(
+      keyword,
+      range,
+      geo,
+      property
+    );
+  }
 }
 
 export default async function handler(req, res) {

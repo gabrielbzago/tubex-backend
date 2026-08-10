@@ -303,6 +303,42 @@ async function requestJsonText(
   };
 }
 
+function buildZeroTrend(range) {
+  const count = range === "12m" ? 52 : 30;
+  const now = Date.now();
+  const step =
+    range === "12m"
+      ? 7 * 24 * 60 * 60 * 1000
+      : 24 * 60 * 60 * 1000;
+
+  return Array.from({ length: count }, (_, index) => {
+    const timestamp =
+      now - (count - 1 - index) * step;
+
+    return {
+      time: new Date(timestamp).toISOString(),
+      label: new Date(timestamp).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "short"
+      }),
+      value: 0,
+      isPartial: false,
+      noData: true
+    };
+  });
+}
+
+function isDegenerateAllHundred(trend) {
+  const values = (Array.isArray(trend) ? trend : [])
+    .map(point => Number(point?.value))
+    .filter(Number.isFinite);
+
+  return (
+    values.length >= 2 &&
+    values.every(value => Math.round(value) === 100)
+  );
+}
+
 async function fetchGoogleTrendOnce(
   keyword,
   range,
@@ -358,9 +394,10 @@ async function fetchGoogleTrendOnce(
     !widget.request ||
     !widget.token
   ) {
-    throw new Error(
-      "Widget TIMESERIES não encontrado no Google Trends"
-    );
+    // Google Trends can return an explore response without a usable
+    // TIMESERIES widget for a malformed/unknown query. Treat that as
+    // "no measurable interest" rather than breaking the chart.
+    return buildZeroTrend(range);
   }
 
   const requestPayload = {
@@ -423,25 +460,15 @@ async function fetchGoogleTrendOnce(
       .filter(Boolean);
 
   if (trend.length < 2) {
-    throw new Error(
-      "Google Trends não retornou dados suficientes"
-    );
+    return buildZeroTrend(range);
   }
 
-  const values = trend
-    .map(point => Number(point?.value))
-    .filter(Number.isFinite);
-
-  // Uma série inteira em 100 não representa demanda alta por si só.
-  // Em consultas malformadas/sem correspondência, o endpoint público
-  // pode devolver uma série degenerada. Nunca apresentá-la como alta.
-  if (
-    values.length >= 2 &&
-    values.every(value => Math.round(value) === 100)
-  ) {
-    throw new Error(
-      "Google Trends retornou uma série degenerada para esta palavra-chave"
-    );
+  // O endpoint público do Google Trends pode devolver uma série
+  // degenerada em 100 para uma consulta sem correspondência.
+  // No Google Trends isso deve ser visualizado como ausência de
+  // interesse mensurável: uma linha em 0, nunca como alta demanda.
+  if (isDegenerateAllHundred(trend)) {
+    return buildZeroTrend(range);
   }
 
   return trend;

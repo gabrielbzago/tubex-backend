@@ -454,37 +454,31 @@ async function fetchGoogleTrend(
   geo,
   property
 ) {
+  // Google Trends can rate-limit the denser 30d YouTube series.
+  // Retry the complete server-side session; never synthesize values.
+  const attempts = range === "30d" ? 3 : 2;
+  let lastError = null;
 
-  try {
+  for(let attempt = 1; attempt <= attempts; attempt++){
+    try{
+      return await fetchGoogleTrendOnce(keyword, range, geo, property);
+    }catch(error){
+      lastError = error;
+      console.warn(
+        `[TubeX] Google Trends ${range} tentativa ${attempt}/${attempts}:`,
+        error?.message || error
+      );
 
-    return await fetchGoogleTrendOnce(
-      keyword,
-      range,
-      geo,
-      property
-    );
-
-  } catch (firstError) {
-
-    console.warn(
-      "[TubeX] Google Trends primeira tentativa falhou:",
-      firstError?.message || firstError
-    );
-
-    // Google Trends can invalidate the short-lived widget token
-    // or session cookie. Rebuild the session once and retry the
-    // complete request. No synthetic data is generated.
-    await new Promise(resolve =>
-      setTimeout(resolve, 600)
-    );
-
-    return await fetchGoogleTrendOnce(
-      keyword,
-      range,
-      geo,
-      property
-    );
+      if(attempt < attempts){
+        const waitMs = range === "30d"
+          ? (attempt === 1 ? 1200 : 2500)
+          : 900;
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
+    }
   }
+
+  throw lastError || new Error("google_trends_failed");
 }
 
 export default async function handler(req, res) {

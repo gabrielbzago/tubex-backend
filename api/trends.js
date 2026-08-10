@@ -556,10 +556,16 @@ export default async function handler(req, res) {
     const geo =
       String(body.geo || "");
 
+    const rawProperty =
+      body.property === undefined || body.property === null
+        ? "youtube"
+        : String(body.property).trim().toLowerCase();
+
+    // Google Trends gprop contract:
+    //   "youtube" => YouTube Search
+    //   "" / "web" / "google" => Google Web Search
     const property =
-      String(
-        body.property || "youtube"
-      ).toLowerCase() === "youtube"
+      rawProperty === "youtube"
         ? "youtube"
         : "";
 

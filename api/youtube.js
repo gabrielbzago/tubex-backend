@@ -172,18 +172,44 @@ if(
     // =========================
     // 📦 CACHE SEO
     // =========================
+
+    // ======================================================
+    // 🧠 GLOBAL CACHES / REQUEST DEDUPLICATION
+    // ======================================================
     global.tubexSeoCache = global.tubexSeoCache || {};
     global.tubexChannelCache = global.tubexChannelCache || {};
+    global.tubexSeoInFlight = global.tubexSeoInFlight || {};
+    global.tubexChannelInFlight = global.tubexChannelInFlight || {};
+    global.tubexGoogleCache = global.tubexGoogleCache || {};
+    global.tubexGoogleInFlight = global.tubexGoogleInFlight || {};
 
-    const cacheKey = keyword ? `seo_v2_google_${keyword.toLowerCase()}` : null;
+    const SEO_CACHE_TTL = 15 * 60 * 1000;
+    const SEO_STALE_TTL = 6 * 60 * 60 * 1000;
+    const CHANNEL_CACHE_TTL = 15 * 60 * 1000;
+    const CHANNEL_STALE_TTL = 6 * 60 * 60 * 1000;
+    const GOOGLE_CACHE_TTL = 15 * 60 * 1000;
 
-    if (cacheKey) {
-      const cached = global.tubexSeoCache[cacheKey];
+    const searchDepth =
+      body?.plan === "free"
+        ? "free"
+        : "paid";
 
-      if (cached && cached.expires > Date.now()) {
-        console.log("⚡ CACHE HIT SEO:", keyword);
-        return res.status(200).json(cached.data);
-      }
+    const cacheKey =
+      keyword
+        ? `seo_v3_google_${searchDepth}_${keyword.toLowerCase()}`
+        : null;
+
+    const cachedSeo =
+      mode === "seo" && cacheKey
+        ? global.tubexSeoCache[cacheKey]
+        : null;
+
+    if (
+      cachedSeo &&
+      cachedSeo.expires > Date.now()
+    ) {
+      console.log("⚡ CACHE HIT SEO:", keyword);
+      return res.status(200).json(cachedSeo.data);
     }
 
     // =========================
@@ -195,155 +221,18 @@ if(
       .split(",")[0]
       .trim();
 
-    let items = [];
-    let success = false;
-    let youtubeSearchSucceeded = false;
-    let totalResults = 0;
-
     if (!activeKey) {
       return res.status(200).json({
         success: false,
         items: [],
-        volume: 0,
+        volume: null,
         competition: null,
+        competitionScore: null,
         error: "youtube_api_unavailable"
       });
     }
 
-    // =========================
-    // 🎯 OPTIMIZED SEARCH FETCH
-    // =========================
-    // Keep the same maximum result coverage while cutting search.list calls:
-    // 25 x 6 pages = 150 results (600 quota units)
-    // 50 x 3 pages = 150 results (300 quota units)
-    // Free remains 50 results in a single call.
-    let maxPages = 3;
-    if (body?.plan === "free") maxPages = 1;
 
-    try {
-      let allIds = [];
-      let nextPageToken = "";
-      let pageCount = 0;
-
-      while (pageCount < maxPages) {
-        const searchUrl =
-          `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet&type=video&order=relevance&maxResults=50` +
-          `&q=${encodeURIComponent(keyword)}` +
-          (nextPageToken ? `&pageToken=${nextPageToken}` : "") +
-          `&key=${activeKey}`;
-
-        const searchRes = await fetch(searchUrl);
-        const searchJson = await searchRes.json().catch(() => ({}));
-
-        const reason = searchJson?.error?.errors?.[0]?.reason || "";
-        if (searchRes.status === 403 || searchRes.status === 429) {
-          if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || searchRes.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
-        }
-
-        if (!searchRes.ok || searchJson?.error) {
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
-        }
-
-        youtubeSearchSucceeded = true;
-        if (pageCount === 0) {
-          totalResults = Number(searchJson.pageInfo?.totalResults || 0);
-        }
-
-        const ids = (searchJson.items || [])
-          .map(v => v.id?.videoId)
-          .filter(Boolean);
-
-        allIds.push(...ids);
-        nextPageToken = searchJson.nextPageToken || "";
-        pageCount++;
-
-        if (!nextPageToken) break;
-      }
-
-      const uniqueIds = [...new Set(allIds)];
-
-      // videos.list is already inexpensive and supports up to 50 IDs/request.
-      for (let i = 0; i < uniqueIds.length; i += 50) {
-        const chunk = uniqueIds.slice(i, i + 50).join(",");
-        if (!chunk) continue;
-
-        const videosUrl =
-          `https://www.googleapis.com/youtube/v3/videos` +
-          `?part=snippet,statistics&id=${chunk}&key=${activeKey}`;
-
-        const resVideos = await fetch(videosUrl);
-        const jsonVideos = await resVideos.json().catch(() => ({}));
-
-        const reason = jsonVideos?.error?.errors?.[0]?.reason || "";
-        if (resVideos.status === 403 || resVideos.status === 429) {
-          if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || resVideos.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-          throw new Error(jsonVideos?.error?.message || `youtube_videos_http_${resVideos.status}`);
-        }
-
-        if (!resVideos.ok || jsonVideos?.error) {
-          throw new Error(jsonVideos?.error?.message || `youtube_videos_http_${resVideos.status}`);
-        }
-
-        if (Array.isArray(jsonVideos.items)) {
-          const filtered = jsonVideos.items.filter(v => {
-            const title = String(v?.snippet?.title || "").toLowerCase();
-            if (title.includes("#shorts")) return false;
-
-            const videoViews = Number(v?.statistics?.viewCount || 0);
-            const published = new Date(v?.snippet?.publishedAt).getTime();
-            const ageDays = (Date.now() - published) / (1000 * 60 * 60 * 24);
-
-            if (ageDays > 900 && videoViews < 5000) return false;
-            return true;
-          });
-
-          items.push(...filtered);
-        }
-      }
-
-      success = true;
-
-    } catch (e) {
-      console.warn("[TubeX] YouTube search failed:", e?.message || e);
-    }
-
-    if (youtubeSearchSucceeded) success = true;
-
- // =========================
-// 🚫 FALHA TOTAL DA API
-// =========================
-//
-// IMPORTANTE:
-// Isso NÃO significa "keyword sem volume".
-// Significa que o YouTube API não respondeu
-// corretamente após tentar as chaves disponíveis.
-//
-
-if (!success) {
-
-    return res.status(200).json({
-
-        success: false,
-
-        items: [],
-
-        volume: 0,
-
-        competition: null,
-
-        error: "youtube_api_unavailable"
-
-    });
-
-}
-
-// =========================
 // 🎬 VIDEO DATA
 // =========================
 
@@ -666,71 +555,191 @@ else {
   // ======================================
   // CHANNEL + LAST VIDEOS
   // ======================================
-  // Cache these channel-scoped calls independently from the keyword cache.
-  // This prevents every new keyword from spending another search.list call
-  // just to rebuild the same channel overview.
-  const channelCacheKey = `channel_v2_${snippet.channelId}`;
-  const cachedChannel = global.tubexChannelCache[channelCacheKey];
+  // Substitui search.list (100 unidades) por
+  // playlistItems.list (1 unidade) para descobrir
+  // os vídeos mais recentes do canal.
+  const channelCacheKey =
+    `channel_v3_${snippet.channelId}`;
 
-  let channel = cachedChannel?.expires > Date.now() ? cachedChannel.data.channel : null;
-  let latestVideos = cachedChannel?.expires > Date.now() ? cachedChannel.data.latestVideos : null;
+  const cachedChannel =
+    global.tubexChannelCache[channelCacheKey];
 
-  if (!channel || !Array.isArray(latestVideos)) {
+  let channel =
+    cachedChannel?.expires > Date.now()
+      ? cachedChannel.data.channel
+      : null;
+
+  let latestVideos =
+    cachedChannel?.expires > Date.now()
+      ? cachedChannel.data.latestVideos
+      : null;
+
+  const staleChannel =
+    cachedChannel?.data || null;
+
+  const fetchChannelOverview = async () => {
+
     const channelUrl =
       `https://www.googleapis.com/youtube/v3/channels` +
-      `?part=snippet,statistics` +
+      `?part=snippet,statistics,contentDetails` +
       `&id=${snippet.channelId}` +
       `&key=${activeKey}`;
 
-    const channelRes = await fetch(channelUrl);
-    const channelJson = await channelRes.json().catch(() => ({}));
+    const channelRes =
+      await fetch(channelUrl);
+
+    const channelJson =
+      await channelRes.json().catch(() => ({}));
+
     if (!channelRes.ok) {
-      throw new Error(channelJson?.error?.message || `youtube_channel_http_${channelRes.status}`);
+      throw new Error(
+        channelJson?.error?.message ||
+        `youtube_channel_http_${channelRes.status}`
+      );
     }
 
-    channel = channelJson.items?.[0] || {};
+    const channelData =
+      channelJson.items?.[0] || {};
 
-    const latestSearchUrl =
-      `https://www.googleapis.com/youtube/v3/search` +
-      `?part=snippet` +
-      `&channelId=${snippet.channelId}` +
-      `&order=date` +
-      `&type=video` +
-      `&maxResults=12` +
-      `&key=${activeKey}`;
+    const uploads =
+      channelData.contentDetails
+        ?.relatedPlaylists
+        ?.uploads;
 
-    const latestSearchRes = await fetch(latestSearchUrl);
-    const latestSearchJson = await latestSearchRes.json().catch(() => ({}));
-    if (!latestSearchRes.ok) {
-      throw new Error(latestSearchJson?.error?.message || `youtube_latest_search_http_${latestSearchRes.status}`);
-    }
+    let latest = [];
 
-    const latestIds = (latestSearchJson.items || [])
-      .map(v => v.id?.videoId)
-      .filter(Boolean);
+    if (uploads) {
 
-    latestVideos = [];
+      const playlistUrl =
+        `https://www.googleapis.com/youtube/v3/playlistItems` +
+        `?part=contentDetails&playlistId=${uploads}` +
+        `&maxResults=12&key=${activeKey}`;
 
-    if (latestIds.length) {
-      const latestStatsUrl =
-        `https://www.googleapis.com/youtube/v3/videos` +
-        `?part=snippet,statistics` +
-        `&id=${latestIds.join(",")}` +
-        `&key=${activeKey}`;
+      const playlistRes =
+        await fetch(playlistUrl);
 
-      const latestStatsRes = await fetch(latestStatsUrl);
-      const latestStatsJson = await latestStatsRes.json().catch(() => ({}));
-      if (!latestStatsRes.ok) {
-        throw new Error(latestStatsJson?.error?.message || `youtube_latest_videos_http_${latestStatsRes.status}`);
+      const playlistJson =
+        await playlistRes.json().catch(() => ({}));
+
+      if (!playlistRes.ok) {
+        throw new Error(
+          playlistJson?.error?.message ||
+          `youtube_playlist_http_${playlistRes.status}`
+        );
       }
 
-      latestVideos = latestStatsJson.items || [];
+      const latestIds =
+        (playlistJson.items || [])
+          .map(v => v.contentDetails?.videoId)
+          .filter(Boolean);
+
+      if (latestIds.length) {
+
+        const latestStatsUrl =
+          `https://www.googleapis.com/youtube/v3/videos` +
+          `?part=snippet,statistics` +
+          `&id=${latestIds.join(",")}` +
+          `&key=${activeKey}`;
+
+        const latestStatsRes =
+          await fetch(latestStatsUrl);
+
+        const latestStatsJson =
+          await latestStatsRes.json().catch(() => ({}));
+
+        if (!latestStatsRes.ok) {
+          throw new Error(
+            latestStatsJson?.error?.message ||
+            `youtube_latest_videos_http_${latestStatsRes.status}`
+          );
+        }
+
+        latest = latestStatsJson.items || [];
+      }
     }
 
-    global.tubexChannelCache[channelCacheKey] = {
-      data: { channel, latestVideos },
-      expires: Date.now() + (15 * 60 * 1000)
+    return {
+      channel: channelData,
+      latestVideos: latest
     };
+  };
+
+  if (
+    !channel ||
+    !Array.isArray(latestVideos)
+  ) {
+
+    const existingInFlight =
+      global.tubexChannelInFlight[
+        channelCacheKey
+      ];
+
+    let resultPromise =
+      existingInFlight;
+
+    if (!resultPromise) {
+
+      resultPromise =
+        fetchChannelOverview();
+
+      global.tubexChannelInFlight[
+        channelCacheKey
+      ] = resultPromise;
+
+    }
+
+    try {
+
+      const result =
+        await resultPromise;
+
+      channel =
+        result.channel || {};
+
+      latestVideos =
+        Array.isArray(result.latestVideos)
+          ? result.latestVideos
+          : [];
+
+      global.tubexChannelCache[
+        channelCacheKey
+      ] = {
+        data: {
+          channel,
+          latestVideos
+        },
+        expires:
+          Date.now() + CHANNEL_CACHE_TTL,
+        staleUntil:
+          Date.now() + CHANNEL_STALE_TTL
+      };
+
+    } catch (channelError) {
+
+      console.warn(
+        "[TubeX] Channel overview unavailable:",
+        channelError?.message || channelError
+      );
+
+      channel =
+        staleChannel?.channel || {};
+
+      latestVideos =
+        Array.isArray(
+          staleChannel?.latestVideos
+        )
+          ? staleChannel.latestVideos
+          : [];
+
+    } finally {
+
+      if (!existingInFlight) {
+        delete global.tubexChannelInFlight[
+          channelCacheKey
+        ];
+      }
+
+    }
   }
 
   const channelSnippet = channel.snippet || {};
@@ -1170,6 +1179,7 @@ analytics.estimatedMinutesWatched,
 }
 
     // =========================
+
     // 📊 SUMMARY MODE
     // =========================
     if (mode === "summary") {
@@ -1201,6 +1211,325 @@ analytics.estimatedMinutesWatched,
         totalVideos: Number(stats?.videoCount || 0),
         subscribers: Number(stats?.subscriberCount || 0)
       });
+    }
+
+
+    // =========================
+    // 🎯 OPTIMIZED SEARCH FETCH
+    // =========================
+    // Paid: 2 pages x 50 = até 100 resultados.
+    // Free: 1 página = até 50 resultados.
+    // search.list custa 100 unidades por chamada.
+    const maxPages =
+      body?.plan === "free"
+        ? 1
+        : 2;
+
+    const searchCacheKey =
+      `yt_search_v3_${keyword.toLowerCase()}`;
+
+    const fetchYoutubeSearch = async () => {
+
+      let allIds = [];
+      let nextPageToken = "";
+      let pageCount = 0;
+      let totalResultsLocal = 0;
+      let itemsLocal = [];
+      let partial = false;
+
+      try {
+
+        while (pageCount < maxPages) {
+
+          const searchUrl =
+            `https://www.googleapis.com/youtube/v3/search` +
+            `?part=snippet&type=video&order=relevance&maxResults=50` +
+            `&q=${encodeURIComponent(keyword)}` +
+            (nextPageToken ? `&pageToken=${nextPageToken}` : "") +
+            `&key=${activeKey}`;
+
+          const searchRes = await fetch(searchUrl);
+          const searchJson =
+            await searchRes.json().catch(() => ({}));
+
+          const reason =
+            searchJson?.error?.errors?.[0]?.reason || "";
+
+          if (
+            searchRes.status === 403 ||
+            searchRes.status === 429
+          ) {
+
+            if (
+              reason === "quotaExceeded" ||
+              reason === "dailyLimitExceeded" ||
+              searchRes.status === 429
+            ) {
+              throw new Error("quota_exceeded");
+            }
+
+            throw new Error(
+              searchJson?.error?.message ||
+              `youtube_search_http_${searchRes.status}`
+            );
+          }
+
+          if (!searchRes.ok || searchJson?.error) {
+            throw new Error(
+              searchJson?.error?.message ||
+              `youtube_search_http_${searchRes.status}`
+            );
+          }
+
+          if (pageCount === 0) {
+            totalResultsLocal =
+              Number(
+                searchJson.pageInfo?.totalResults || 0
+              );
+          }
+
+          const ids =
+            (searchJson.items || [])
+              .map(v => v.id?.videoId)
+              .filter(Boolean);
+
+          allIds.push(...ids);
+
+          nextPageToken =
+            searchJson.nextPageToken || "";
+
+          pageCount++;
+
+          if (!nextPageToken) break;
+        }
+
+        const uniqueIds =
+          [...new Set(allIds)];
+
+        // videos.list aceita até 50 IDs por chamada.
+        for (
+          let i = 0;
+          i < uniqueIds.length;
+          i += 50
+        ) {
+
+          const chunk =
+            uniqueIds
+              .slice(i, i + 50)
+              .join(",");
+
+          if (!chunk) continue;
+
+          const videosUrl =
+            `https://www.googleapis.com/youtube/v3/videos` +
+            `?part=snippet,statistics&id=${chunk}&key=${activeKey}`;
+
+          const resVideos =
+            await fetch(videosUrl);
+
+          const jsonVideos =
+            await resVideos.json().catch(() => ({}));
+
+          const reason =
+            jsonVideos?.error?.errors?.[0]?.reason || "";
+
+          if (
+            resVideos.status === 403 ||
+            resVideos.status === 429
+          ) {
+
+            if (
+              reason === "quotaExceeded" ||
+              reason === "dailyLimitExceeded" ||
+              resVideos.status === 429
+            ) {
+              throw new Error("quota_exceeded");
+            }
+
+            throw new Error(
+              jsonVideos?.error?.message ||
+              `youtube_videos_http_${resVideos.status}`
+            );
+          }
+
+          if (!resVideos.ok || jsonVideos?.error) {
+            throw new Error(
+              jsonVideos?.error?.message ||
+              `youtube_videos_http_${resVideos.status}`
+            );
+          }
+
+          if (Array.isArray(jsonVideos.items)) {
+
+            const filtered =
+              jsonVideos.items.filter(v => {
+
+                const title =
+                  String(
+                    v?.snippet?.title || ""
+                  ).toLowerCase();
+
+                if (title.includes("#shorts")) {
+                  return false;
+                }
+
+                const videoViews =
+                  Number(
+                    v?.statistics?.viewCount || 0
+                  );
+
+                const published =
+                  new Date(
+                    v?.snippet?.publishedAt
+                  ).getTime();
+
+                const ageDays =
+                  (Date.now() - published) /
+                  (1000 * 60 * 60 * 24);
+
+                if (
+                  ageDays > 900 &&
+                  videoViews < 5000
+                ) {
+                  return false;
+                }
+
+                return true;
+              });
+
+            itemsLocal.push(...filtered);
+          }
+        }
+
+        return {
+          success: itemsLocal.length > 0,
+          items: itemsLocal,
+          totalResults: totalResultsLocal,
+          partial: false
+        };
+
+      } catch (e) {
+
+        console.warn(
+          "[TubeX] YouTube search failed:",
+          e?.message || e
+        );
+
+        if (itemsLocal.length > 0) {
+          partial = true;
+        }
+
+        return {
+          success: itemsLocal.length > 0,
+          items: itemsLocal,
+          totalResults: totalResultsLocal,
+          partial,
+          error:
+            e?.message ||
+            "youtube_api_unavailable"
+        };
+      }
+    };
+
+    let youtubeResult;
+
+    if (
+      global.tubexSeoInFlight[searchCacheKey]
+    ) {
+
+      console.log(
+        "⚡ SEO SEARCH IN-FLIGHT HIT:",
+        keyword
+      );
+
+      youtubeResult =
+        await global.tubexSeoInFlight[
+          searchCacheKey
+        ];
+
+    } else {
+
+      const promise =
+        fetchYoutubeSearch();
+
+      global.tubexSeoInFlight[
+        searchCacheKey
+      ] = promise;
+
+      try {
+
+        youtubeResult =
+          await promise;
+
+      } finally {
+
+        delete global.tubexSeoInFlight[
+          searchCacheKey
+        ];
+
+      }
+    }
+
+    let items =
+      Array.isArray(youtubeResult?.items)
+        ? youtubeResult.items
+        : [];
+
+    const totalResults =
+      Number(
+        youtubeResult?.totalResults || 0
+      );
+
+    const searchPartial =
+      !!youtubeResult?.partial;
+
+    // =========================
+    // 🚫 FALHA TOTAL DA API
+    // =========================
+    //
+    // Nunca transforme indisponibilidade da API
+    // em "Volume 0 / Competition 0".
+    //
+    if (!items.length) {
+
+      const stale =
+        cacheKey
+          ? global.tubexSeoCache[cacheKey]
+          : null;
+
+      if (
+        stale?.data &&
+        (
+          stale.staleUntil > Date.now() ||
+          stale.expires > Date.now()
+        )
+      ) {
+
+        console.warn(
+          "♻️ SERVING STALE SEO CACHE:",
+          keyword
+        );
+
+        return res.status(200).json({
+          ...stale.data,
+          stale: true,
+          dataFresh: false,
+          error:
+            "youtube_api_unavailable"
+        });
+
+      }
+
+      return res.status(200).json({
+        success: false,
+        items: [],
+        volume: null,
+        competition: null,
+        competitionScore: null,
+        error:
+          "youtube_api_unavailable"
+      });
+
     }
 
     // =========================
@@ -2988,13 +3317,76 @@ topShare,
 
 };
 
-const googleSearch = await fetchGoogleVerification(keyword);
+const googleCacheKey =
+  `google_${keyword.toLowerCase()}`;
+
+let googleSearch;
+
+const cachedGoogle =
+  global.tubexGoogleCache[googleCacheKey];
+
+if (
+  cachedGoogle &&
+  cachedGoogle.expires > Date.now()
+) {
+
+  googleSearch =
+    cachedGoogle.data;
+
+} else {
+
+  const existingGoogleInFlight =
+    global.tubexGoogleInFlight[
+      googleCacheKey
+    ];
+
+  let googlePromise =
+    existingGoogleInFlight;
+
+  if (!googlePromise) {
+
+    googlePromise =
+      fetchGoogleVerification(keyword);
+
+    global.tubexGoogleInFlight[
+      googleCacheKey
+    ] = googlePromise;
+
+  }
+
+  try {
+
+    googleSearch =
+      await googlePromise;
+
+  } finally {
+
+    if (!existingGoogleInFlight) {
+      delete global.tubexGoogleInFlight[
+        googleCacheKey
+      ];
+    }
+
+  }
+
+  global.tubexGoogleCache[
+    googleCacheKey
+  ] = {
+    data: googleSearch,
+    expires:
+      Date.now() + GOOGLE_CACHE_TTL
+  };
+
+}
 
 const responseData = {
 
     success: true,
 
     items,
+
+    partial: searchPartial,
+    dataFresh: !searchPartial,
 
     volume: finalVolume,
 
@@ -3062,8 +3454,10 @@ if (cacheKey) {
     data: responseData,
 
     expires:
-      Date.now() +
-      (15 * 60 * 1000)
+      Date.now() + SEO_CACHE_TTL,
+
+    staleUntil:
+      Date.now() + SEO_STALE_TTL
 
   };
 

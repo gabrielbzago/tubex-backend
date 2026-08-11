@@ -7,27 +7,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key, authorization");
 
-console.log(
-  "HEADER:",
-  req.headers["x-api-key"]
-);
-
-console.log(
-  "ENV:",
-  process.env.API_KEY
-);
-
   if (req.method === "OPTIONS") return res.status(200).end();
-
-console.log(
-  "HEADER KEY:",
-  req.headers["x-api-key"]
-);
-
-console.log(
-  "ENV KEY:",
-  process.env.API_KEY
-);
 
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
     return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
@@ -52,6 +32,10 @@ console.log(
     }
 
 global.tubexChannelCache = global.tubexChannelCache || {};
+global.tubexChannelInFlight = global.tubexChannelInFlight || {};
+
+const CHANNEL_CACHE_TTL = 15 * 60 * 1000;
+const CHANNEL_STALE_TTL = 6 * 60 * 60 * 1000;
 
 const cacheKey = `channel_${channelId}`;
 
@@ -103,7 +87,15 @@ if(cached){
         }));
 
       }catch(e){
-        console.warn("⚠️ erro fetch videos:", e);
+        console.warn("⚠️ erro fetch videos:", e?.message || e);
+
+        if (
+          e?.message === "quota_exceeded" ||
+          e?.message === "daily_limit_exceeded"
+        ) {
+          throw e;
+        }
+
         return [];
       }
     };
@@ -111,40 +103,175 @@ if(cached){
     // ======================================================
     // 🔹 SINGLE API KEY / SINGLE PROJECT
     // ======================================================
-    try {
+    const fetchChannelData = async () => {
+
       const chRes = await fetch(
         `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
       );
-      const chJson = await chRes.json();
+
+      const chJson =
+        await chRes.json().catch(() => ({}));
+
       if (!chRes.ok) {
-        if (chRes.status === 403 || chRes.status === 429) throw new Error("quota_exceeded");
-        throw new Error(`channel_api_${chRes.status}`);
-      }
-      if (!chJson.items?.length) throw new Error("channel_not_found");
-      channel = chJson.items[0];
-      const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
-      if (!uploads) {
-        videos = [];
-      } else {
-        const vidsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
-        );
-        const vidsJson = await vidsRes.json();
-        if (!vidsRes.ok) {
-          if (vidsRes.status === 403 || vidsRes.status === 429) throw new Error("quota_exceeded");
-          throw new Error(`playlist_api_${vidsRes.status}`);
+
+        if (
+          chRes.status === 403 ||
+          chRes.status === 429
+        ) {
+          throw new Error("quota_exceeded");
         }
-        const idsArr = (vidsJson.items || []).map(v => v.contentDetails?.videoId).filter(Boolean);
-        videos = idsArr.length ? await fetchVideosFromIds(idsArr.join(","), key) : [];
+
+        throw new Error(
+          `channel_api_${chRes.status}`
+        );
+
       }
+
+      if (!chJson.items?.length) {
+        throw new Error("channel_not_found");
+      }
+
+      const channelData =
+        chJson.items[0];
+
+      const uploads =
+        channelData.contentDetails
+          ?.relatedPlaylists
+          ?.uploads;
+
+      let videosData = [];
+
+      if (uploads) {
+
+        const vidsRes =
+          await fetch(
+            `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
+          );
+
+        const vidsJson =
+          await vidsRes.json().catch(() => ({}));
+
+        if (!vidsRes.ok) {
+
+          if (
+            vidsRes.status === 403 ||
+            vidsRes.status === 429
+          ) {
+            throw new Error("quota_exceeded");
+          }
+
+          throw new Error(
+            `playlist_api_${vidsRes.status}`
+          );
+
+        }
+
+        const idsArr =
+          (vidsJson.items || [])
+            .map(
+              v => v.contentDetails?.videoId
+            )
+            .filter(Boolean);
+
+        if (idsArr.length) {
+
+          videosData =
+            await fetchVideosFromIds(
+              idsArr.join(","),
+              key
+            );
+
+        }
+
+      }
+
+      return {
+        channel: channelData,
+        videos: videosData
+      };
+
+    };
+
+    try {
+
+          let channelResult;
+
+          const existingInFlight =
+            global.tubexChannelInFlight[
+              cacheKey
+            ];
+
+          if (existingInFlight) {
+
+            console.log(
+              "⚡ CHANNEL IN-FLIGHT HIT:",
+              channelId
+            );
+
+            channelResult =
+              await existingInFlight;
+
+          } else {
+
+            const promise =
+              fetchChannelData();
+
+            global.tubexChannelInFlight[
+              cacheKey
+            ] = promise;
+
+            try {
+
+              channelResult =
+                await promise;
+
+            } finally {
+
+              delete global.tubexChannelInFlight[
+                cacheKey
+              ];
+
+            }
+
+          }
+
+          channel =
+            channelResult.channel;
+
+          videos =
+            channelResult.videos;
+
     } catch (e) {
-      console.warn("⚠️ YouTube channel fetch failed:", e?.message || e);
-      const stale = global.tubexChannelCache[cacheKey];
-      if (stale?.data) {
-        console.warn("♻️ Serving stale channel cache after API failure:", channelId);
-        return res.status(200).json(stale.data);
+
+      console.warn(
+        "⚠️ YouTube channel fetch failed:",
+        e?.message || e
+      );
+
+      const stale =
+        global.tubexChannelCache[cacheKey];
+
+      if (
+        stale?.data &&
+        (
+          stale.staleUntil > Date.now() ||
+          stale.expires > Date.now()
+        )
+      ) {
+
+        console.warn(
+          "♻️ Serving stale channel cache after API failure:",
+          channelId
+        );
+
+        return res
+          .status(200)
+          .json(stale.data);
+
       }
+
       throw e;
+
     }
 
     // ======================================================
@@ -277,8 +404,8 @@ const finalData = {
 // 💾 SALVA CACHE
 global.tubexChannelCache[cacheKey] = {
   data: finalData,
-  expires: Date.now() + (15 * 60 * 1000), // fresh for 15 min
-  staleUntil: Date.now() + (6 * 60 * 60 * 1000) // stale fallback
+  expires: Date.now() + CHANNEL_CACHE_TTL,
+  staleUntil: Date.now() + CHANNEL_STALE_TTL
 
 };
 

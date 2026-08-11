@@ -174,8 +174,13 @@ if(
     // =========================
     global.tubexSeoCache = global.tubexSeoCache || {};
     global.tubexChannelCache = global.tubexChannelCache || {};
+    global.tubexSearchCache = global.tubexSearchCache || {};
+    global.tubexSearchInflight = global.tubexSearchInflight || {};
 
-    const cacheKey = keyword ? `seo_v2_google_${keyword.toLowerCase()}` : null;
+    const normalizedKeyword = keyword ? keyword.toLowerCase().trim() : "";
+    const cacheKey = keyword
+      ? `seo_v3_${normalizedKeyword}_${body?.plan || "default"}`
+      : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -211,60 +216,99 @@ if(
     }
 
     // =========================
-    // 🎯 OPTIMIZED SEARCH FETCH
+    // 🎯 QUOTA-SAFE SEARCH
     // =========================
-    // Keep the same maximum result coverage while cutting search.list calls:
-    // 25 x 6 pages = 150 results (600 quota units)
-    // 50 x 3 pages = 150 results (300 quota units)
-    // Free remains 50 results in a single call.
-    let maxPages = 3;
-    if (body?.plan === "free") maxPages = 1;
-
+    // IMPORTANT:
+    // search.list is the constrained YouTube Search bucket.
+    // One SEO request uses ONE search.list call only (50 results).
+    // Pagination was intentionally removed here because every extra
+    // page consumes another Search Query and does not materially improve
+    // the TubeX score enough to justify the quota cost.
+    //
+    // We also cache the raw search result and coalesce simultaneous
+    // requests for the same keyword. This prevents multiple users
+    // requesting the same keyword at the same moment from spending
+    // multiple search.list calls.
     try {
-      let allIds = [];
-      let nextPageToken = "";
-      let pageCount = 0;
+      global.tubexSearchCache = global.tubexSearchCache || {};
+      global.tubexSearchInflight = global.tubexSearchInflight || {};
 
-      while (pageCount < maxPages) {
-        const searchUrl =
-          `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet&type=video&order=relevance&maxResults=50` +
-          `&q=${encodeURIComponent(keyword)}` +
-          (nextPageToken ? `&pageToken=${nextPageToken}` : "") +
-          `&key=${activeKey}`;
+      const searchCacheKey = `yt_search_v3_${normalizedKeyword}`;
+      const searchTtl = 30 * 60 * 1000;
+      let searchJson = null;
 
-        const searchRes = await fetch(searchUrl);
-        const searchJson = await searchRes.json().catch(() => ({}));
+      const cachedSearch = global.tubexSearchCache[searchCacheKey];
+      if (cachedSearch && cachedSearch.expires > Date.now()) {
+        console.log("⚡ CACHE HIT YOUTUBE SEARCH:", keyword);
+        searchJson = cachedSearch.data;
+      } else {
+        const existingInflight = global.tubexSearchInflight[searchCacheKey];
 
-        const reason = searchJson?.error?.errors?.[0]?.reason || "";
-        if (searchRes.status === 403 || searchRes.status === 429) {
-          if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || searchRes.status === 429) {
-            throw new Error("quota_exceeded");
+        if (existingInflight) {
+          console.log("⏳ JOIN YOUTUBE SEARCH:", keyword);
+          searchJson = await existingInflight;
+        } else {
+          const searchPromise = (async () => {
+            const searchUrl =
+              `https://www.googleapis.com/youtube/v3/search` +
+              `?part=snippet&type=video&order=relevance&maxResults=50` +
+              `&q=${encodeURIComponent(keyword)}` +
+              `&key=${activeKey}`;
+
+            const searchRes = await fetch(searchUrl);
+            const payload = await searchRes.json().catch(() => ({}));
+
+            const reason = payload?.error?.errors?.[0]?.reason || "";
+            if (searchRes.status === 403 || searchRes.status === 429) {
+              if (
+                reason === "quotaExceeded" ||
+                reason === "dailyLimitExceeded" ||
+                searchRes.status === 429
+              ) {
+                throw new Error("quota_exceeded");
+              }
+
+              throw new Error(
+                payload?.error?.message ||
+                `youtube_search_http_${searchRes.status}`
+              );
+            }
+
+            if (!searchRes.ok || payload?.error) {
+              throw new Error(
+                payload?.error?.message ||
+                `youtube_search_http_${searchRes.status}`
+              );
+            }
+
+            global.tubexSearchCache[searchCacheKey] = {
+              data: payload,
+              expires: Date.now() + searchTtl
+            };
+
+            return payload;
+          })();
+
+          global.tubexSearchInflight[searchCacheKey] = searchPromise;
+
+          try {
+            searchJson = await searchPromise;
+          } finally {
+            delete global.tubexSearchInflight[searchCacheKey];
           }
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
         }
-
-        if (!searchRes.ok || searchJson?.error) {
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
-        }
-
-        youtubeSearchSucceeded = true;
-        if (pageCount === 0) {
-          totalResults = Number(searchJson.pageInfo?.totalResults || 0);
-        }
-
-        const ids = (searchJson.items || [])
-          .map(v => v.id?.videoId)
-          .filter(Boolean);
-
-        allIds.push(...ids);
-        nextPageToken = searchJson.nextPageToken || "";
-        pageCount++;
-
-        if (!nextPageToken) break;
       }
 
-      const uniqueIds = [...new Set(allIds)];
+      youtubeSearchSucceeded = true;
+      totalResults = Number(searchJson?.pageInfo?.totalResults || 0);
+
+      const uniqueIds = [
+        ...new Set(
+          (searchJson?.items || [])
+            .map(v => v.id?.videoId)
+            .filter(Boolean)
+        )
+      ];
 
       // videos.list is already inexpensive and supports up to 50 IDs/request.
       for (let i = 0; i < uniqueIds.length; i += 50) {
@@ -678,7 +722,7 @@ else {
   if (!channel || !Array.isArray(latestVideos)) {
     const channelUrl =
       `https://www.googleapis.com/youtube/v3/channels` +
-      `?part=snippet,statistics` +
+      `?part=snippet,statistics,contentDetails` +
       `&id=${snippet.channelId}` +
       `&key=${activeKey}`;
 
@@ -690,24 +734,46 @@ else {
 
     channel = channelJson.items?.[0] || {};
 
-    const latestSearchUrl =
-      `https://www.googleapis.com/youtube/v3/search` +
-      `?part=snippet` +
-      `&channelId=${snippet.channelId}` +
-      `&order=date` +
-      `&type=video` +
-      `&maxResults=12` +
-      `&key=${activeKey}`;
+    // Do NOT use search.list for latest channel videos.
+    // The channel uploads playlist provides the same information
+    // without consuming the constrained Search Queries bucket.
+    const uploadsPlaylistId =
+      channel.contentDetails?.relatedPlaylists?.uploads;
 
-    const latestSearchRes = await fetch(latestSearchUrl);
-    const latestSearchJson = await latestSearchRes.json().catch(() => ({}));
-    if (!latestSearchRes.ok) {
-      throw new Error(latestSearchJson?.error?.message || `youtube_latest_search_http_${latestSearchRes.status}`);
+    const latestIds = [];
+
+    if (uploadsPlaylistId) {
+      const uploadsUrl =
+        `https://www.googleapis.com/youtube/v3/playlistItems` +
+        `?part=contentDetails&playlistId=${uploadsPlaylistId}` +
+        `&maxResults=12&key=${activeKey}`;
+
+      const uploadsRes = await fetch(uploadsUrl);
+      const uploadsJson = await uploadsRes.json().catch(() => ({}));
+
+      if (!uploadsRes.ok) {
+        const reason = uploadsJson?.error?.errors?.[0]?.reason || "";
+        if (
+          uploadsRes.status === 403 ||
+          uploadsRes.status === 429 ||
+          reason === "quotaExceeded" ||
+          reason === "dailyLimitExceeded"
+        ) {
+          throw new Error("quota_exceeded");
+        }
+
+        throw new Error(
+          uploadsJson?.error?.message ||
+          `youtube_latest_playlist_http_${uploadsRes.status}`
+        );
+      }
+
+      latestIds.push(
+        ...(uploadsJson.items || [])
+          .map(v => v.contentDetails?.videoId)
+          .filter(Boolean)
+      );
     }
-
-    const latestIds = (latestSearchJson.items || [])
-      .map(v => v.id?.videoId)
-      .filter(Boolean);
 
     latestVideos = [];
 
@@ -729,7 +795,7 @@ else {
 
     global.tubexChannelCache[channelCacheKey] = {
       data: { channel, latestVideos },
-      expires: Date.now() + (15 * 60 * 1000)
+      expires: Date.now() + (30 * 60 * 1000)
     };
   }
 
@@ -1174,33 +1240,96 @@ analytics.estimatedMinutesWatched,
     // =========================
     if (mode === "summary") {
 
-      const searchRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(keyword)}&key=${activeKey}`
-      );
+      global.tubexSummaryCache = global.tubexSummaryCache || {};
+      global.tubexSummaryInflight = global.tubexSummaryInflight || {};
 
-      const searchJson = await searchRes.json();
-      const channelId = searchJson.items?.[0]?.id?.channelId;
+      const summaryKey = `summary_v2_${normalizedKeyword}`;
+      const summaryTtl = 30 * 60 * 1000;
 
-      if (!channelId) {
-        return res.status(200).json({
-          success: false,
-          error: "channel_not_found"
-        });
+      const cachedSummary = global.tubexSummaryCache[summaryKey];
+      if (cachedSummary && cachedSummary.expires > Date.now()) {
+        console.log("⚡ CACHE HIT SUMMARY:", keyword);
+        return res.status(200).json(cachedSummary.data);
       }
 
-      const channelRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${activeKey}`
-      );
+      const existingSummary = global.tubexSummaryInflight[summaryKey];
+      if (existingSummary) {
+        return res.status(200).json(await existingSummary);
+      }
 
-      const stats = (await channelRes.json())?.items?.[0]?.statistics;
+      const summaryPromise = (async () => {
+        const searchRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(keyword)}&key=${activeKey}`
+        );
 
-      return res.status(200).json({
-        success: true,
-        channelId,
-        totalViews: Number(stats?.viewCount || 0),
-        totalVideos: Number(stats?.videoCount || 0),
-        subscribers: Number(stats?.subscriberCount || 0)
-      });
+        const searchJson = await searchRes.json().catch(() => ({}));
+
+        if (!searchRes.ok || searchJson?.error) {
+          const reason = searchJson?.error?.errors?.[0]?.reason || "";
+          if (
+            searchRes.status === 403 ||
+            searchRes.status === 429 ||
+            reason === "quotaExceeded" ||
+            reason === "dailyLimitExceeded"
+          ) {
+            throw new Error("quota_exceeded");
+          }
+
+          throw new Error(
+            searchJson?.error?.message ||
+            `youtube_summary_search_http_${searchRes.status}`
+          );
+        }
+
+        const channelId = searchJson.items?.[0]?.id?.channelId;
+
+        if (!channelId) {
+          return {
+            success: false,
+            error: "channel_not_found"
+          };
+        }
+
+        const channelRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${activeKey}`
+        );
+
+        const channelJson = await channelRes.json().catch(() => ({}));
+
+        if (!channelRes.ok || channelJson?.error) {
+          throw new Error(
+            channelJson?.error?.message ||
+            `youtube_summary_channel_http_${channelRes.status}`
+          );
+        }
+
+        const stats = channelJson?.items?.[0]?.statistics;
+
+        return {
+          success: true,
+          channelId,
+          totalViews: Number(stats?.viewCount || 0),
+          totalVideos: Number(stats?.videoCount || 0),
+          subscribers: Number(stats?.subscriberCount || 0)
+        };
+      })();
+
+      global.tubexSummaryInflight[summaryKey] = summaryPromise;
+
+      try {
+        const summaryData = await summaryPromise;
+
+        if (summaryData?.success) {
+          global.tubexSummaryCache[summaryKey] = {
+            data: summaryData,
+            expires: Date.now() + summaryTtl
+          };
+        }
+
+        return res.status(200).json(summaryData);
+      } finally {
+        delete global.tubexSummaryInflight[summaryKey];
+      }
     }
 
     // =========================
@@ -3063,7 +3192,7 @@ if (cacheKey) {
 
     expires:
       Date.now() +
-      (15 * 60 * 1000)
+      (30 * 60 * 1000)
 
   };
 

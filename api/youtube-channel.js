@@ -7,27 +7,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers","Content-Type, x-api-key, authorization");
 
-console.log(
-  "HEADER:",
-  req.headers["x-api-key"]
-);
-
-console.log(
-  "ENV:",
-  process.env.API_KEY
-);
-
   if (req.method === "OPTIONS") return res.status(200).end();
-
-console.log(
-  "HEADER KEY:",
-  req.headers["x-api-key"]
-);
-
-console.log(
-  "ENV KEY:",
-  process.env.API_KEY
-);
 
   if (req.headers["x-api-key"] !== process.env.API_KEY) {
     return res.status(200).json({ success:false, error:"unauthorized", items:[], data:{channel:null,videos:[]} });
@@ -52,8 +32,9 @@ console.log(
     }
 
 global.tubexChannelCache = global.tubexChannelCache || {};
+global.tubexChannelInflight = global.tubexChannelInflight || {};
 
-const cacheKey = `channel_${channelId}`;
+const cacheKey = `channel_v2_${channelId}`;
 
 const cached = global.tubexChannelCache[cacheKey];
 
@@ -87,7 +68,9 @@ if(cached){
 
         if (!res.ok) {
           console.warn("⚠️ erro videos API:", res.status);
-          if (res.status === 403 || res.status === 429) throw new Error("quota_exceeded");
+          if (res.status === 403 || res.status === 429) {
+            throw new Error("quota_exceeded");
+          }
           return [];
         }
 
@@ -111,40 +94,121 @@ if(cached){
     // ======================================================
     // 🔹 SINGLE API KEY / SINGLE PROJECT
     // ======================================================
-    try {
+    // Production uses one credential/project only.
+    //
+    // The channel endpoint intentionally avoids search.list.
+    // Uploads are obtained from the channel's uploads playlist,
+    // preserving the data needed by this module without consuming
+    // the constrained "Search Queries per day" bucket.
+    //
+    // Concurrent requests for the same channel are coalesced so
+    // several users opening the same channel at the same time do
+    // not trigger duplicate API calls.
+
+    const existingInflight = global.tubexChannelInflight[cacheKey];
+
+    if (existingInflight) {
+      console.log("⏳ JOIN CHANNEL REQUEST:", channelId);
+      return res.status(200).json(await existingInflight);
+    }
+
+    const channelPromise = (async () => {
       const chRes = await fetch(
         `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${channelId}&key=${key}`
       );
-      const chJson = await chRes.json();
+
+      const chJson = await chRes.json().catch(() => ({}));
+
       if (!chRes.ok) {
-        if (chRes.status === 403 || chRes.status === 429) throw new Error("quota_exceeded");
-        throw new Error(`channel_api_${chRes.status}`);
+        const reason = chJson?.error?.errors?.[0]?.reason || "";
+
+        if (
+          chRes.status === 403 ||
+          chRes.status === 429 ||
+          reason === "quotaExceeded" ||
+          reason === "dailyLimitExceeded"
+        ) {
+          throw new Error("quota_exceeded");
+        }
+
+        throw new Error(
+          chJson?.error?.message || `channel_api_${chRes.status}`
+        );
       }
-      if (!chJson.items?.length) throw new Error("channel_not_found");
+
+      if (!chJson.items?.length) {
+        throw new Error("channel_not_found");
+      }
+
       channel = chJson.items[0];
+
       const uploads = channel.contentDetails?.relatedPlaylists?.uploads;
+
       if (!uploads) {
         videos = [];
       } else {
         const vidsRes = await fetch(
           `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploads}&maxResults=50&key=${key}`
         );
-        const vidsJson = await vidsRes.json();
+
+        const vidsJson = await vidsRes.json().catch(() => ({}));
+
         if (!vidsRes.ok) {
-          if (vidsRes.status === 403 || vidsRes.status === 429) throw new Error("quota_exceeded");
-          throw new Error(`playlist_api_${vidsRes.status}`);
+          const reason = vidsJson?.error?.errors?.[0]?.reason || "";
+
+          if (
+            vidsRes.status === 403 ||
+            vidsRes.status === 429 ||
+            reason === "quotaExceeded" ||
+            reason === "dailyLimitExceeded"
+          ) {
+            throw new Error("quota_exceeded");
+          }
+
+          throw new Error(
+            vidsJson?.error?.message ||
+            `playlist_api_${vidsRes.status}`
+          );
         }
-        const idsArr = (vidsJson.items || []).map(v => v.contentDetails?.videoId).filter(Boolean);
-        videos = idsArr.length ? await fetchVideosFromIds(idsArr.join(","), key) : [];
+
+        const idsArr = (vidsJson.items || [])
+          .map(v => v.contentDetails?.videoId)
+          .filter(Boolean);
+
+        videos = idsArr.length
+          ? await fetchVideosFromIds(idsArr.join(","), key)
+          : [];
       }
+
+      return { channel, videos };
+    })();
+
+    global.tubexChannelInflight[cacheKey] = channelPromise;
+
+    try {
+      const result = await channelPromise;
+      channel = result.channel;
+      videos = result.videos;
     } catch (e) {
-      console.warn("⚠️ YouTube channel fetch failed:", e?.message || e);
+      console.warn(
+        "⚠️ YouTube channel fetch failed:",
+        e?.message || e
+      );
+
       const stale = global.tubexChannelCache[cacheKey];
+
       if (stale?.data) {
-        console.warn("♻️ Serving stale channel cache after API failure:", channelId);
+        console.warn(
+          "♻️ Serving stale channel cache after API failure:",
+          channelId
+        );
+
         return res.status(200).json(stale.data);
       }
+
       throw e;
+    } finally {
+      delete global.tubexChannelInflight[cacheKey];
     }
 
     // ======================================================
@@ -277,7 +341,7 @@ const finalData = {
 // 💾 SALVA CACHE
 global.tubexChannelCache[cacheKey] = {
   data: finalData,
-  expires: Date.now() + (15 * 60 * 1000), // fresh for 15 min
+  expires: Date.now() + (30 * 60 * 1000), // fresh for 30 min
   staleUntil: Date.now() + (6 * 60 * 60 * 1000) // stale fallback
 
 };

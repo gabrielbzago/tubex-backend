@@ -11,7 +11,7 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
@@ -31,7 +31,9 @@ function cleanKeyword(value) {
 }
 
 function normalizeRange(value) {
-  return value === "12m" ? "12m" : "30d";
+  return value === "7d" || value === "30d" || value === "12m"
+    ? value
+    : "30d";
 }
 
 function formatTrendDate(date) {
@@ -42,6 +44,10 @@ function formatTrendDate(date) {
 }
 
 function trendsTime(range, exact12m = false) {
+  if (range === "7d") {
+    return "today 7-d";
+  }
+
   if (range === "12m") {
     if (!exact12m) return "today 12-m";
 

@@ -183,11 +183,11 @@ if(
     global.tubexGoogleCache = global.tubexGoogleCache || {};
     global.tubexGoogleInFlight = global.tubexGoogleInFlight || {};
 
-    const SEO_CACHE_TTL = 15 * 60 * 1000;
+    const SEO_CACHE_TTL = 24 * 60 * 60 * 1000;
     const SEO_STALE_TTL = 6 * 60 * 60 * 1000;
     const CHANNEL_CACHE_TTL = 15 * 60 * 1000;
     const CHANNEL_STALE_TTL = 6 * 60 * 60 * 1000;
-    const GOOGLE_CACHE_TTL = 15 * 60 * 1000;
+    const GOOGLE_CACHE_TTL = 24 * 60 * 60 * 1000;
 
     const searchDepth =
       body?.plan === "free"

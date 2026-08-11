@@ -11,7 +11,7 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
@@ -482,7 +482,7 @@ async function fetchGoogleTrend(
 ) {
   // Google Trends can rate-limit the denser 30d YouTube series.
   // Retry the complete server-side session; never synthesize values.
-  const attempts = range === "30d" ? 3 : 2;
+  const attempts = (range === "30d" || range === "7d") ? 3 : 2;
   let lastError = null;
 
   for(let attempt = 1; attempt <= attempts; attempt++){
@@ -498,7 +498,9 @@ async function fetchGoogleTrend(
       if(attempt < attempts){
         const waitMs = range === "30d"
           ? (attempt === 1 ? 1200 : 2500)
-          : 900;
+          : range === "7d"
+            ? (attempt === 1 ? 900 : 1800)
+            : 900;
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }
     }
@@ -658,6 +660,10 @@ export default async function handler(req, res) {
       keyword,
       range,
       trend,
+      trend7d:
+        range === "7d"
+          ? trend
+          : undefined,
       trend30d:
         range === "30d"
           ? trend

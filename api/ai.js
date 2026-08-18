@@ -3343,7 +3343,7 @@ tipo === "video_analysis"
 
 : [
 
-    "v7",
+    (tipo === "niche" ? "niche_v8_taxonomy" : "v7"),
 
     userId,
 
@@ -3879,6 +3879,20 @@ if (tipo === "seo_workspace") {
 const parsed = JSON.parse(clean);
 
 if (tipo !== "seo_workspace") {
+  if (
+      String(parsed.niche || "").trim().toLowerCase() === "conteúdo geral" &&
+      Number(parsed.confidence || 0) <= 0
+    ) {
+      return res.status(200).json({
+        success: false,
+        error: "niche_generic_result",
+        niche: "",
+        confidence: 0,
+        reason: "A IA não identificou um nicho com confiança suficiente"
+      });
+    }
+
+
   global.__tubexCache.set(cacheKey, {
     text: parsed,
     timestamp: Date.now()
@@ -4279,27 +4293,21 @@ return res.status(200).json({
 
 });
 
-  } catch (e) {
-
+   } catch (e) {
     console.error(
       "💥 NICHE JSON:",
       e
     );
 
+    // Falha de parsing não é classificação.
+    // O Intelligence recebe success:false e usa o fallback local.
     return res.status(200).json({
-
-      success: true,
-
-      niche:
-        "Conteúdo Geral",
-
+      success: false,
+      error: "niche_parse_failed",
+      niche: "",
       confidence: 0,
-
-      reason:
-        "Falha ao interpretar resposta"
-
+      reason: "Falha ao interpretar resposta da IA"
     });
-
   }
 
 }

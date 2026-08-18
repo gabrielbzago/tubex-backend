@@ -1195,26 +1195,90 @@ Nunca retorne o nome de uma marca.
 Nunca retorne um produto específico.
 Sempre retorne uma categoria temática.
 
-Exemplos válidos:
+Exemplos válidos (use como referência de granularidade; a categoria final deve seguir os títulos enviados):
 
-Games
-Games Mobile
-FPS
-Criação de Aves
-Animais
-Programação
-Desenvolvimento Web
-Finanças
-Criptomoedas
-Automóveis
-Música
-Culinária
-Fitness
-Saúde
-História
-Astronomia
-Marketing
-Inteligência Artificial
+- YouTube / Marketing
+- Inteligência Artificial
+- Programação
+- Desenvolvimento Web
+- Games
+- Esports
+- Criação de Aves
+- Animais e Pets
+- Animais Exóticos
+- Finanças
+- Finanças Pessoais
+- Fitness
+- Bodybuilding
+- Saúde e Bem-estar
+- Música
+- Instrumentos Musicais
+- Culinária
+- Confeitaria e Panificação
+- Gastronomia e Food Reviews
+- História
+- Astronomia e Espaço
+- Ciência
+- Física
+- Geografia e Geopolítica
+- Notícias e Atualidades
+- Política
+- Comédia Stand-up
+- Humor e Entretenimento
+- Cinema e Filmes
+- Séries e TV
+- Anime e Mangá
+- Cultura Pop
+- Livros e Literatura
+- Psicologia
+- Desenvolvimento Pessoal
+- Relacionamentos
+- Família e Parentalidade
+- Viagens e Turismo
+- Camping e Outdoor
+- Jardinagem e Plantas
+- Agro e Agricultura
+- Cavalos e Equitação
+- Aquarismo
+- Automóveis
+- Automobilismo e Motorsport
+- Motocicletas
+- Pesca
+- Esportes
+- Futebol
+- Lutas e Artes Marciais
+- Ciclismo
+- Corrida e Running
+- Aviação
+- Imóveis e Mercado Imobiliário
+- Direito e Legislação
+- Carreira e Trabalho
+- Marketing e Negócios
+- Vendas
+- E-commerce
+- Construção e Obras
+- DIY / Faça Você Mesmo
+- Marcenaria e Madeira
+- Artesanato e Trabalhos Manuais
+- Fotografia
+- Vídeo e Produção Audiovisual
+- Podcasts e Entrevistas
+- Áudio e Produção Musical
+- Arquitetura e Design
+- Casa e Decoração
+- Moda e Estilo
+- Beleza
+- Maquiagem
+- Educação e Estudos
+- Idiomas
+- Engenharia
+- Produtividade e Organização
+- Espiritualidade
+- Religião e Fé
+- Colecionismo
+- Brinquedos e Colecionáveis
+- Relógios e Relojoaria
+- Psicologia e Comportamento
 
 Evite nichos excessivamente específicos como nomes de canais, marcas, pessoas ou espécies.
 
@@ -1300,6 +1364,71 @@ Marketing Digital
 
 Inteligência Artificial
 → Inteligência Artificial
+
+Exemplos adicionais importantes:
+
+Astronomia, universo, buracos negros, planetas
+→ Astronomia e Espaço
+
+Stand-up, comediantes, especiais de comédia, open mic
+→ Comédia Stand-up
+
+Fórmula 1, MotoGP, Stock Car, automobilismo
+→ Automobilismo e Motorsport
+
+Futebol, Brasileirão, Libertadores
+→ Futebol
+
+UFC, boxe, muay thai, jiu-jitsu
+→ Lutas e Artes Marciais
+
+Podcasts e cortes de entrevistas
+→ Podcasts e Entrevistas
+
+Marcenaria, móveis de madeira, carpintaria
+→ Marcenaria e Madeira
+
+DIY, projetos caseiros, faça você mesmo
+→ DIY / Faça Você Mesmo
+
+Jardinagem, plantas, horta
+→ Jardinagem e Plantas
+
+Aquários, peixes ornamentais, aquascaping
+→ Aquarismo
+
+Cinema, filmes e críticas
+→ Cinema e Filmes
+
+Netflix, séries e temporadas
+→ Séries e TV
+
+Anime, mangá, Naruto, One Piece
+→ Anime e Mangá
+
+Marvel, DC, Star Wars, cultura geek
+→ Cultura Pop
+
+Psicologia, comportamento e mente
+→ Psicologia e Comportamento
+
+Viagens, destinos, hotéis e roteiros
+→ Viagens e Turismo
+
+Construção, reformas e obras
+→ Construção e Obras
+
+Fotografia, câmeras e lentes
+→ Fotografia
+
+E-commerce, Shopify, lojas online
+→ E-commerce
+
+Imóveis, apartamentos, terrenos e aluguel
+→ Imóveis e Mercado Imobiliário
+
+Aviação, aviões e pilotos
+→ Aviação
 
 Se existir um tema dominante, NUNCA responda "Conteúdo Geral".
 

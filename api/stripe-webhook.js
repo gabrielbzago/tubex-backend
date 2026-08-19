@@ -13,9 +13,31 @@ export const config = {
 };
 
 // ======================================================
-// PLANOS — manter os Product IDs atuais do TubeX
+// TUBEX — PLANOS REAIS POR PRICE ID
+// O Price ID é a fonte de verdade para plano + ciclo.
 // ======================================================
-const PLAN_MAP = {
+const PRICE_MAP = {
+  "price_1U3L12AQLcT2SPxrktmUhqiM": {
+    plan: "pro",
+    billing_cycle: "monthly"
+  },
+  "price_1U3L4VAQLcT2SPxrDyxAAvPS": {
+    plan: "pro",
+    billing_cycle: "annual"
+  },
+  "price_1U3L5uAQLcT2SPxrA9nL5LUp": {
+    plan: "expert",
+    billing_cycle: "monthly"
+  },
+  "price_1U3LBJAQLcT2SPxrve5oa0XP": {
+    plan: "expert",
+    billing_cycle: "annual"
+  }
+};
+
+// Product IDs antigos continuam reconhecidos como fallback,
+// mas nunca têm prioridade sobre o Price ID.
+const PRODUCT_MAP = {
   "prod_SlRU1DGWgG5nzq": "start",
   "prod_SlRVtiheQa9IZG": "pro",
   "prod_SlRWvDMlS5e9dR": "expert"
@@ -23,6 +45,8 @@ const PLAN_MAP = {
 
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
 const GRACE_STATUSES = new Set(["past_due", "unpaid"]);
+const CRON_BATCH_SIZE = 1000;
+const CRON_CONCURRENCY = 4;
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -33,8 +57,12 @@ function normalizeName(name) {
   return value || null;
 }
 
-function getPlanFromProduct(productId) {
-  return productId ? PLAN_MAP[productId] || null : null;
+function getCustomerId(value) {
+  return typeof value === "string" ? value : value?.id || null;
+}
+
+function getPriceIdFromSubscription(subscription) {
+  return subscription?.items?.data?.[0]?.price?.id || null;
 }
 
 function getProductFromSubscription(subscription) {
@@ -42,12 +70,36 @@ function getProductFromSubscription(subscription) {
   return typeof product === "string" ? product : product?.id || null;
 }
 
+function getPriceConfig(subscription) {
+  const priceId = getPriceIdFromSubscription(subscription);
+  if (priceId && PRICE_MAP[priceId]) return PRICE_MAP[priceId];
+
+  // Compatibilidade com assinaturas antigas ainda vinculadas por Product ID.
+  const productId = getProductFromSubscription(subscription);
+  const fallbackPlan = productId ? PRODUCT_MAP[productId] || null : null;
+  if (!fallbackPlan) return null;
+
+  const interval = subscription?.items?.data?.[0]?.price?.recurring?.interval;
+  return {
+    plan: fallbackPlan,
+    billing_cycle: interval === "year" ? "annual" : "monthly"
+  };
+}
+
+function getPlanFromSubscription(subscription) {
+  return getPriceConfig(subscription)?.plan || null;
+}
+
+function getBillingCycleFromSubscription(subscription) {
+  return getPriceConfig(subscription)?.billing_cycle || null;
+}
+
 function getStatusRank(status) {
-  if (status === "active") return 5;
-  if (status === "trialing") return 4;
-  if (status === "past_due") return 3;
-  if (status === "unpaid") return 2;
-  if (status === "incomplete") return 1;
+  if (status === "active") return 6;
+  if (status === "trialing") return 5;
+  if (status === "past_due") return 4;
+  if (status === "unpaid") return 3;
+  if (status === "incomplete") return 2;
   return 0;
 }
 
@@ -66,8 +118,36 @@ function getSubscriptionStatusForUser(subscription) {
   return "canceled";
 }
 
-function getCustomerId(value) {
-  return typeof value === "string" ? value : value?.id || null;
+function subscriptionIsUsable(subscription) {
+  return Boolean(subscription && getPriceConfig(subscription));
+}
+
+function compareSubscriptions(a, b) {
+  const statusRank = getStatusRank(b.status) - getStatusRank(a.status);
+  if (statusRank) return statusRank;
+
+  const timestamp = getSubscriptionTimestamp(b) - getSubscriptionTimestamp(a);
+  if (timestamp) return timestamp;
+
+  return String(b.id || "").localeCompare(String(a.id || ""));
+}
+
+function chooseCanonicalSubscription(subscriptions) {
+  const usable = (subscriptions || []).filter(subscriptionIsUsable);
+
+  const active = usable
+    .filter(sub => ACTIVE_STATUSES.has(sub.status))
+    .sort(compareSubscriptions);
+
+  if (active.length) return active[0];
+
+  const grace = usable
+    .filter(sub => GRACE_STATUSES.has(sub.status))
+    .sort(compareSubscriptions);
+
+  if (grace.length) return grace[0];
+
+  return null;
 }
 
 async function getStripeCustomer(customerId) {
@@ -75,7 +155,11 @@ async function getStripeCustomer(customerId) {
   return stripe.customers.retrieve(customerId);
 }
 
-async function getCustomerEmailAndName(customerId, fallbackEmail = null, fallbackName = null) {
+async function getCustomerEmailAndName(
+  customerId,
+  fallbackEmail = null,
+  fallbackName = null
+) {
   let customer = null;
 
   if (customerId) {
@@ -94,16 +178,13 @@ async function getCustomerEmailAndName(customerId, fallbackEmail = null, fallbac
 }
 
 // ======================================================
-// ASSINATURAS DO CUSTOMER
-// Regra central: o Supabase reflete a assinatura vigente
-// mais relevante do Customer, nunca simplesmente o evento
-// que acabou de chegar.
+// ASSINATURAS DE UM CUSTOMER
 // ======================================================
 async function listRelevantSubscriptions(customerId) {
   if (!customerId) return [];
 
   const all = [];
-  let startingAfter = undefined;
+  let startingAfter;
 
   while (true) {
     const page = await stripe.subscriptions.list({
@@ -122,51 +203,19 @@ async function listRelevantSubscriptions(customerId) {
   return all;
 }
 
-function chooseCanonicalSubscription(subscriptions) {
-  const usable = subscriptions
-    .filter(Boolean)
-    .filter(sub => {
-      const productId = getProductFromSubscription(sub);
-      return !!getPlanFromProduct(productId);
-    });
-
-  // 1) Ativa/trialing sempre vence cancelada/incompleta.
-  const active = usable
-    .filter(sub => ACTIVE_STATUSES.has(sub.status))
-    .sort((a, b) => {
-      const rank = getStatusRank(b.status) - getStatusRank(a.status);
-      if (rank) return rank;
-      return getSubscriptionTimestamp(b) - getSubscriptionTimestamp(a);
-    });
-
-  if (active.length) return active[0];
-
-  // 2) Se não há ativa, preserva acesso em grace period.
-  const grace = usable
-    .filter(sub => GRACE_STATUSES.has(sub.status))
-    .sort((a, b) => {
-      const rank = getStatusRank(b.status) - getStatusRank(a.status);
-      if (rank) return rank;
-      return getSubscriptionTimestamp(b) - getSubscriptionTimestamp(a);
-    });
-
-  if (grace.length) return grace[0];
-
-  // 3) Nenhuma assinatura vigente.
-  return null;
-}
-
 // ======================================================
 // LOCALIZAÇÃO DO USUÁRIO
-// Customer ID é a identidade Stripe principal.
-// Email é fallback para cadastros antigos.
+// REGRA: e-mail é a identidade TubeX.
+// Customer ID é identificador de cobrança e pode mudar.
 // ======================================================
 async function findUsersByCustomerId(customerId) {
   if (!customerId) return [];
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at")
+    .select(
+      "id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at"
+    )
     .eq("stripe_customer_id", customerId)
     .limit(20);
 
@@ -180,7 +229,9 @@ async function findUsersByEmail(email) {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at")
+    .select(
+      "id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at"
+    )
     .ilike("email", normalized)
     .limit(20);
 
@@ -188,27 +239,36 @@ async function findUsersByEmail(email) {
   return data || [];
 }
 
+function chooseUser(candidates) {
+  if (!candidates?.length) return null;
+
+  // Se houver duplicatas internas, prefere registro ativo e mais recentemente atualizado.
+  return [...candidates].sort((a, b) => {
+    const activeA = a.status === "active" ? 1 : 0;
+    const activeB = b.status === "active" ? 1 : 0;
+    if (activeB !== activeA) return activeB - activeA;
+
+    return (
+      new Date(b.updated_at || 0).getTime() -
+      new Date(a.updated_at || 0).getTime()
+    );
+  })[0];
+}
+
 async function findCanonicalUser({ customerId, email }) {
   const byCustomer = await findUsersByCustomerId(customerId);
-
   if (byCustomer.length) {
-    // Se houver duplicatas internas, prioriza a linha mais recentemente atualizada.
     return {
-      user: [...byCustomer].sort(
-        (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
-      )[0],
+      user: chooseUser(byCustomer),
       candidates: byCustomer,
       source: "customer_id"
     };
   }
 
   const byEmail = await findUsersByEmail(email);
-
   if (byEmail.length) {
     return {
-      user: [...byEmail].sort(
-        (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0)
-      )[0],
+      user: chooseUser(byEmail),
       candidates: byEmail,
       source: "email"
     };
@@ -218,8 +278,10 @@ async function findCanonicalUser({ customerId, email }) {
 }
 
 // ======================================================
-// UPSERT SEGURO
-// Não sobrescreve uma assinatura nova por um evento velho.
+// SAVE
+// Só grava campos já existentes no schema atual do arquivo.
+// O ciclo e Price ID são usados na decisão, mas não exigem
+// novas colunas no Supabase.
 // ======================================================
 async function saveUserState({
   customerId,
@@ -246,22 +308,28 @@ async function saveUserState({
   let plan = "free";
   let status = "canceled";
   let subscriptionId = null;
+  let canonicalCustomerId = customerId || null;
 
   if (canonicalSubscription) {
-    const productId = getProductFromSubscription(canonicalSubscription);
-    const mappedPlan = getPlanFromProduct(productId);
+    const config = getPriceConfig(canonicalSubscription);
 
-    if (!mappedPlan) {
-      throw new Error(`Produto Stripe não mapeado: ${productId || "ausente"}`);
+    if (!config) {
+      throw new Error(
+        `Preço Stripe não mapeado: ${getPriceIdFromSubscription(canonicalSubscription) || "ausente"}`
+      );
     }
 
-    plan = mappedPlan;
+    plan = config.plan;
     status = getSubscriptionStatusForUser(canonicalSubscription);
     subscriptionId = canonicalSubscription.id;
+    canonicalCustomerId =
+      getCustomerId(canonicalSubscription.customer) || customerId || null;
   } else if (!forceFreeIfNone && existingUser) {
     plan = existingUser.plan || "free";
     status = existingUser.status || "active";
     subscriptionId = existingUser.stripe_subscription_id || null;
+    canonicalCustomerId =
+      existingUser.stripe_customer_id || canonicalCustomerId;
   }
 
   if (existingUser) {
@@ -269,21 +337,21 @@ async function saveUserState({
       updated_at: now,
       plan,
       status,
-      stripe_customer_id: customerId || existingUser.stripe_customer_id || null,
+      stripe_customer_id:
+        canonicalCustomerId || existingUser.stripe_customer_id || null,
       stripe_subscription_id: subscriptionId
     };
 
-    // Stripe é a fonte de verdade para email/nome quando disponíveis.
     if (normalizedEmail) {
-      const emailOwner = (await findUsersByEmail(normalizedEmail))
-        .find(row => row.id !== existingUser.id);
+      const emailOwners = await findUsersByEmail(normalizedEmail);
+      const conflict = emailOwners.find(row => row.id !== existingUser.id);
 
-      if (!emailOwner) {
+      if (!conflict) {
         updateData.email = normalizedEmail;
       } else {
-        console.warn("⚠ Email já pertence a outro usuário; mantendo email do registro canônico.", {
+        console.warn("⚠ E-mail já pertence a outro usuário TubeX.", {
           existingUserId: existingUser.id,
-          conflictingUserId: emailOwner.id,
+          conflictingUserId: conflict.id,
           email: normalizedEmail
         });
       }
@@ -304,7 +372,7 @@ async function saveUserState({
       plan,
       status,
       subscriptionId,
-      customerId
+      customerId: canonicalCustomerId
     });
 
     return existingUser.id;
@@ -315,7 +383,7 @@ async function saveUserState({
     name: normalizedName,
     plan,
     status,
-    stripe_customer_id: customerId || null,
+    stripe_customer_id: canonicalCustomerId,
     stripe_subscription_id: subscriptionId,
     created_at: now,
     updated_at: now
@@ -334,11 +402,19 @@ async function saveUserState({
 }
 
 // ======================================================
-// RECONCILIAÇÃO CENTRAL
-// É chamada por checkout, subscription events e invoices.
-// Assim qualquer ordem de webhook converge para o mesmo estado.
+// RECONCILIAÇÃO DE UM CUSTOMER
+//
+// IMPORTANTE:
+// Se o mesmo e-mail tiver mudado de Customer no Stripe,
+// também consultamos o Customer atualmente salvo no Supabase.
+// Isso impede que o cancelamento do Customer ANTIGO derrube
+// o plano da NOVA assinatura.
 // ======================================================
-async function reconcileCustomer(customerId, fallbackEmail = null, fallbackName = null) {
+async function reconcileCustomer(
+  customerId,
+  fallbackEmail = null,
+  fallbackName = null
+) {
   if (!customerId) {
     throw new Error("reconcileCustomer: customerId ausente");
   }
@@ -353,31 +429,77 @@ async function reconcileCustomer(customerId, fallbackEmail = null, fallbackName 
     throw new Error(`Customer ${customerId} sem email no Stripe`);
   }
 
-  const subscriptions = await listRelevantSubscriptions(customerId);
-  const canonical = chooseCanonicalSubscription(subscriptions);
+  const found = await findCanonicalUser({
+    customerId,
+    email: identity.email
+  });
+
+  const currentUser = found.user;
+
+  const customerIds = new Set([customerId]);
+
+  // Se o usuário já aponta para outro Customer, compare os dois.
+  // Isso resolve exatamente o caso de recompra que criou novo Customer.
+  if (
+    currentUser?.stripe_customer_id &&
+    currentUser.stripe_customer_id !== customerId
+  ) {
+    customerIds.add(currentUser.stripe_customer_id);
+  }
+
+  const subscriptionGroups = await Promise.all(
+    [...customerIds].map(async id => ({
+      customerId: id,
+      subscriptions: await listRelevantSubscriptions(id)
+    }))
+  );
+
+  const allSubscriptions = subscriptionGroups.flatMap(group =>
+    group.subscriptions.map(subscription => ({
+      subscription,
+      sourceCustomerId: group.customerId
+    }))
+  );
+
+  const canonicalEntry = [...allSubscriptions]
+    .filter(({ subscription }) => subscriptionIsUsable(subscription))
+    .sort((a, b) => compareSubscriptions(a.subscription, b.subscription))[0];
+
+  const canonical = canonicalEntry?.subscription || null;
+  const canonicalCustomerId =
+    canonicalEntry?.sourceCustomerId || customerId;
 
   console.log("🧭 RECONCILE CUSTOMER", {
-    customerId,
+    eventCustomerId: customerId,
+    currentUserCustomerId: currentUser?.stripe_customer_id || null,
     email: identity.email,
-    subscriptions: subscriptions.map(sub => ({
-      id: sub.id,
-      status: sub.status,
-      product: getProductFromSubscription(sub),
-      plan: getPlanFromProduct(getProductFromSubscription(sub)),
-      created: sub.created,
-      current_period_start: sub.current_period_start
-    })),
+    subscriptions: allSubscriptions.map(
+      ({ subscription, sourceCustomerId }) => ({
+        id: subscription.id,
+        sourceCustomerId,
+        status: subscription.status,
+        price: getPriceIdFromSubscription(subscription),
+        plan: getPlanFromSubscription(subscription),
+        billing_cycle: getBillingCycleFromSubscription(subscription),
+        created: subscription.created,
+        current_period_start: subscription.current_period_start,
+        current_period_end: subscription.current_period_end
+      })
+    ),
     canonical: canonical
       ? {
           id: canonical.id,
+          customerId: canonicalCustomerId,
           status: canonical.status,
-          plan: getPlanFromProduct(getProductFromSubscription(canonical))
+          plan: getPlanFromSubscription(canonical),
+          billing_cycle: getBillingCycleFromSubscription(canonical),
+          price: getPriceIdFromSubscription(canonical)
         }
       : null
   });
 
   await saveUserState({
-    customerId,
+    customerId: canonicalCustomerId,
     email: identity.email,
     name: identity.name,
     canonicalSubscription: canonical,
@@ -385,12 +507,14 @@ async function reconcileCustomer(customerId, fallbackEmail = null, fallbackName 
   });
 
   return {
-    customerId,
+    customerId: canonicalCustomerId,
     email: identity.email,
     subscriptionId: canonical?.id || null,
-    plan: canonical
-      ? getPlanFromProduct(getProductFromSubscription(canonical))
-      : "free",
+    plan: canonical ? getPlanFromSubscription(canonical) : "free",
+    billing_cycle: canonical
+      ? getBillingCycleFromSubscription(canonical)
+      : null,
+    price_id: canonical ? getPriceIdFromSubscription(canonical) : null,
     status: canonical
       ? getSubscriptionStatusForUser(canonical)
       : "canceled"
@@ -398,8 +522,7 @@ async function reconcileCustomer(customerId, fallbackEmail = null, fallbackName 
 }
 
 // ======================================================
-// CHECKOUT → descobre Customer e força reconciliação.
-// Não confia somente no line_item para o estado final.
+// EVENTOS
 // ======================================================
 async function handleCheckoutCompleted(session) {
   const customerId = getCustomerId(session.customer);
@@ -408,7 +531,6 @@ async function handleCheckoutCompleted(session) {
     throw new Error(`checkout.session.completed sem customer: ${session.id}`);
   }
 
-  // O Customer no Stripe é a fonte de email/nome.
   const identity = await getCustomerEmailAndName(
     customerId,
     session.customer_details?.email || session.customer_email,
@@ -419,8 +541,6 @@ async function handleCheckoutCompleted(session) {
     throw new Error(`Checkout ${session.id} sem email`);
   }
 
-  // Para checkout de assinatura, a reconciliação do Customer decide
-  // qual subscription é realmente a vigente.
   const result = await reconcileCustomer(
     customerId,
     identity.email,
@@ -433,10 +553,6 @@ async function handleCheckoutCompleted(session) {
   });
 }
 
-// ======================================================
-// EVENTOS DE ASSINATURA
-// Todos convergem para a mesma reconciliação.
-// ======================================================
 async function handleSubscriptionEvent(subscription) {
   const customerId = getCustomerId(subscription.customer);
 
@@ -445,17 +561,13 @@ async function handleSubscriptionEvent(subscription) {
   }
 
   const result = await reconcileCustomer(customerId);
+
   console.log("🔄 SUBSCRIPTION RECONCILIADA", {
     eventSubscriptionId: subscription.id,
     ...result
   });
 }
 
-// ======================================================
-// INVOICE
-// invoice.paid / payment_failed NÃO decidem sozinhos o plano.
-// A assinatura atual do Customer decide.
-// ======================================================
 async function handleInvoiceEvent(invoice) {
   const customerId = getCustomerId(invoice.customer);
 
@@ -464,16 +576,13 @@ async function handleInvoiceEvent(invoice) {
   }
 
   const result = await reconcileCustomer(customerId);
+
   console.log("💳 INVOICE RECONCILIADA", {
     invoiceId: invoice.id,
     ...result
   });
 }
 
-// ======================================================
-// CUSTOMER UPDATED
-// Mantém email/nome sincronizados mesmo sem checkout.
-// ======================================================
 async function handleCustomerUpdated(customer) {
   const customerId = getCustomerId(customer);
 
@@ -489,9 +598,164 @@ async function handleCustomerUpdated(customer) {
 }
 
 // ======================================================
+// CHECK DE SEGURANÇA A CADA 24 HORAS
+//
+// Vercel Cron chama GET diariamente.
+// O check só processa registros com updated_at anterior a
+// 24h, evitando consultar repetidamente clientes recém
+// sincronizados por webhook.
+//
+// Configure CRON_SECRET na Vercel.
+// ======================================================
+function isCronAuthorized(req) {
+  const configuredSecret = process.env.CRON_SECRET;
+  if (!configuredSecret) {
+    console.warn("⚠ CRON_SECRET não configurado.");
+    return false;
+  }
+
+  const auth = String(req.headers.authorization || "");
+  if (auth === `Bearer ${configuredSecret}`) return true;
+
+  const querySecret =
+    typeof req.query?.secret === "string" ? req.query.secret : null;
+
+  return querySecret === configuredSecret;
+}
+
+async function listUsersForHealthCheck() {
+  const users = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + CRON_BATCH_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at")
+      .not("stripe_customer_id", "is", null)
+      .range(from, to);
+
+    if (error) throw error;
+
+    users.push(...(data || []));
+
+    if (!data || data.length < CRON_BATCH_SIZE) break;
+    from += CRON_BATCH_SIZE;
+  }
+
+  return users;
+}
+
+async function runSubscriptionHealthCheck() {
+  const startedAt = Date.now();
+  const users = await listUsersForHealthCheck();
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+
+  const candidates = users.filter(user => {
+    const updated = new Date(user.updated_at || 0).getTime();
+    return !updated || updated <= cutoff;
+  });
+
+  let checked = 0;
+  let changed = 0;
+  let errors = 0;
+
+  for (let i = 0; i < candidates.length; i += CRON_CONCURRENCY) {
+    const batch = candidates.slice(i, i + CRON_CONCURRENCY);
+
+    const results = await Promise.all(
+      batch.map(async user => {
+        try {
+          const before = {
+            plan: user.plan || "free",
+            status: user.status || "canceled",
+            subscriptionId: user.stripe_subscription_id || null,
+            customerId: user.stripe_customer_id || null
+          };
+
+          const result = await reconcileCustomer(
+            user.stripe_customer_id,
+            user.email,
+            user.name
+          );
+
+          checked += 1;
+
+          const didChange =
+            result.subscriptionId !== before.subscriptionId ||
+            result.customerId !== before.customerId ||
+            result.plan !== before.plan ||
+            result.status !== before.status;
+
+          if (didChange) changed += 1;
+
+          return { ok: true, userId: user.id, result };
+        } catch (err) {
+          errors += 1;
+          console.error("❌ HEALTH CHECK FALHOU", {
+            userId: user.id,
+            email: user.email,
+            customerId: user.stripe_customer_id,
+            message: err?.message
+          });
+          return { ok: false, userId: user.id };
+        }
+      })
+    );
+
+    // Evita variável não utilizada e mantém logs compactos.
+    void results;
+  }
+
+  return {
+    users_found: users.length,
+    candidates_older_than_24h: candidates.length,
+    checked,
+    changed,
+    errors,
+    duration_ms: Date.now() - startedAt
+  };
+}
+
+// ======================================================
 // HANDLER
+// POST = Stripe Webhook
+// GET  = Vercel Cron de verificação 24h
 // ======================================================
 export default async function handler(req, res) {
+  if (req.method === "GET") {
+    if (!isCronAuthorized(req)) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized cron request"
+      });
+    }
+
+    try {
+      const result = await runSubscriptionHealthCheck();
+
+      console.log("🩺 SUBSCRIPTION HEALTH CHECK", result);
+
+      return res.status(200).json({
+        success: true,
+        mode: "subscription_health_check",
+        ...result
+      });
+    } catch (err) {
+      console.error("💥 FALHA NO HEALTH CHECK", {
+        message: err?.message,
+        stack: err?.stack
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: "Subscription health check failed"
+      });
+    }
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
@@ -514,6 +778,7 @@ export default async function handler(req, res) {
     rawBody = await buffer(req);
   } catch (err) {
     console.error("❌ Erro lendo webhook:", err);
+
     return res.status(400).json({
       success: false,
       error: "Invalid request body"
@@ -543,9 +808,6 @@ export default async function handler(req, res) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object);
-        break;
-
       case "checkout.session.async_payment_succeeded":
         await handleCheckoutCompleted(event.data.object);
         break;

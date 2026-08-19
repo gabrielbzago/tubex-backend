@@ -48,6 +48,10 @@ const GRACE_STATUSES = new Set(["past_due", "unpaid"]);
 const CRON_BATCH_SIZE = 1000;
 const CRON_CONCURRENCY = 4;
 
+// Regra de segurança: nunca considerar "canceled" como plano pago.
+// O acesso pago somente é mantido para active/trialing/past_due/unpaid. 
+const PAID_PLANS = new Set(["pro", "expert", "start"]);
+
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
@@ -322,6 +326,14 @@ async function saveUserState({
     plan = config.plan;
     status = getSubscriptionStatusForUser(canonicalSubscription);
     subscriptionId = canonicalSubscription.id;
+
+    // INVARIANTE: assinatura realmente cancelada nunca mantém plano pago.
+    // O acesso pago só permanece enquanto a assinatura estiver active/trialing
+    // (ou em grace period past_due/unpaid, conforme a política do produto).
+    if (status === "canceled") {
+      plan = "free";
+      subscriptionId = canonicalSubscription.id;
+    }
     canonicalCustomerId =
       getCustomerId(canonicalSubscription.customer) || customerId || null;
   } else if (!forceFreeIfNone && existingUser) {
@@ -655,7 +667,20 @@ async function runSubscriptionHealthCheck() {
 
   const candidates = users.filter(user => {
     const updated = new Date(user.updated_at || 0).getTime();
-    return !updated || updated <= cutoff;
+    const inconsistentCanceledPaid =
+      String(user.status || "").toLowerCase() === "canceled" &&
+      String(user.plan || "free").toLowerCase() !== "free";
+
+    const paidWithoutSubscription =
+      String(user.plan || "free").toLowerCase() !== "free" &&
+      !user.stripe_subscription_id;
+
+    return (
+      !updated ||
+      updated <= cutoff ||
+      inconsistentCanceledPaid ||
+      paidWithoutSubscription
+    );
   });
 
   let checked = 0;

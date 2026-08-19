@@ -156,53 +156,64 @@ async function saveUser({
       normalizeEmail(email);
 
     if(!normalizedEmail){
-
-      console.warn(
-        "⚠ saveUser sem email"
-      );
-
-      throw new Error(
-        "saveUser: email ausente"
-      );
+      throw new Error("saveUser: email ausente");
     }
 
     const normalizedName =
       normalizeName(name);
 
     // ==================================================
-    // 🔍 EXISTE?
+    // 🔎 LOCALIZAÇÃO ROBUSTA
+    // 1. Stripe Customer ID (mais confiável para recompra)
+    // 2. Email case-insensitive como fallback
     // ==================================================
-    const {
-      data: existingUser,
-      error: findError
-    } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
+    let existingUser = null;
+    let findError = null;
+
+    if(stripe_customer_id){
+      const result = await supabase
+        .from("users")
+        .select("id,email,stripe_customer_id")
+        .eq("stripe_customer_id", stripe_customer_id)
+        .limit(1)
+        .maybeSingle();
+
+      existingUser = result.data;
+      findError = result.error;
+    }
+
+    if(findError) throw findError;
+
+    // Fallback para usuários antigos que ainda não possuem
+    // stripe_customer_id salvo ou que foram cadastrados com
+    // diferença de maiúsculas/minúsculas no email.
+    if(!existingUser){
+      const result = await supabase
+        .from("users")
+        .select("id,email,stripe_customer_id")
+        .ilike("email", normalizedEmail)
+        .limit(1)
+        .maybeSingle();
+
+      existingUser = result.data;
+      findError = result.error;
+    }
 
     if(findError){
-
-      console.error(
-        "💥 erro buscando usuário:",
-        findError
-      );
-
+      console.error("💥 erro buscando usuário:", findError);
       throw findError;
     }
 
+    const now = new Date().toISOString();
     let saveError = null;
 
     // ==================================================
-    // 🔄 UPDATE
+    // 🔄 UPDATE — usuário já cadastrado
     // ==================================================
     if(existingUser){
 
       const updateData = {
-
-        updated_at:
-          new Date().toISOString()
-
+        updated_at: now
       };
 
       if(normalizedName !== null){
@@ -218,87 +229,69 @@ async function saveUser({
       }
 
       if(stripe_customer_id !== null){
-        updateData.stripe_customer_id =
-          stripe_customer_id;
+        updateData.stripe_customer_id = stripe_customer_id;
       }
 
       if(stripe_subscription_id !== null){
-        updateData.stripe_subscription_id =
-          stripe_subscription_id;
+        updateData.stripe_subscription_id = stripe_subscription_id;
       }
 
-      const { error } =
-        await supabase
-          .from("users")
-          .update(updateData)
-          .eq("email", normalizedEmail);
+      const { error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("id", existingUser.id);
 
       saveError = error;
 
-    }
+      console.log("🔄 usuário EXISTENTE atualizado:", {
+        id: existingUser.id,
+        email: existingUser.email,
+        plan,
+        status,
+        stripe_customer_id,
+        stripe_subscription_id
+      });
 
-    // ==================================================
-    // ➕ INSERT
-    // ==================================================
-    else{
+    }else{
 
-      const { error } =
-        await supabase
-          .from("users")
-          .insert({
-
-            email: normalizedEmail,
-            name: normalizedName,
-            plan: plan !== null
-              ? plan
-              : "free",
-            status: status !== null
-              ? status
-              : "active",
-
-            stripe_customer_id,
-            stripe_subscription_id,
-
-            created_at:
-              new Date().toISOString(),
-
-            updated_at:
-              new Date().toISOString()
-
-          });
+      // ==================================================
+      // ➕ INSERT — usuário realmente novo
+      // ==================================================
+      const { error } = await supabase
+        .from("users")
+        .insert({
+          email: normalizedEmail,
+          name: normalizedName,
+          plan: plan !== null ? plan : "free",
+          status: status !== null ? status : "active",
+          stripe_customer_id,
+          stripe_subscription_id,
+          created_at: now,
+          updated_at: now
+        });
 
       saveError = error;
 
+      console.log("➕ usuário NOVO criado:", {
+        email: normalizedEmail,
+        plan,
+        status,
+        stripe_customer_id,
+        stripe_subscription_id
+      });
     }
 
     if(saveError){
-
-      console.error(
-        "💥 erro salvando usuário:",
-        saveError
-      );
-
+      console.error("💥 erro salvando usuário:", saveError);
       throw saveError;
     }
 
-    console.log(
-      "✅ usuário salvo:",
-      normalizedEmail,
-      normalizedName,
-      plan,
-      status
-    );
-
   }catch(err){
-
-    console.error(
-      "💥 saveUser fatal:",
-      err
-    );
-
+    console.error("💥 saveUser fatal:", err);
     throw err;
   }
 }
+
 
 // ======================================================
 // 🚀 HANDLER
@@ -656,19 +649,83 @@ export default async function handler(
           customer?.name
         );
 
-      await saveUser({
+      // ==================================================
+      // 🔁 RECOMPRA / NOVA ASSINATURA
+      // Se o cliente cancelou uma assinatura antiga e já
+      // possui outra ativa, NUNCA devemos colocar o usuário
+      // de volta em FREE por causa do evento antigo.
+      // ==================================================
+      let currentSubscription = null;
 
+      try{
+        const activeSubs = await stripe.subscriptions.list({
+          customer: subscription.customer,
+          status: "active",
+          limit: 10
+        });
+
+        currentSubscription =
+          activeSubs?.data
+            ?.sort((a,b) => Number(b.created || 0) - Number(a.created || 0))
+            ?.[0] || null;
+
+        if(!currentSubscription){
+          const trialSubs = await stripe.subscriptions.list({
+            customer: subscription.customer,
+            status: "trialing",
+            limit: 10
+          });
+
+          currentSubscription =
+            trialSubs?.data
+              ?.sort((a,b) => Number(b.created || 0) - Number(a.created || 0))
+              ?.[0] || null;
+        }
+      }catch(e){
+        console.warn("⚠ não foi possível verificar assinatura atual:", e);
+      }
+
+      if(currentSubscription){
+
+        const currentProductId =
+          getProductFromSubscription(currentSubscription);
+
+        const currentPlan =
+          getPlanFromProduct(currentProductId);
+
+        if(currentPlan){
+          await saveUser({
+            email,
+            name,
+            plan: currentPlan,
+            status: "active",
+            stripe_customer_id: subscription.customer || null,
+            stripe_subscription_id: currentSubscription.id || null
+          });
+
+          console.log(
+            "🔁 cancelamento antigo ignorado: cliente possui nova assinatura ativa:",
+            email,
+            currentPlan,
+            currentSubscription.id
+          );
+
+          return res.json({
+            received:true,
+            recovered:true,
+            reason:"active_replacement_subscription"
+          });
+        }
+      }
+
+      // Não existe outra assinatura ativa: agora sim pode ficar FREE.
+      await saveUser({
         email,
         name,
         plan:"free",
         status:"canceled",
-
-        stripe_customer_id:
-          subscription.customer || null,
-
-        stripe_subscription_id:
-          subscription.id || null
-
+        stripe_customer_id: subscription.customer || null,
+        stripe_subscription_id: subscription.id || null
       });
 
       console.log(

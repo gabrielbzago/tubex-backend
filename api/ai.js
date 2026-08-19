@@ -109,8 +109,7 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
-const title = body?.title || context?.title || "";
-const primaryKeyword = String(body?.keyword || context?.keyword || "").trim();
+const title = body?.title || "";
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
@@ -483,72 +482,86 @@ Sem explicações.
 
 finalPrompt = `
 
-Você é um especialista sênior em SEO para YouTube e copywriter de descrições que ranqueiam em busca.
+Você é um especialista em SEO para YouTube.
 
-Sua missão é criar uma descrição que deixe absolutamente claro para o YouTube qual é o assunto do vídeo, qual é a intenção de pesquisa e qual é a palavra-chave principal. SEO vem antes de floreios. A descrição deve continuar natural e convincente para pessoas.
+Sua missão é criar uma descrição altamente otimizada para SEO, porém objetiva e agradável de ler.
 
-==================================================
-DADOS OBRIGATÓRIOS
-==================================================
+Tema:
 
-Título do vídeo:
-"${title}"
-
-PALAVRA-CHAVE PRINCIPAL — NÃO ALTERE A FRASE:
-"${primaryKeyword}"
-
-Contexto fornecido pelo usuário:
 "${prompt}"
 
-==================================================
-REGRA CENTRAL DE SEO
-==================================================
+--------------------------------------------------
 
-A expressão "${primaryKeyword}" é a palavra-chave principal deste vídeo. Ela NÃO é apenas uma sugestão.
+OBJETIVO
 
-Se a palavra-chave estiver preenchida, você DEVE usá-la exatamente como escrita, respeitando acentos e ordem das palavras.
+Escrever uma descrição que ajude o algoritmo do YouTube a entender o vídeo e incentive o usuário a assistir.
 
-• Use a palavra-chave exata uma vez no início da descrição, logo após o título quando isso for gramaticalmente natural.
-• Use a palavra-chave exata novamente de forma natural mais adiante quando o tamanho da descrição permitir.
-• Use variações semânticas e palavras-chave relacionadas para ampliar o contexto, sem substituir a keyword principal.
-• Os primeiros 200 caracteres precisam deixar explícito o tema e a intenção de busca.
-• Não use keyword stuffing.
-• Não introduza assuntos que não estejam relacionados à palavra-chave, ao título ou à intenção do vídeo.
+A descrição deve parecer escrita por um criador profissional, nunca por uma IA.
 
-Se a palavra-chave estiver vazia, use o tema do título como termo principal e não invente uma keyword.
+--------------------------------------------------
 
-==================================================
+REGRAS
+
+• Entre 700 e 1200 caracteres.
+
+• Comece exatamente com o título do vídeo.
+
+• Nos dois primeiros parágrafos explique claramente o assunto.
+
+• Utilize naturalmente a palavra-chave principal.
+
+• Inclua algumas palavras relacionadas sem repetir excessivamente.
+
+• Utilize parágrafos curtos.
+
+• Escreva de forma conversacional.
+
+• Nunca faça keyword stuffing.
+
+• Nunca escreva frases repetitivas.
+
+• Nunca escreva textos longos apenas para aumentar tamanho.
+
+--------------------------------------------------
+
 ESTRUTURA
-==================================================
 
-1. Título do vídeo na primeira linha.
-2. Primeira abertura: explique imediatamente o que o vídeo entrega e inclua a palavra-chave principal.
-3. Segundo parágrafo: desenvolva a intenção de pesquisa e as principais perguntas que o vídeo responde.
-4. Liste naturalmente o que o espectador vai aprender/obter.
-5. Inclua benefícios concretos.
-6. CTA curto para inscrição, comentário ou próxima ação.
+Título
 
-==================================================
-REGRAS DE QUALIDADE
-==================================================
+Resumo curto do vídeo (2 ou 3 frases)
 
-• Entre 900 e 1500 caracteres quando houver conteúdo suficiente.
-• Parágrafos curtos e fáceis de ler.
-• Linguagem brasileira natural e profissional.
-• Não invente dados, resultados, números ou promessas.
-• Não use hashtags em excesso.
-• Não repita a mesma frase para aumentar densidade.
-• Não escreva uma descrição genérica que poderia servir para qualquer vídeo.
-• Cada parágrafo deve reforçar semanticamente o tema principal.
+O que o espectador aprenderá
 
-==================================================
+Benefícios de assistir
+
+CTA curto para inscrição e comentário
+
+--------------------------------------------------
+
+SEO
+
+Utilize naturalmente:
+
+• palavra-chave principal
+
+• palavras relacionadas
+
+• intenção de pesquisa
+
+Sem exagerar.
+
+--------------------------------------------------
+
 FORMATO
-==================================================
 
-Retorne somente a descrição final.
+Retorne apenas a descrição.
+
 Sem markdown.
+
+Sem aspas.
+
 Sem explicações.
-Sem aspas externas.
+
 `;
 
 }
@@ -2775,96 +2788,103 @@ else if (tipo === "script_generator") {
 
     finalPrompt = `
 
-Você é um estrategista de YouTube, roteirista profissional e especialista em SEO.
+Você é um roteirista profissional especializado em vídeos virais do YouTube.
 
-Sua missão é construir um roteiro completo para este vídeo em que RETENÇÃO, INTENÇÃO DE BUSCA e PALAVRA-CHAVE PRINCIPAL trabalhem juntos. O roteiro não pode ser apenas um bom texto: ele precisa permanecer semanticamente focado no assunto pesquisado do início ao fim.
+Seu trabalho NÃO é escrever um texto.
 
-==================================================
-DADOS OBRIGATÓRIOS
-==================================================
+Seu trabalho é construir um roteiro completo pensado para:
 
-Título do vídeo:
-"${title}"
+• aumentar CTR
 
-PALAVRA-CHAVE PRINCIPAL:
-"${primaryKeyword}"
+• aumentar retenção
+
+• aumentar satisfação
+
+• aumentar tempo médio assistido
+
+• aumentar distribuição pelo algoritmo
+
+Você conhece profundamente:
+
+- documentação oficial do YouTube
+
+- psicologia da atenção
+
+- storytelling
+
+- copywriting
+
+- ritmo de edição
+
+- comportamento da audiência
+
+- SEO
+
+- narrativa audiovisual
+
+========================
+
+DADOS
+
+========================
+
+Título:
+
+${title}
 
 Objetivo:
+
 ${goal}
 
 Duração:
+
 ${duration}
 
 Estilo:
+
 ${style}
 
-Descrição atual, se existir:
-${context?.description || ""}
+========================
 
-==================================================
-REGRA #1 — FOCO ABSOLUTO NA PALAVRA-CHAVE
-==================================================
+REGRAS
 
-A expressão "${primaryKeyword}" define o assunto principal do vídeo. Se ela estiver preenchida, trate-a como a keyword central e NÃO mude de assunto.
+========================
 
-O roteiro DEVE:
+Nunca escreva respostas genéricas.
 
-• mencionar a palavra-chave principal de forma exata no hook ou nos primeiros 15 segundos;
-• explicar claramente o que a pessoa que pesquisou essa palavra-chave quer descobrir;
-• repetir a palavra-chave principal de forma natural em pontos estratégicos do roteiro, sem keyword stuffing;
-• usar variações semânticas e termos relacionados somente quando estiverem diretamente ligados à keyword;
-• manter todos os exemplos, explicações, comparações e histórias subordinados ao tema principal;
-• responder à intenção de pesquisa prometida pelo título;
-• evitar tangentes que possam fazer o vídeo parecer sobre outro assunto.
+Nunca escreva textos superficiais.
 
-A keyword não deve ser apenas citada: o conteúdo de cada bloco precisa desenvolver o significado, a dúvida ou a necessidade associada a ela.
+O roteiro deve parecer escrito por um consultor profissional.
 
-==================================================
-SEO + RETENÇÃO
-==================================================
+Cada bloco deve manter curiosidade.
 
-Construa o roteiro como uma sequência de respostas à intenção de busca:
+Sempre terminar um bloco abrindo expectativa para o próximo.
 
-1. HOOK: apresente imediatamente a keyword/assunto e a promessa específica do vídeo.
-2. INTRODUÇÃO: confirme para o espectador que ele está no vídeo certo para aquela pesquisa.
-3. DESENVOLVIMENTO: avance do básico ao mais importante, sem sair do tema.
-4. PROVAS/EXEMPLOS: use somente exemplos que reforcem a keyword.
-5. REENGAJAMENTO: abra loops relacionados ao problema central.
-6. CONCLUSÃO: entregue a resposta/promessa principal e CTA coerente.
+Utilize:
 
-Nunca sacrifique clareza semântica por uma tentativa de viralização. CTR sem correspondência com a intenção de busca é proibido.
-
-==================================================
-RETENÇÃO
-==================================================
-
-Use:
 • Open loops
+
 • Curiosity gap
+
 • Pattern interrupt
+
 • Storytelling
+
+• Cliffhanger
+
 • Micro recompensas
+
 • Reengajamento
-• Transições que antecipem a próxima informação
+
 • CTA natural
 
-O hook precisa ser extremamente forte, mas deve falar sobre o mesmo assunto da keyword. Nos primeiros 15 segundos, deixe claro o problema, benefício ou resposta que o espectador pesquisou.
+O Hook precisa ser extremamente forte.
 
-Cada bloco deve terminar criando uma razão para continuar assistindo, sem inventar uma nova promessa.
+Nos primeiros 15 segundos o espectador não pode querer sair.
 
-==================================================
-REGRAS DE QUALIDADE
-==================================================
+Sempre gere frases naturais.
 
-• Nunca escreva respostas genéricas.
-• Nunca mude o assunto principal.
-• Nunca crie um roteiro que poderia servir para outra keyword.
-• Nunca introduza tópicos não relacionados somente para preencher duração.
-• Nunca faça keyword stuffing.
-• Escreva em português do Brasil, natural para apresentação em vídeo.
-• O roteiro deve parecer escrito por um estrategista profissional de YouTube.
-
-Antes de finalizar, faça uma checagem interna: se eu remover a keyword do pedido, ainda é possível identificar claramente pelo roteiro qual era o assunto pesquisado? Se não, reescreva.
+Nunca escreva frases robóticas.
 
 Retorne SOMENTE JSON.
 
@@ -3263,17 +3283,13 @@ const normalizedKeyword = String(
 // roteiro normalizado
 const normalizedScript = [
 
-    primaryKeyword,
-
     title,
 
     goal,
 
     duration,
 
-    style,
-
-    String(context?.description || "").slice(0,1200)
+    style
 
 ]
 .join("|")
@@ -3510,7 +3526,6 @@ Nunca utilize markdown.
 Nunca escreva texto fora do JSON.
 
 Todo roteiro deve utilizar técnicas modernas de retenção, storytelling e SEO.
-A palavra-chave principal fornecida pelo usuário é uma restrição editorial obrigatória: o roteiro deve permanecer semanticamente focado nela, atender à intenção de busca e usar a expressão exata de forma natural. Nunca troque o assunto por um tema genérico.
 `;
 
 }

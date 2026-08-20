@@ -109,15 +109,16 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
-const title = String(body?.title || "").trim();
+const title = body?.title || "";
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
 
-// Script Workspace: title is the canonical input.
+// Script Workspace: o título é a entrada principal.
 if (tipo === "script_generator" && !prompt) {
   prompt = title;
 }
+
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -2921,7 +2922,14 @@ NENHUMA seção pode fugir do tema central. Seja criativo DENTRO do assunto, nun
 SAÍDA
 ========================
 
-Retorne SOMENTE JSON válido.
+Retorne SOMENTE JSON válido e PREENCHA TODOS OS CAMPOS RELEVANTES COM CONTEÚDO REAL.
+
+NÃO retorne strings vazias, arrays vazios ou apenas o esqueleto abaixo.
+O campo fullScript é OBRIGATÓRIO e deve conter o roteiro completo, palavra por palavra, pronto para gravação.
+O campo hook deve conter o hook completo.
+O campo intro deve conter a introdução completa.
+sections deve conter vários blocos completos, cada um com title e content preenchidos.
+cta e ending devem conter conteúdo completo.
 
 {
   "title":"",
@@ -3238,10 +3246,15 @@ const normalizedKeyword = String(
 
 // roteiro normalizado
 const normalizedScript = [
-    String(title || "").trim(),
-    String(goal || "").trim(),
-    String(duration || "").trim(),
-    String(style || "").trim()
+
+    title,
+
+    goal,
+
+    duration,
+
+    style
+
 ]
 .join("|")
 .toLowerCase()
@@ -3319,7 +3332,7 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
-script_generator: 0,
+script_generator:0,
 video_analysis:12,
   niche: 24,
   ideas: 24,
@@ -3477,6 +3490,9 @@ Nunca utilize markdown.
 Nunca escreva texto fora do JSON.
 
 Todo roteiro deve utilizar técnicas modernas de retenção, storytelling e SEO.
+
+Para script_generator, NUNCA retorne campos vazios, placeholders ou apenas a estrutura JSON.
+O campo fullScript deve conter o roteiro completo e falado, e hook, intro, sections, cta e ending devem estar preenchidos com conteúdo real.
 `;
 
 }
@@ -3991,97 +4007,78 @@ if (tipo === "video_analysis") {
 }
 
 if (tipo === "script_generator") {
-
     try {
-console.log(text);
+        console.log("SCRIPT RAW:", text);
         const parsed = JSON.parse(text);
 
-        global.__tubexCache.set(cacheKey,{
-            text: parsed,
-            timestamp: Date.now()
-        });
+        let roteiro = String(parsed.fullScript || "").trim();
 
-        // ===========================================
-        // monta o roteiro em texto
-        // ===========================================
+        // Fallback para respostas estruturadas antigas.
+        if (!roteiro) {
+            if (parsed.hook) {
+                roteiro += "🎣 HOOK\n\n";
+                roteiro += typeof parsed.hook === "string"
+                    ? parsed.hook
+                    : String(parsed.hook.text || "");
+                roteiro += "\n\n";
+            }
 
-        let roteiro = "";
+            if (parsed.why) {
+                roteiro += "❓ POR QUE ASSISTIR\n\n";
+                roteiro += String(parsed.why) + "\n\n";
+            }
 
-        if (parsed.hook) {
+            if (parsed.intro) {
+                roteiro += "📖 INTRODUÇÃO\n\n";
+                roteiro += String(parsed.intro) + "\n\n";
+            }
 
-            roteiro += "🎣 HOOK\n\n";
+            if (Array.isArray(parsed.sections)) {
+                parsed.sections.forEach((sec, i) => {
+                    if (!sec) return;
+                    const sectionTitle = String(sec.title || "").trim();
+                    const content = String(sec.content || "").trim();
+                    if (!sectionTitle && !content) return;
+                    roteiro += `## BLOCO ${i + 1}\n\n`;
+                    if (sectionTitle) roteiro += sectionTitle + "\n\n";
+                    if (content) roteiro += content + "\n\n";
+                });
+            }
 
-            roteiro += typeof parsed.hook === "string"
-                ? parsed.hook
-                : (parsed.hook.text || "");
-
-            roteiro += "\n\n";
-
+            const ending = String(parsed.ending || parsed.outro || parsed.cta || "").trim();
+            if (ending) {
+                roteiro += "🎬 FINAL\n\n";
+                roteiro += ending;
+            }
         }
 
-        if (parsed.why) {
+        roteiro = roteiro.trim();
 
-            roteiro += "❓ POR QUE ASSISTIR\n\n";
-            roteiro += parsed.why + "\n\n";
-
-        }
-
-        if (parsed.intro) {
-
-            roteiro += "📖 INTRODUÇÃO\n\n";
-            roteiro += parsed.intro + "\n\n";
-
-        }
-
-        if (Array.isArray(parsed.sections)) {
-
-            parsed.sections.forEach((sec,i)=>{
-
-                roteiro += `## BLOCO ${i+1}\n\n`;
-
-                if(sec.title)
-                    roteiro += sec.title + "\n\n";
-
-                if(sec.content)
-                    roteiro += sec.content + "\n\n";
-
+        if (roteiro.length < 120) {
+            console.error("SCRIPT VAZIO/INCOMPLETO:", parsed);
+            return res.status(502).json({
+                success: false,
+                error: "empty_script",
+                text: ""
             });
-
         }
 
-        if(parsed.outro){
-
-            roteiro += "🎬 FINAL\n\n";
-            roteiro += parsed.outro;
-
-        }
-
+        // Script Workspace não usa cache.
         return res.status(200).json({
-
-            success:true,
-
-            text:roteiro,
-
-            data:parsed
-
+            success: true,
+            text: roteiro,
+            data: parsed
         });
 
-    }
-
-    catch(err){
-
-        console.error(err);
-
+    } catch (err) {
+        console.error("💥 SCRIPT JSON INVÁLIDO:", err);
+        console.error(text);
         return res.status(500).json({
-
-            success:false,
-
-            error:"invalid_json"
-
+            success: false,
+            error: "invalid_json",
+            text: ""
         });
-
     }
-
 }
 
 if (tipo === "advanced_tags") {

@@ -175,7 +175,7 @@ if(
     global.tubexSeoCache = global.tubexSeoCache || {};
     global.tubexChannelCache = global.tubexChannelCache || {};
 
-    const cacheKey = keyword ? `seo_v5_related_${keyword.toLowerCase()}` : null;
+    const cacheKey = keyword ? `seo_v3_related_${keyword.toLowerCase()}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -2960,437 +2960,161 @@ items.length
 // Gera oportunidades a partir dos próprios resultados reais da SERP.
 // Não usa palavras inventadas por IA nem faz chamadas adicionais para
 // cada sugestão (preserva a cota da YouTube Data API).
-async function fetchYouTubeAutocompleteSuggestions(seedKeyword){
-    const seed = String(seedKeyword || "").trim();
-    if(!seed) return [];
-    try{
-        const url = new URL("https://suggestqueries.google.com/complete/search");
-        url.searchParams.set("client", "chrome");
-        url.searchParams.set("ds", "yt");
-        url.searchParams.set("hl", "pt-BR");
-        url.searchParams.set("gl", "BR");
-        url.searchParams.set("q", seed);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 7000);
-        try{
-            const response = await fetch(url.toString(), {
-                headers: { Accept: "application/json" },
-                signal: controller.signal
-            });
-            if(!response.ok) return [];
-            const payload = await response.json().catch(() => null);
-            return Array.isArray(payload?.[1])
-                ? payload[1].map(v => String(v || "").trim()).filter(Boolean).slice(0, 20)
-                : [];
-        } finally {
-            clearTimeout(timer);
-        }
-    }catch(e){
-        console.warn("[TubeX] YouTube autocomplete indisponível:", e?.message || e);
-        return [];
-    }
-}
+function buildRelatedKeywords(items, seedKeyword, limit=30){
 
-async function fetchGoogleTrendsRelatedQueries(seedKeyword){
-    if(!process.env.SERPAPI_API_KEY) return [];
-    const seed = String(seedKeyword || "").trim();
-    if(!seed) return [];
-    try{
-        const url = new URL("https://serpapi.com/search.json");
-        url.searchParams.set("engine", "google_trends");
-        url.searchParams.set("q", seed);
-        url.searchParams.set("geo", "BR");
-        url.searchParams.set("hl", "pt-BR");
-        url.searchParams.set("data_type", "RELATED_QUERIES");
-        url.searchParams.set("api_key", process.env.SERPAPI_API_KEY);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
-        try{
-            const response = await fetch(url.toString(), {
-                headers: { Accept: "application/json" },
-                signal: controller.signal
-            });
-            const payload = await response.json().catch(() => ({}));
-            if(!response.ok) return [];
-            const top = Array.isArray(payload?.related_queries?.top) ? payload.related_queries.top : [];
-            const rising = Array.isArray(payload?.related_queries?.rising) ? payload.related_queries.rising : [];
-            return [...top, ...rising]
-                .map(item => ({
-                    keyword: String(item?.query || "").trim(),
-                    trendValue: Number.isFinite(Number(item?.extracted_value)) ? Number(item.extracted_value) : null,
-                    trendLabel: String(item?.value || "").trim()
-                }))
-                .filter(item => item.keyword)
-                .slice(0, 30);
-        } finally {
-            clearTimeout(timer);
-        }
-    }catch(e){
-        console.warn("[TubeX] Google Trends related queries indisponível:", e?.message || e);
-        return [];
-    }
-}
-
-function buildRelatedKeywords(items, seedKeyword, limit=30, autocompleteSuggestions=[], trendQueries=[], seedVolumeScore=0){
     const videos = Array.isArray(items) ? items : [];
     const seed = String(seedKeyword || "").toLowerCase().trim();
-    const seedNorm = seed.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const seedTerms = seedNorm.split(/\s+/).filter(w => w.length >= 2);
-
-    // Stopwords are used only to remove generic phrases generated from titles.
-    // Real YouTube autocomplete suggestions and Google Trends related queries
-    // are allowed even when they do not repeat the seed verbatim.
+    const seedTerms = seed.split(/\s+/).filter(w => w.length >= 2);
     const stop = new Set([
         "como","para","com","sem","mais","muito","melhor","melhores","youtube",
         "vídeo","video","canal","sobre","aqui","esse","esta","este","uma","um",
         "que","por","dos","das","nos","nas","de","do","da","e","em","no","na",
         "the","and","for","with","from","how","what","this","that","your","you",
-        "los","las","con","una","del","por","para","agora","hoje","dicas"
+        "los","las","con","una","del","por","para"
     ]);
 
     const candidates = new Map();
 
-    const normalizePhrase = raw => String(raw || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[#|,;:!?()[\]{}<>"'“”‘’]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    const addCandidate = (raw, video, sourceWeight=1) => {
+        let phrase = String(raw || "")
+            .toLowerCase()
+            .replace(/[#|,;:!?()[\]{}<>"'“”‘’]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
 
-    const addCandidate = (raw, video=null, sourceWeight=1, meta={}) => {
-        const phraseOriginal = String(raw || "").trim();
-        const norm = normalizePhrase(phraseOriginal);
-        if(!norm || norm === seedNorm || norm.length < 3 || norm.length > 70) return;
+        if(!phrase || phrase.length < 3 || phrase.length > 70) return;
+        if(phrase === seed) return;
 
-        const words = norm.split(/\s+/).filter(Boolean);
+        const words = phrase.split(/\s+/).filter(Boolean);
+        if(words.length < 1 || words.length > 5) return;
 
-        // Related searches are phrases, not isolated words.
-        if(words.length < 2 || words.length > 6) return;
-
+        // Não aceitar termos isolados ou frases dominadas por stopwords.
+        if(words.length === 1 && (stop.has(words[0]) || words[0].length < 4)) return;
+        if(stop.has(words[0]) || stop.has(words[words.length-1])) return;
         const meaningfulWords = words.filter(w => !stop.has(w) && w.length >= 3);
-        if(meaningfulWords.length < 2) return;
+        if(!meaningfulWords.length || meaningfulWords.length < Math.ceil(words.length/2)) return;
 
-        const seedHits = seedTerms.filter(term => norm.includes(term)).length;
+        const norm = phrase.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const seedNorm = seed.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const seedHits = seedTerms.filter(term => phrase.includes(term)).length;
         const directSeed = seedNorm && norm.includes(seedNorm);
 
-        // Title/tag phrases must have a direct relationship to the searched
-        // keyword. Autocomplete and Trends are independent external signals.
-        if(meta.source !== "autocomplete" && meta.source !== "trends"){
-            if(!directSeed && seedTerms.length === 1 && seedHits === 0) return;
-            if(seedTerms.length > 1 && seedHits === 0) return;
+        // Uma relacionada precisa ter relação semântica/textual com a busca.
+        // Para buscas multi-termo, pelo menos um termo deve aparecer.
+        // Para buscas de um termo, a associação vem da coocorrência na SERP.
+        if(seedTerms.length > 1 && seedHits === 0) return;
+        if(seedTerms.length === 1 && seed && !phrase.includes(seedTerms[0])){
+            // Permite variações próximas somente quando o vídeo realmente
+            // contém a palavra pesquisada no título ou nas tags.
+            const title = String(video?.snippet?.title || "").toLowerCase();
+            const tags = Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [];
+            const hasSeedContext = title.includes(seedTerms[0]) || tags.some(t => String(t).toLowerCase().includes(seedTerms[0]));
+            if(!hasSeedContext) return;
         }
 
-        // Reject obvious generic fragments when they are not externally
-        // validated by YouTube autocomplete or Google Trends.
-        if(!["autocomplete","trends"].includes(meta.source)){
-            if(words.some(w => stop.has(w))) return;
-        }
-
-        const key = norm;
+        const key = phrase.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const views = Number(video?.statistics?.viewCount || 0);
         const entry = candidates.get(key) || {
-            keyword: phraseOriginal.replace(/\s+/g," ").trim(),
+            keyword: phrase,
             videos: new Map(),
             sourceWeight: 0,
-            seedHits: 0,
-            autocompleteRank: null,
-            trendValue: null,
-            trendLabel: "",
-            sources: new Set()
+            tagHits: 0,
+            titleHits: 0,
+            seedHits: 0
         };
 
-        const id = String(
-            video?.id ||
-            video?.snippet?.title ||
-            `${meta.source || "local"}:${key}`
-        );
-
-        if(video && !entry.videos.has(id)) entry.videos.set(id, video);
-
-        entry.sourceWeight += Number(sourceWeight) || 0;
+        const id = String(video?.id || video?.snippet?.title || Math.random());
+        if(!entry.videos.has(id)) entry.videos.set(id, video);
+        entry.sourceWeight += sourceWeight;
         if(seedHits > 0 || directSeed) entry.seedHits++;
-        if(meta.source) entry.sources.add(meta.source);
-
-        if(Number.isFinite(meta.autocompleteRank) &&
-           (entry.autocompleteRank === null || meta.autocompleteRank < entry.autocompleteRank)){
-            entry.autocompleteRank = meta.autocompleteRank;
-        }
-
-        if(Number.isFinite(meta.trendValue)){
-            entry.trendValue = Math.max(entry.trendValue ?? 0, meta.trendValue);
-        }
-
-        if(meta.trendLabel) entry.trendLabel = meta.trendLabel;
-
         candidates.set(key, entry);
     };
 
-    // Real YouTube autocomplete is the strongest related-search signal.
-    (Array.isArray(autocompleteSuggestions) ? autocompleteSuggestions : [])
-        .forEach((suggestion, index) => {
-            addCandidate(
-                suggestion,
-                null,
-                Math.max(4, 12 - Math.min(index, 7)),
-                {source:"autocomplete", autocompleteRank:index + 1}
-            );
-        });
-
-    // Google Trends related queries are a second external demand signal.
-    (Array.isArray(trendQueries) ? trendQueries : [])
-        .forEach(item => {
-            addCandidate(
-                item?.keyword,
-                null,
-                5,
-                {
-                    source:"trends",
-                    trendValue:item?.trendValue,
-                    trendLabel:item?.trendLabel
-                }
-            );
-        });
-
-    // Real SERP titles/tags are only used when a phrase is repeated by
-    // multiple returned videos. This prevents fragments such as "rico você".
     videos.forEach(video => {
         const title = String(video?.snippet?.title || "").trim();
         const tags = Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [];
 
-        tags.forEach(tag =>
-            addCandidate(tag, video, 2.5, {source:"tag"})
-        );
+        // Tags são a principal fonte de keywords porque são metadados reais
+        // devolvidos pela API para os vídeos analisados.
+        tags.forEach(tag => addCandidate(tag, video, 3));
 
-        const words = normalizePhrase(title).split(/\s+/).filter(Boolean);
+        // Frases de 2–4 palavras do título capturam long-tails reais.
+        const words = title
+            .toLowerCase()
+            .replace(/[#|,;:!?()[\]{}<>"'“”‘’]+/g, " ")
+            .split(/\s+/)
+            .filter(Boolean);
 
         for(let n=2; n<=4; n++){
             for(let i=0; i+n<=words.length; i++){
                 const phrase = words.slice(i,i+n).join(" ");
-                addCandidate(
-                    phrase,
-                    video,
-                    n===2 ? 1 : 1.4,
-                    {source:"title"}
-                );
+                if(words.slice(i,i+n).some(w => stop.has(w)) && n < 3) continue;
+                addCandidate(phrase, video, n===2 ? 1 : 1.5);
             }
         }
     });
 
-    const maxAvgViews = Math.max(
-        1,
-        ...videos.map(v => Number(v?.statistics?.viewCount || 0))
-    );
-
-    const safeSeedVolume = Math.max(
-        1,
-        Math.min(100, Number(seedVolumeScore) || 1)
-    );
-
     const rows = [];
-
     for(const entry of candidates.values()){
         const support = [...entry.videos.values()];
+        if(support.length < 2 && videos.length >= 10) continue;
 
-        const isExternal =
-            entry.sources.has("autocomplete") ||
-            entry.sources.has("trends");
+        const views = support.map(v => Number(v?.statistics?.viewCount || 0)).filter(Number.isFinite);
+        if(!views.length) continue;
 
-        // Local title/tag phrases need real repetition. External suggestions
-        // are valid even without a matching SERP video because they come from
-        // Google/YouTube's own suggestion systems.
-        if(!isExternal && support.length < 2) continue;
+        const sortedViews = [...views].sort((a,b)=>a-b);
+        const medianViews = sortedViews.length % 2
+            ? sortedViews[(sortedViews.length-1)/2]
+            : Math.round((sortedViews[sortedViews.length/2-1] + sortedViews[sortedViews.length/2]) / 2);
+        const avgViews = Math.round(views.reduce((a,b)=>a+b,0) / views.length);
 
-        const views = support
-            .map(v => Number(v?.statistics?.viewCount || 0))
-            .filter(Number.isFinite);
+        const titleMatches = support.filter(v => String(v?.snippet?.title || "").toLowerCase().includes(entry.keyword.toLowerCase())).length;
+        const supportRate = support.length / Math.max(videos.length,1);
+        const titleRate = titleMatches / Math.max(support.length,1);
+        const highViewRate = support.filter(v => Number(v?.statistics?.viewCount || 0) >= Math.max(10000, avgViews)).length / Math.max(support.length,1);
 
-        const avgViews = views.length
-            ? Math.round(views.reduce((a,b)=>a+b,0) / views.length)
-            : 0;
+        // Quanto mais vídeos disputam a mesma frase no título, maior a
+        // dificuldade. O resultado é convertido para "oportunidade":
+        // 100 = pouca concorrência / excelente espaço para competir.
+        const difficulty = Math.min(100, Math.round(
+            supportRate * 55 +
+            titleRate * 30 +
+            highViewRate * 15
+        ));
+        const competition = Math.max(0, Math.min(100, 100 - difficulty));
 
-        const medianViews = views.length
-            ? (() => {
-                const sorted=[...views].sort((a,b)=>a-b);
-                return sorted.length%2
-                    ? sorted[(sorted.length-1)/2]
-                    : Math.round(
-                        (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2
-                    );
-              })()
-            : 0;
+        const maxAvg = Math.max(1, ...videos.map(v => Number(v?.statistics?.viewCount || 0)));
+        const viewScore = Math.max(0, Math.min(100,
+            Math.round((Math.log10(avgViews + 1) / Math.log10(maxAvg + 1)) * 100)
+        ));
 
-        const titleMatches = support.filter(v =>
-            normalizePhrase(v?.snippet?.title || "")
-                .includes(normalizePhrase(entry.keyword))
-        ).length;
+        const relevance = Math.max(0, Math.min(100, Math.round(
+            (entry.seedHits / Math.max(support.length,1)) * 65 +
+            Math.min(35, entry.sourceWeight)
+        )));
 
-        const supportRate =
-            support.length / Math.max(videos.length,1);
-
-        const titleRate =
-            titleMatches / Math.max(support.length,1);
-
-        const highViewRate =
-            support.length
-                ? support.filter(v =>
-                    Number(v?.statistics?.viewCount || 0) >=
-                    Math.max(10000, avgViews)
-                  ).length / support.length
-                : 0;
-
-        const competition = Math.max(
-            0,
-            Math.min(
-                100,
-                100 - Math.min(
-                    100,
-                    Math.round(
-                        supportRate*55 +
-                        titleRate*30 +
-                        highViewRate*15
-                    )
-                )
-            )
-        );
-
-        const viewScore = avgViews > 0
-            ? Math.max(
-                0,
-                Math.min(
-                    100,
-                    Math.round(
-                        (Math.log10(avgViews+1) /
-                         Math.log10(maxAvgViews+1))*100
-                    )
-                )
-            )
-            : 0;
-
-        const autocompleteScore = entry.autocompleteRank
-            ? Math.max(0, 100 - ((entry.autocompleteRank-1)*7))
-            : 0;
-
-        const trendScore = Number.isFinite(entry.trendValue)
-            ? Math.max(0, Math.min(100, entry.trendValue))
-            : 0;
-
-        const sourceBonus =
-            entry.sources.has("autocomplete") ? 100 :
-            entry.sources.has("trends") ? 82 :
-            45;
-
-        const relevance = Math.max(
-            0,
-            Math.min(
-                100,
-                Math.round(
-                    (entry.seedHits / Math.max(support.length,1))*50 +
-                    Math.min(25,entry.sourceWeight) +
-                    autocompleteScore*.25 +
-                    sourceBonus*.10
-                )
-            )
-        );
-
-        const demandScore = Math.max(
-            0,
-            Math.min(
-                100,
-                Math.round(
-                    viewScore*.25 +
-                    autocompleteScore*.35 +
-                    trendScore*.20 +
-                    relevance*.15 +
-                    safeSeedVolume*.05
-                )
-            )
-        );
-
-        const opportunity = Math.max(
-            0,
-            Math.min(
-                100,
-                Math.round(
-                    demandScore*.55 +
-                    competition*.25 +
-                    relevance*.20
-                )
-            )
-        );
-
-        // TubeX Medal Score: normalized 10–100 indicator. It combines
-        // demand, opportunity and relevance; it is not an official YouTube
-        // metric and is intentionally separate from search volume.
-        const medalScore = Math.max(
-            10,
-            Math.min(
-                100,
-                Math.round(
-                    10 +
-                    (
-                        demandScore*.50 +
-                        opportunity*.30 +
-                        relevance*.20
-                    )*.90
-                )
-            )
-        );
-
-        // YouTube Data API does NOT expose an official monthly search-count
-        // metric. Keep the current estimate, but explicitly mark it as an
-        // estimate derived from real YouTube/Trends signals rather than
-        // presenting a fabricated "official" number.
-        const relativeDemand = Math.max(
-            0.08,
-            Math.min(1.35, demandScore / Math.max(safeSeedVolume,1))
-        );
-
-        const estimatedMonthlySearches = Math.round(
-            Math.max(
-                100,
-                Math.pow(Math.max(safeSeedVolume,10),1.55) *
-                28 *
-                relativeDemand
-            )
-        );
+        const opportunity = Math.max(0, Math.min(100, Math.round(
+            viewScore * 0.45 +
+            competition * 0.35 +
+            relevance * 0.20
+        )));
 
         rows.push({
-            keyword:entry.keyword,
+            keyword: entry.keyword,
             avgViews,
             medianViews,
-            videosAnalyzed:support.length,
+            videosAnalyzed: support.length,
             competition,
             opportunity,
             relevance,
-            viewScore,
-            demandScore,
-            medalScore,
-            searchVolume:estimatedMonthlySearches,
-            searchVolumeLabel:"estimativa/mês",
-            searchVolumeSource:"TubeX — estimativa baseada em sinais reais",
-            searchVolumeIsEstimate:true,
-            autocompleteRank:entry.autocompleteRank,
-            googleTrendsValue:Number.isFinite(entry.trendValue)
-                ? entry.trendValue
-                : null,
-            googleTrendsLabel:entry.trendLabel || null,
-            sources:[...entry.sources]
+            viewScore
         });
     }
 
     return rows
         .filter(x => x.keyword)
-        .sort((a,b) =>
-            b.medalScore-a.medalScore ||
-            b.demandScore-a.demandScore ||
-            b.searchVolume-a.searchVolume ||
-            b.avgViews-a.avgViews
-        )
-        .slice(
-            0,
-            Math.max(5, Math.min(30, Number(limit)||30))
-        );
+        .sort((a,b)=>b.opportunity-a.opportunity || b.avgViews-a.avgViews || b.competition-a.competition)
+        .slice(0, Math.max(3, Math.min(30, Number(limit)||30)));
 }
 
 // =========================
@@ -3429,25 +3153,12 @@ topShare,
 
 const googleSearch = await fetchGoogleVerification(keyword);
 
-const normalizedPlan = String(body?.plan || "free").toLowerCase();
 const requestedRelatedLimit =
-    normalizedPlan === "expert" || normalizedPlan === "owner" ? 30 :
-    normalizedPlan === "pro" ? 15 :
-    5;
+    String(body?.plan || "free").toLowerCase() === "free" ? 3 :
+    String(body?.plan || "free").toLowerCase() === "pro" ? 10 :
+    String(body?.plan || "free").toLowerCase() === "expert" || String(body?.plan || "free").toLowerCase() === "owner" ? 30 : 3;
 
-const [autocompleteSuggestions, trendQueries] = await Promise.all([
-    fetchYouTubeAutocompleteSuggestions(keyword),
-    fetchGoogleTrendsRelatedQueries(keyword)
-]);
-
-const relatedKeywords = buildRelatedKeywords(
-    items,
-    keyword,
-    requestedRelatedLimit,
-    autocompleteSuggestions,
-    trendQueries,
-    finalVolume
-);
+const relatedKeywords = buildRelatedKeywords(items, keyword, requestedRelatedLimit);
 
 const responseData = {
 

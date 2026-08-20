@@ -113,6 +113,13 @@ const title = body?.title || "";
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
+
+// 🎬 SCRIPT WORKSPACE — o título atual é sempre a fonte de verdade.
+// Isso garante que trocar o título gere um roteiro baseado no novo título.
+if (tipo === "script_generator") {
+  prompt = String(title || prompt || "").trim();
+}
+
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -3660,7 +3667,8 @@ tipo === "video_analysis"
 
     "script",
 
-    normalizedScript
+    normalizedScript,
+    String(title || "").trim().toLowerCase()
 
 ].join("|")
 
@@ -3691,7 +3699,7 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
-script_generator:12,
+script_generator:0,
 video_analysis:12,
   niche: 24,
   ideas: 24,
@@ -4384,10 +4392,8 @@ console.log(text);
 
         const parsed = JSON.parse(cleanScript);
 
-        global.__tubexCache.set(cacheKey,{
-            text: parsed,
-            timestamp: Date.now()
-        });
+        // SCRIPT WORKSPACE NÃO USA CACHE.
+        // Cada clique em Generate deve gerar o roteiro novamente.
 
         // ===========================================
         // monta o roteiro em texto
@@ -4652,7 +4658,7 @@ return res.status(200).json({
 }
 
 // 💾 salvar só se válido
-if (tipo !== "seo_workspace") {
+if (tipo !== "seo_workspace" && tipo !== "script_generator") {
   global.__tubexCache.set(cacheKey, {
     text,
     timestamp: Date.now()

@@ -175,7 +175,9 @@ if(
     global.tubexSeoCache = global.tubexSeoCache || {};
     global.tubexChannelCache = global.tubexChannelCache || {};
 
-    const cacheKey = keyword ? `seo_v3_related_${keyword.toLowerCase()}` : null;
+    const normalizedPlan = String(body?.plan || "free").toLowerCase();
+    const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
+    const cacheKey = keyword ? `seo_v4_related_${cachePlan}_${keyword.toLowerCase()}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -3093,8 +3095,17 @@ function buildRelatedKeywords(items, seedKeyword, limit=30){
             Math.min(35, entry.sourceWeight)
         )));
 
-        const opportunity = Math.max(0, Math.min(100, Math.round(
-            viewScore * 0.45 +
+        // Search-demand score is intentionally an INDEX, not a fabricated
+        // monthly search count. The YouTube Data API exposes result/video
+        // signals but does not expose absolute keyword search volume.
+        const searchDemand = Math.max(10, Math.min(100, Math.round(
+            viewScore * 0.55 +
+            relevance * 0.25 +
+            Math.min(100, supportRate * 100) * 0.20
+        )));
+
+        const opportunity = Math.max(10, Math.min(100, Math.round(
+            searchDemand * 0.45 +
             competition * 0.35 +
             relevance * 0.20
         )));
@@ -3106,14 +3117,18 @@ function buildRelatedKeywords(items, seedKeyword, limit=30){
             videosAnalyzed: support.length,
             competition,
             opportunity,
+            score: opportunity,
             relevance,
-            viewScore
+            viewScore,
+            searchDemand,
+            searchVolume: null,
+            searchVolumeSource: "unavailable"
         });
     }
 
     return rows
         .filter(x => x.keyword)
-        .sort((a,b)=>b.opportunity-a.opportunity || b.avgViews-a.avgViews || b.competition-a.competition)
+        .sort((a,b)=>b.searchDemand-a.searchDemand || b.opportunity-a.opportunity || b.avgViews-a.avgViews || b.competition-a.competition)
         .slice(0, Math.max(3, Math.min(30, Number(limit)||30)));
 }
 
@@ -3153,10 +3168,12 @@ topShare,
 
 const googleSearch = await fetchGoogleVerification(keyword);
 
+const relatedPlan = String(body?.plan || "free").toLowerCase();
 const requestedRelatedLimit =
-    String(body?.plan || "free").toLowerCase() === "free" ? 3 :
-    String(body?.plan || "free").toLowerCase() === "pro" ? 10 :
-    String(body?.plan || "free").toLowerCase() === "expert" || String(body?.plan || "free").toLowerCase() === "owner" ? 30 : 3;
+    relatedPlan === "free" ? 5 :
+    relatedPlan === "pro" ? 15 :
+    relatedPlan === "expert" || relatedPlan === "owner" ? 30 :
+    relatedPlan === "member" ? 15 : 5;
 
 const relatedKeywords = buildRelatedKeywords(items, keyword, requestedRelatedLimit);
 

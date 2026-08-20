@@ -2986,7 +2986,7 @@ else if (tipo === "script_generator") {
     finalPrompt = `
 
 ========================
-REGRA CRÍTICA — FIDELIDADE AO TÍTULO + SEO
+REGRA CRÍTICA — FIDELIDADE TOTAL AO TÍTULO + COBERTURA COMPLETA DO TEMA
 ========================
 
 O TÍTULO É A FONTE PRINCIPAL DE TODO O ROTEIRO.
@@ -2995,78 +2995,201 @@ TÍTULO EXATO:
 ${title}
 
 Antes de escrever, identifique silenciosamente:
+
 - palavra-chave principal do título;
-- palavras-chave secundárias presentes no título;
+- palavras-chave secundárias;
+- termos e expressões mais importantes do título;
+- todos os conceitos principais presentes no título;
 - intenção de busca;
 - promessa principal;
 - problema que o título promete resolver;
-- resultado esperado pelo espectador.
+- resultado esperado pelo espectador;
+- relação entre os diferentes elementos do título.
+
+REGRA FUNDAMENTAL:
+
+O roteiro NÃO pode reduzir o assunto a apenas uma palavra-chave quando o título apresentar vários conceitos.
+
+Se o título tiver, por exemplo:
+
+"Ferramenta de SEO para YouTube: Como Otimizar Seu Vídeo para 1ª Página"
+
+o roteiro deve abordar de forma equilibrada e conectada:
+
+1. SEO para YouTube;
+2. a ferramenta de SEO;
+3. como a ferramenta funciona;
+4. como utilizar a ferramenta;
+5. como otimizar vídeos;
+6. quais elementos do vídeo devem ser otimizados;
+7. como a otimização se relaciona com posicionamento/ranking;
+8. o que significa buscar a 1ª página;
+9. como aplicar a estratégia na prática.
+
+NÃO transforme esse vídeo em um vídeo exclusivamente sobre "palavras-chave".
+
+Palavras-chave podem fazer parte da estratégia de SEO, mas NÃO devem dominar o roteiro se o título promete ensinar SEO para YouTube, otimização de vídeos, uso de ferramenta e posicionamento.
+
+REGRA DE COBERTURA SEMÂNTICA:
+
+Cada conceito importante presente no título precisa aparecer e ser desenvolvido no roteiro.
+
+Quanto mais importante for um elemento do título para a promessa do vídeo, maior deve ser sua presença no roteiro.
+
+O roteiro deve responder à pergunta:
+
+"O espectador recebeu tudo aquilo que o título prometeu?"
+
+Se o título apresentar vários conceitos, NÃO concentre a maior parte do roteiro em apenas um deles.
 
 O roteiro DEVE permanecer no mesmo assunto do título do início ao fim.
+
 NÃO mude o tema para motivação, dinheiro, hábitos, sucesso, histórias pessoais ou qualquer outro assunto que não esteja diretamente relacionado ao título.
-Se o título for sobre SEO para YouTube, todo o conteúdo deve permanecer em SEO para YouTube.
-Se for sobre palavras-chave, permaneça em palavras-chave.
-Se for sobre thumbnails, permaneça em thumbnails.
-Se for sobre monetização, permaneça em monetização.
+
+Exemplos:
+
+Se o título for sobre SEO para YouTube, explique SEO para YouTube aplicado ao vídeo.
+
+Se o título for sobre otimização de vídeos, explique como otimizar vídeos na prática.
+
+Se o título for sobre uma ferramenta, explique o que ela faz, como funciona, como usar e como ela se conecta ao resultado prometido.
+
+Se o título mencionar palavras-chave, trate palavras-chave como uma parte do assunto, e NÃO automaticamente como o assunto inteiro.
+
+Se o título mencionar thumbnail, título, descrição, tags ou outros elementos de SEO, cada elemento deve ser tratado dentro da proporção necessária para cumprir a promessa do título.
 
 ========================
-HOOK OBRIGATÓRIO
+HOOK OBRIGATÓRIO — REPETIÇÃO ESTRATÉGICA DO TÍTULO
 ========================
 
-Nos primeiros 10–15 segundos, o HOOK deve: 
-1. repetir naturalmente a PALAVRA-CHAVE PRINCIPAL do título;
-2. repetir pelo menos 1–2 termos importantes do próprio título;
-3. apresentar imediatamente o problema ou a promessa do título;
-4. deixar claro o resultado que será entregue.
+Nos primeiros 10–15 segundos, o HOOK deve repetir estrategicamente os termos mais importantes do título.
+
+REGRA OBRIGATÓRIA:
+
+Quando o título contiver expressões específicas importantes, elas DEVEM aparecer naturalmente no hook.
+
+Para o título:
+
+"Ferramenta de SEO para YouTube: Como Otimizar Seu Vídeo para 1ª Página"
+
+o hook DEVE mencionar explicitamente:
+
+- "SEO para YouTube";
+- "otimizar seu vídeo" ou "otimizar vídeos";
+- e a promessa de "1ª página" ou "primeira página".
+
+Também deve mencionar naturalmente a ferramenta quando ela for parte central do título.
+
+Exemplo de direção:
+
+"Se você quer usar SEO para YouTube para otimizar seu vídeo e aumentar suas chances de chegar à 1ª página, hoje eu vou mostrar como usar uma ferramenta de SEO para fazer isso na prática."
+
+NÃO use esse exemplo literalmente em todos os vídeos. Gere uma frase original.
+
+IMPORTANTE:
+
+O hook NÃO pode falar apenas sobre palavras-chave quando o título promete algo maior.
+
+O hook precisa vender a PROMESSA COMPLETA do título.
+
+O hook deve:
+
+1. repetir a palavra-chave principal;
+2. repetir 2–4 termos ou expressões relevantes do título;
+3. apresentar imediatamente o problema;
+4. apresentar a transformação ou resultado prometido;
+5. criar curiosidade sobre COMO o resultado será alcançado;
+6. deixar claro o que o espectador aprenderá.
 
 O hook precisa fazer sentido mesmo se o espectador não estiver vendo o título na tela.
-NÃO comece com uma história ou reflexão genérica que poderia pertencer a qualquer vídeo.
 
-Exemplo: se o título for "Ferramenta de SEO para YouTube: Como Otimizar Seu Vídeo para 1ª Página", o hook precisa mencionar naturalmente "SEO para YouTube", "ferramenta de SEO", "otimizar seu vídeo" e/ou "1ª página".
+NÃO comece com uma história, reflexão ou frase genérica que poderia pertencer a qualquer vídeo.
 
 ========================
 SEO NO ROTEIRO
 ========================
 
 A palavra-chave principal deve aparecer naturalmente no HOOK, na INTRODUÇÃO, nos primeiros 30 segundos, em pontos estratégicos do desenvolvimento e na conclusão.
-Use palavras-chave secundárias e termos semanticamente relacionados derivados do título e da intenção de busca.
-NÃO faça keyword stuffing. A repetição deve soar natural na fala.
+
+Use também:
+
+- palavras-chave secundárias;
+- variações naturais;
+- termos semanticamente relacionados;
+- conceitos diretamente presentes no título;
+- termos relacionados à intenção de busca.
+
+MAS:
+
+SEO não significa repetir palavras-chave o tempo todo.
+
+O objetivo é criar um roteiro semanticamente completo sobre o assunto prometido pelo título.
+
+NÃO faça keyword stuffing.
+
+NÃO transforme o roteiro em uma lista de palavras-chave.
+
+NÃO repita "palavra-chave" artificialmente em todos os blocos.
+
+Quando o título for sobre SEO para YouTube, o roteiro deve falar sobre SEO PARA YOUTUBE como um sistema completo, e não somente sobre pesquisa de palavras-chave.
 
 ========================
-ANTI-DESVIO
+ANTI-DESVIO + ANTI-CONCENTRAÇÃO EM UM ÚNICO SUBTEMA
 ========================
 
 Antes de cada bloco, verifique silenciosamente:
+
 "Este bloco ajuda diretamente a cumprir a promessa do título?"
+
 Se não ajudar, NÃO escreva o bloco.
 
+Depois verifique:
+
+"Estou explicando apenas um subtema enquanto ignoro outros conceitos importantes prometidos pelo título?"
+
+Se sim, redistribua o conteúdo.
+
 Todos os exemplos, histórias, analogias e técnicas de retenção precisam estar diretamente ligados ao assunto do título.
+
 Storytelling, open loops, curiosity gaps e pattern interrupts podem ser usados, mas nunca para mudar o assunto.
 
 ========================
-INTENÇÃO DE BUSCA
+INTENÇÃO DE BUSCA + COBERTURA DA PROMESSA
 ========================
 
 O formato deve respeitar a intenção do título:
+
 - "como fazer" / tutorial → passo a passo prático;
-- ferramenta → o que é, como usar e como resolve o problema;
-- SEO → SEO aplicado especificamente ao tema;
+- ferramenta → o que é, como usar, principais funções e como resolve o problema;
+- SEO → SEO aplicado especificamente ao objetivo do vídeo;
+- otimização de vídeo → mostrar os elementos que precisam ser otimizados e como;
 - comparação → comparação dos elementos prometidos;
 - lista → entregar a lista prometida;
 - análise → analisar exatamente o objeto do título.
+
+Se o título combinar mais de uma intenção, o roteiro deve combinar os elementos necessários para cumprir todas elas.
 
 ========================
 VALIDAÇÃO FINAL
 ========================
 
 Antes de responder, confirme silenciosamente:
+
 1. O roteiro responde exatamente ao título?
 2. O hook repete a palavra-chave principal?
-3. O hook repete termos importantes do título?
-4. Os primeiros 30 segundos deixam a promessa clara?
-5. Todos os blocos permanecem no mesmo assunto?
-6. A intenção de busca foi atendida?
-7. A conclusão reforça a palavra-chave e a promessa?
+3. O hook repete os termos mais importantes do título?
+4. Se o título contém "SEO para YouTube", o hook fala explicitamente "SEO para YouTube"?
+5. Se o título contém "otimizar seu vídeo", o hook fala explicitamente em otimizar o vídeo/vídeos?
+6. Se o título contém uma promessa de resultado, o hook apresenta essa promessa?
+7. O hook vende a promessa COMPLETA e não apenas uma palavra-chave?
+8. Os primeiros 30 segundos deixam a promessa clara?
+9. Todos os conceitos importantes do título aparecem no roteiro?
+10. O roteiro está equilibrado entre os principais conceitos do título?
+11. O roteiro evita ficar excessivamente concentrado em palavras-chave?
+12. Todos os blocos permanecem no mesmo assunto?
+13. A intenção de busca foi atendida?
+14. A conclusão reforça a promessa principal?
+15. O espectador realmente recebe aquilo que o título prometeu?
 
 Se qualquer resposta for NÃO, corrija o roteiro antes de responder.
 
@@ -3173,124 +3296,37 @@ Sempre gere frases naturais.
 
 Nunca escreva frases robóticas.
 
+========================
+LIMITE DE SAÍDA — REGRA TÉCNICA
+========================
+
+O roteiro deve ser completo, mas CONCISO o suficiente para caber em uma única resposta JSON válida.
+
+• Gere entre 5 e 7 blocos principais.
+• Cada bloco deve ser objetivo e conter conteúdo realmente útil.
+• Não repita a mesma explicação.
+• Não gere campos extras além do JSON solicitado.
+• Priorize HOOK + INTRO + desenvolvimento + CTA/FINAL.
+• Nunca interrompa o JSON no meio.
+• Se precisar reduzir tamanho, reduza detalhes secundários antes de cortar o roteiro principal.
+
 Retorne SOMENTE JSON.
 
+
 {
-
 "title":"",
-
 "estimatedDuration":"",
-
-"retentionScore":92,
-
+"retentionScore":0,
 "fullScript":"",
-
-"hook":{
-
-"text":"",
-
-"why":""
-
-},
-
+"hook":{"text":"","why":""},
 "intro":"",
-
-"sections":[
-
-{
-
-"title":"",
-
-"content":""
-
-}
-
-],
-
+"sections":[{"title":"","content":""}],
 "cta":"",
-
-"ending":"",
-
-"thumbnailIdeas":[
-"",
-"",
-""
-],
-
-"bRoll":[],
-
-"editingTips":[],
-
-"editingSequence":[],
-
+"outro":"",
 "keywords":[],
-
-"timeline":[
-{
-"time":"00:00",
-"title":"Hook",
-"action":"..."
-}
-],
-
-"audienceProfile":"",
-
 "searchIntent":"",
-
 "algorithmRecommendation":0,
-
-"searchPotential":0,
-
-"emotionTimeline":[],
-
-"psychologicalTriggers":[],
-
-"recordingChecklist":[],
-
-"performanceForecast":{
-
-"ctr":0,
-
-"retention":0,
-
-"recommendation":0,
-
-"confidence":0
-
-},
-
-"directorTimeline":[],
-
-"cameraShots":[],
-
-"audioDesign":[],
-
-"engagementMoments":[],
-
-"presentationCoach":[],
-
-"speechMistakes":[],
-
-"recordingEnvironment":[],
-
-"creatorTips":[],
-
-"finalChecklist":[],
-
-"stats":{
-
-"words":0,
-
-"characters":0,
-
-"readingTime":"",
-
-"speakingTime":"",
-
-"seoScore":0,
-
-"keywordDensity":""
-
+"stats":{"words":0,"characters":0,"readingTime":"","speakingTime":"","seoScore":0}
 }
 
 }
@@ -3986,7 +4022,7 @@ const maxTokens =
         ? 1200
 : tipo === "script_generator"
 
-? 6000
+? 8000
 
     : tipo === "niche"
 
@@ -4334,7 +4370,19 @@ if (tipo === "script_generator") {
 
     try {
 console.log(text);
-        const parsed = JSON.parse(text);
+        let cleanScript = String(text || "").trim();
+
+        if (!cleanScript) {
+            throw new Error("empty_script_response");
+        }
+
+        cleanScript = cleanScript
+            .replace(/^```json\\s*/i, "")
+            .replace(/^```\\s*/i, "")
+            .replace(/\\s*```$/i, "")
+            .trim();
+
+        const parsed = JSON.parse(cleanScript);
 
         global.__tubexCache.set(cacheKey,{
             text: parsed,
@@ -4389,10 +4437,10 @@ console.log(text);
 
         }
 
-        if(parsed.outro){
+        if(parsed.outro || parsed.ending){
 
             roteiro += "🎬 FINAL\n\n";
-            roteiro += parsed.outro;
+            roteiro += parsed.outro || parsed.ending || "";
 
         }
 

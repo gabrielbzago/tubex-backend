@@ -482,90 +482,287 @@ Sem explicações.
 
 finalPrompt = `
 
-Você é um especialista em SEO para YouTube.
+Você é um especialista de nível avançado em SEO para YouTube, especializado em otimização semântica, intenção de busca, indexação e descoberta de vídeos.
 
-Sua missão é criar uma descrição altamente otimizada para SEO, porém objetiva e agradável de ler.
+Sua única missão é criar uma DESCRIÇÃO DE VÍDEO EXTREMAMENTE FOCADA EM SEO, baseada diretamente no TÍTULO DIGITADO PELO USUÁRIO.
 
-Tema:
+TÍTULO DO VÍDEO:
 
 "${prompt}"
 
---------------------------------------------------
+==================================================
+OBJETIVO PRINCIPAL
+==================================================
 
-OBJETIVO
+Crie uma descrição que ajude o YouTube a compreender com máxima clareza:
 
-Escrever uma descrição que ajude o algoritmo do YouTube a entender o vídeo e incentive o usuário a assistir.
+• qual é o assunto principal do vídeo;
+• qual é a palavra-chave principal;
+• quais são as palavras-chave secundárias;
+• quais termos semanticamente relacionados pertencem ao mesmo tópico;
+• qual é a intenção de pesquisa do usuário;
+• quais perguntas o vídeo responde;
+• para quais buscas o vídeo deve ser relevante.
 
-A descrição deve parecer escrita por um criador profissional, nunca por uma IA.
+A descrição deve ser construída a partir do título.
 
---------------------------------------------------
+NÃO invente outro assunto.
 
-REGRAS
+NÃO mude o foco do vídeo.
 
-• Entre 700 e 1200 caracteres.
+NÃO transforme a descrição em um texto genérico sobre o nicho.
 
-• Comece exatamente com o título do vídeo.
+O título é a principal fonte semântica para definir o conteúdo da descrição.
 
-• Nos dois primeiros parágrafos explique claramente o assunto.
+==================================================
+ANÁLISE INTERNA OBRIGATÓRIA
+==================================================
 
-• Utilize naturalmente a palavra-chave principal.
+Antes de escrever, identifique silenciosamente:
 
-• Inclua algumas palavras relacionadas sem repetir excessivamente.
+1. A palavra-chave principal do título.
+2. As palavras-chave secundárias do título.
+3. Os termos mais importantes e específicos do título.
+4. A intenção de busca.
+5. O assunto central.
+6. Subtemas diretamente relacionados.
+7. Perguntas que um usuário provavelmente faria sobre esse assunto.
+8. Variações naturais da palavra-chave.
+9. Termos semanticamente relacionados que ajudam o YouTube a compreender o contexto.
 
-• Utilize parágrafos curtos.
+NÃO mostre essa análise.
 
-• Escreva de forma conversacional.
+==================================================
+AS 2 PRIMEIRAS LINHAS — REGRA CRÍTICA DE SEO
+==================================================
 
-• Nunca faça keyword stuffing.
+As DUAS PRIMEIRAS LINHAS da descrição são a parte mais importante para SEO.
 
-• Nunca escreva frases repetitivas.
+Elas DEVEM conter estrategicamente a palavra-chave principal e repetir naturalmente palavras-chave importantes do título.
 
-• Nunca escreva textos longos apenas para aumentar tamanho.
+REGRA OBRIGATÓRIA:
 
---------------------------------------------------
+• Linha 1: utilize a PALAVRA-CHAVE PRINCIPAL de forma clara e natural e conecte-a diretamente ao assunto/promessa do título.
 
-ESTRUTURA
+• Linha 2: repita a PALAVRA-CHAVE PRINCIPAL ou uma variação muito próxima e inclua 1–3 termos secundários importantes presentes no título.
 
-Título
+A repetição deve ser estratégica, NÃO mecânica.
 
-Resumo curto do vídeo (2 ou 3 frases)
+As duas primeiras linhas precisam deixar absolutamente claro para o YouTube e para o usuário qual é o tema do vídeo.
 
-O que o espectador aprenderá
+NÃO comece com:
 
-Benefícios de assistir
+• "Neste vídeo..."
+• "Olá pessoal..."
+• "Seja bem-vindo..."
+• frases motivacionais;
+• introduções genéricas;
+• histórias;
+• perguntas que não contenham o assunto principal.
 
-CTA curto para inscrição e comentário
+Comece diretamente pelo assunto e pelas palavras-chave.
 
---------------------------------------------------
+IMPORTANTE:
 
-SEO
+A palavra-chave principal deve aparecer nas duas primeiras linhas, salvo quando uma repetição literal tornaria a frase artificial. Nesse caso, utilize uma variação semântica extremamente próxima na segunda linha.
 
-Utilize naturalmente:
+==================================================
+DENSIDADE SEMÂNTICA
+==================================================
 
-• palavra-chave principal
+Distribua naturalmente ao longo da descrição:
 
-• palavras relacionadas
+• palavra-chave principal;
+• variações da palavra-chave;
+• palavras-chave secundárias;
+• long-tail keywords;
+• termos relacionados;
+• entidades diretamente relacionadas ao assunto;
+• perguntas de pesquisa;
+• sinônimos quando fizerem sentido;
+• termos que um usuário realmente pesquisaria no YouTube ou Google.
 
-• intenção de pesquisa
+O objetivo é criar ALTA RELEVÂNCIA SEMÂNTICA, e não simplesmente repetir palavras.
 
-Sem exagerar.
+Não utilize palavras-chave que não tenham relação direta com o título.
 
---------------------------------------------------
+==================================================
+FOCO ABSOLUTO NA INTENÇÃO DE BUSCA
+==================================================
 
-FORMATO
+A descrição deve responder à intenção por trás do título.
 
-Retorne apenas a descrição.
+Se o título for tutorial:
+
+• explique o que será ensinado;
+• inclua termos como "como", "passo a passo", "tutorial" somente quando fizerem sentido;
+• deixe claro o resultado que o usuário obterá.
+
+Se o título for uma análise:
+
+• explique exatamente o que será analisado;
+• utilize termos relacionados ao objeto da análise.
+
+Se o título for sobre uma ferramenta:
+
+• mencione naturalmente o nome da ferramenta;
+• explique sua finalidade;
+• utilize termos relacionados ao problema que ela resolve.
+
+Se o título for sobre uma estratégia:
+
+• explique a estratégia;
+• mencione os conceitos diretamente relacionados.
+
+Nunca altere a intenção do título.
+
+==================================================
+ESTRUTURA SEO
+==================================================
+
+A descrição deve seguir esta estrutura:
+
+1. DUAS PRIMEIRAS LINHAS:
+Máxima concentração semântica.
+Palavra-chave principal + termos importantes do título + assunto central.
+
+2. PRIMEIRO BLOCO:
+Explique claramente o que o vídeo aborda e qual problema ou intenção de pesquisa ele resolve.
+
+3. SEGUNDO BLOCO:
+Explique os principais pontos, conceitos, etapas, estratégias ou informações que o espectador encontrará.
+
+4. TERCEIRO BLOCO:
+Inclua naturalmente variações, long tails e termos semanticamente relacionados ao assunto.
+
+5. BLOCO DE BENEFÍCIO:
+Explique o que o espectador será capaz de entender, fazer ou melhorar depois de assistir.
+
+6. CTA:
+Inclua uma chamada curta e natural para inscrição no canal, comentário ou continuidade do conteúdo.
+
+==================================================
+SEO PARA YOUTUBE + GOOGLE
+==================================================
+
+Otimize a descrição para descoberta tanto no YouTube quanto em mecanismos de busca.
+
+Priorize:
+
+• correspondência semântica com o título;
+• intenção de pesquisa;
+• relevância temática;
+• palavras-chave relacionadas;
+• entidades;
+• variações naturais;
+• long tails;
+• clareza contextual;
+• primeiros 200 caracteres;
+• linguagem natural.
+
+Não tente manipular o algoritmo com repetição excessiva.
+
+==================================================
+KEYWORD STUFFING — PROIBIDO
+==================================================
+
+NUNCA faça:
+
+• listas artificiais de palavras-chave;
+• repetição excessiva da mesma palavra;
+• sequência de keywords sem contexto;
+• frases sem sentido criadas apenas para SEO;
+• inserção de termos populares que não tenham relação com o título.
+
+SEO deve ser forte, mas a leitura precisa continuar natural.
+
+==================================================
+FIDELIDADE AO TÍTULO
+==================================================
+
+REGRA ABSOLUTA:
+
+Cada parágrafo deve permanecer diretamente relacionado ao título.
+
+Se uma frase puder ser removida sem prejudicar a compreensão do assunto principal, prefira removê-la.
+
+Não fale genericamente sobre o nicho.
+
+Não introduza assuntos paralelos.
+
+Não crie informações que não possam ser inferidas do título.
+
+A descrição deve responder:
+
+"Se alguém encontrar esta descrição pela busca, ela deixa imediatamente claro que este vídeo responde à intenção representada pelo título?"
+
+Se a resposta for não, reescreva.
+
+==================================================
+TAMANHO
+==================================================
+
+• Entre 1200 e 1800 caracteres.
+• Priorize qualidade semântica.
+• Não aumente o texto artificialmente apenas para atingir o limite.
+
+==================================================
+ESTILO
+==================================================
+
+• Português do Brasil.
+• Natural.
+• Profissional.
+• Claro.
+• Direto.
+• Persuasivo sem exagero.
+• Escrito para humanos, mas fortemente otimizado para mecanismos de busca.
+• Nunca pareça texto gerado por IA.
+
+==================================================
+VALIDAÇÃO INTERNA ANTES DE RESPONDER
+==================================================
+
+Antes de retornar a descrição, verifique silenciosamente:
+
+1. A palavra-chave principal aparece na primeira linha?
+2. A palavra-chave principal ou uma variação muito próxima aparece na segunda linha?
+3. As duas primeiras linhas repetem estrategicamente termos importantes do título?
+4. O assunto da descrição é exatamente o assunto do título?
+5. A intenção de busca está clara?
+6. Existem palavras-chave secundárias relevantes?
+7. Existem termos semanticamente relacionados?
+8. Existem variações naturais e long tails quando apropriado?
+9. O texto evita keyword stuffing?
+10. A descrição está otimizada para YouTube e Google?
+11. A descrição parece escrita por um especialista em SEO?
+12. Existe algum trecho genérico que poderia pertencer a qualquer vídeo?
+
+Se qualquer resposta for negativa, corrija antes de responder.
+
+==================================================
+FORMATO FINAL
+==================================================
+
+Retorne APENAS a descrição final.
 
 Sem markdown.
 
 Sem aspas.
 
-Sem explicações.
+Sem títulos como "Descrição:".
+
+Sem explicações sobre o processo.
+
+Sem listas de palavras-chave separadas.
+
+A primeira linha deve começar diretamente com a palavra-chave principal ou com uma frase altamente relevante que contenha a palavra-chave principal.
+
+A segunda linha deve repetir estrategicamente a palavra-chave principal ou sua variação próxima e utilizar termos importantes do título.
 
 `;
 
 }
-
 
 
 else if (tipo === "thumbnail_prompt") {

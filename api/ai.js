@@ -109,10 +109,15 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
-const title = body?.title || "";
+const title = String(body?.title || "").trim();
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
+
+// Script Workspace: title is the canonical input.
+if (tipo === "script_generator" && !prompt) {
+  prompt = title;
+}
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
 
@@ -130,7 +135,6 @@ const requiresPrompt = [
   "viral_content",
   "thumbnail_prompt",
 "video_analysis",
-"script_generator",
   "channel_analysis"
 ];
 
@@ -3234,15 +3238,10 @@ const normalizedKeyword = String(
 
 // roteiro normalizado
 const normalizedScript = [
-
-    title,
-
-    goal,
-
-    duration,
-
-    style
-
+    String(title || "").trim(),
+    String(goal || "").trim(),
+    String(duration || "").trim(),
+    String(style || "").trim()
 ]
 .join("|")
 .toLowerCase()
@@ -3320,7 +3319,7 @@ const cached = global.__tubexCache.get(cacheKey);
 const TTL = {
   diagnosis: 6,
   strategy: 12,
-script_generator:12,
+script_generator: 0,
 video_analysis:12,
   niche: 24,
   ideas: 24,
@@ -4265,7 +4264,7 @@ return res.status(200).json({
 }
 
 // 💾 salvar só se válido
-if (tipo !== "seo_workspace") {
+if (tipo !== "seo_workspace" && tipo !== "script_generator") {
   global.__tubexCache.set(cacheKey, {
     text,
     timestamp: Date.now()

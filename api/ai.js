@@ -2,6 +2,14 @@ export default async function handler(req, res) {
 
   const origin = req.headers.origin || "*";
 
+  // IMPORTANTE: o Workspace não pode reutilizar respostas antigas.
+  // Especialmente o Script Workspace: cada título deve gerar um roteiro novo.
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+  res.setHeader("Vary", "Origin, x-client, x-request-id");
+
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -122,6 +130,14 @@ if (tipo === "script_generator") {
 
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
+
+// Cada execução do Script Workspace é uma nova geração.
+// O request id também ajuda a rastrear qualquer resposta antiga em logs/CDN.
+const requestId = String(req.headers["x-request-id"] || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+res.setHeader("X-TubeX-Request-Id", requestId);
+if (tipo === "script_generator") {
+  res.setHeader("X-TubeX-Cache", "BYPASS");
+}
 
 // ======================================================
 // 🔒 VALIDAÇÃO PROMPT
@@ -2998,8 +3014,10 @@ REGRA CRÍTICA — FIDELIDADE TOTAL AO TÍTULO + COBERTURA COMPLETA DO TEMA
 
 O TÍTULO É A FONTE PRINCIPAL DE TODO O ROTEIRO.
 
-TÍTULO EXATO:
+TÍTULO EXATO DA REQUISIÇÃO ATUAL (NÃO reutilize o conteúdo de nenhuma geração anterior):
 ${title}
+
+ID DA GERAÇÃO: ${requestId}
 
 Antes de escrever, identifique silenciosamente:
 
@@ -3639,6 +3657,10 @@ const videoCacheId =
 
     "";
 
+// Script Generator: não usa cache em hipótese alguma.
+// O título atual é parte obrigatória da requisição e cada clique deve gerar uma nova resposta.
+const scriptCacheBypass = tipo === "script_generator";
+
 const cacheKey =
 
 tipo === "video_analysis"
@@ -3693,7 +3715,7 @@ tipo === "video_analysis"
 ].join("|");
 
 // procura cache
-const cached = global.__tubexCache.get(cacheKey);
+const cached = scriptCacheBypass ? null : global.__tubexCache.get(cacheKey);
 
 // TTL por tipo
 const TTL = {

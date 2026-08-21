@@ -177,7 +177,7 @@ if(
 
     const normalizedPlan = String(body?.plan || "free").toLowerCase();
     const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
-    const cacheKey = keyword ? `seo_v5_related_${cachePlan}_${keyword.toLowerCase()}` : null;
+    const cacheKey = keyword ? `seo_v6_estimate_related_${cachePlan}_${keyword.toLowerCase()}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];

@@ -177,7 +177,7 @@ if(
 
     const normalizedPlan = String(body?.plan || "free").toLowerCase();
     const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
-    const cacheKey = keyword ? `seo_v4_related_${cachePlan}_${keyword.toLowerCase()}` : null;
+    const cacheKey = keyword ? `seo_v5_related_${cachePlan}_${keyword.toLowerCase()}` : null;
 
     if (cacheKey) {
       const cached = global.tubexSeoCache[cacheKey];
@@ -3136,7 +3136,27 @@ function buildRelatedKeywords(items, seedKeyword, limit=30){
 // 📦 RESPONSE
 // =========================
 
-const trend = [];
+// Keep `volume` as the existing 0-100 demand score.
+// The YouTube Data API does not expose an absolute monthly keyword-search count,
+// so these fields are deterministic TubeX ESTIMATES derived from the existing
+// demand score/trend engine. No existing score is changed.
+const trend = items.length
+    ? generateEstimatedTrend(finalVolume, finalCompetition)
+    : [];
+
+const estimatedMonthlySearches = trend.length
+    ? Math.max(0, Math.round(
+        trend.reduce((sum, point) => sum + Number(point?.value || 0), 0)
+      ))
+    : null;
+
+const monthlySearchesEstimated = estimatedMonthlySearches;
+const monthlySearchesMin = estimatedMonthlySearches !== null
+    ? Math.max(0, Math.round(estimatedMonthlySearches * 0.75))
+    : null;
+const monthlySearchesMax = estimatedMonthlySearches !== null
+    ? Math.max(monthlySearchesMin, Math.round(estimatedMonthlySearches * 1.25))
+    : null;
 // =========================
 // 📊 YOUTUBE METRICS
 // =========================
@@ -3184,6 +3204,16 @@ const responseData = {
     items,
 
     volume: finalVolume,
+
+    // Backward-compatible fields for the Keyword Explorer.
+    // `monthlySearches` is an estimate, not an official YouTube search count.
+    monthlySearches: monthlySearchesEstimated,
+    monthlySearchesEstimated,
+    monthlySearchesMin,
+    monthlySearchesMax,
+    searchVolume: monthlySearchesEstimated,
+    searchVolumeSource: monthlySearchesEstimated !== null ? "tubex_estimate" : "unavailable",
+    searchVolumeType: monthlySearchesEstimated !== null ? "estimated" : "unavailable",
 
     competition: finalCompetition,
 competitionDetails,
@@ -3233,6 +3263,11 @@ medianScore,
 velocityScore,
 strengthScore,
 serpDemandScore,
+
+    monthlySearches: monthlySearchesEstimated,
+    monthlySearchesEstimated,
+    monthlySearchesMin,
+    monthlySearchesMax,
 
     medianViews: median
 

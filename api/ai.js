@@ -117,15 +117,37 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
-const title = body?.title || "";
+
+// 🎬 SCRIPT WORKSPACE — o título enviado pelo Workspace é a fonte de verdade.
+// A extensão atual envia o título em `scriptTitle` e também dentro de `youtube.title`.
+// O backend precisa priorizar esses campos; `body.title` não é garantido pelo bridge.
+const scriptTitle = String(
+  body?.scriptTitle ||
+  youtube?.title ||
+  body?.title ||
+  context?.title ||
+  ""
+).trim();
+
+const title = scriptTitle;
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
 
-// 🎬 SCRIPT WORKSPACE — o título atual é sempre a fonte de verdade.
-// Isso garante que trocar o título gere um roteiro baseado no novo título.
 if (tipo === "script_generator") {
-  prompt = String(title || prompt || "").trim();
+  // Nunca use o prompt anterior como título. O prompt pode conter instruções
+  // de uma geração e não deve substituir o título atual.
+  prompt = scriptTitle;
+
+  if (!scriptTitle) {
+    return res.status(400).json({
+      success: false,
+      error: "script_title_required",
+      text: ""
+    });
+  }
+
+  console.log("🎬 SCRIPT TITLE RECEIVED:", scriptTitle);
 }
 
 // 🔑 chave real de rate limit

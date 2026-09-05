@@ -1,3 +1,5 @@
+import { searchPublicYoutube, getPublicVideo, getPublicChannel } from "./public-youtube.js";
+
 export default async function handler(req, res) {
 
   // =========================
@@ -202,117 +204,55 @@ if(
     let youtubeSearchSucceeded = false;
     let totalResults = 0;
 
-    if (!activeKey) {
-      return res.status(200).json({
-        success: false,
-        items: [],
-        volume: 0,
-        competition: null,
-        error: "youtube_api_unavailable"
-      });
+    // No API key is required for the public-first path. The key is only
+    // required if the public source fails and the legacy fallback is used.
+
+    // =========================
+    // 🌐 PUBLIC YOUTUBE FIRST (ZERO DATA API QUOTA)
+    // =========================
+    // The public adapter is attempted first. It reads publicly available
+    // YouTube search data. Existing Data API logic remains the fallback.
+    if (mode !== "video_ai") {
+      try {
+        const publicLimit = body?.plan === "free" ? 50 : 150;
+        const publicData = await searchPublicYoutube(keyword, { limit: publicLimit });
+        if (Array.isArray(publicData.items) && publicData.items.length) {
+          items = publicData.items;
+          totalResults = publicData.totalResults || items.length;
+          success = true;
+          console.log("[TubeX] Public YouTube search hit:", keyword, items.length);
+        }
+      } catch (e) {
+        console.warn("[TubeX] Public YouTube search unavailable:", e?.message || e);
+      }
     }
 
     // =========================
-    // 🎯 OPTIMIZED SEARCH FETCH
+    // 🔑 DATA API FALLBACK
     // =========================
-    // Keep the same maximum result coverage while cutting search.list calls:
-    // 25 x 6 pages = 150 results (600 quota units)
-    // 50 x 3 pages = 150 results (300 quota units)
-    // Free remains 50 results in a single call.
-    let maxPages = 3;
-    if (body?.plan === "free") maxPages = 1;
-
-    try {
-      let allIds = [];
-      let nextPageToken = "";
-      let pageCount = 0;
-
-      while (pageCount < maxPages) {
-        const searchUrl =
-          `https://www.googleapis.com/youtube/v3/search` +
-          `?part=snippet&type=video&order=relevance&maxResults=50` +
-          `&q=${encodeURIComponent(keyword)}` +
-          (nextPageToken ? `&pageToken=${nextPageToken}` : "") +
-          `&key=${activeKey}`;
-
-        const searchRes = await fetch(searchUrl);
-        const searchJson = await searchRes.json().catch(() => ({}));
-
-        const reason = searchJson?.error?.errors?.[0]?.reason || "";
-        if (searchRes.status === 403 || searchRes.status === 429) {
-          if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || searchRes.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
+    if (!success && mode !== "video_ai" && activeKey) {
+      let maxPages = body?.plan === "free" ? 1 : 3;
+      try {
+        let allIds = [], nextPageToken = "", pageCount = 0;
+        while (pageCount < maxPages) {
+          const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=relevance&maxResults=50&q=${encodeURIComponent(keyword)}` + (nextPageToken ? `&pageToken=${nextPageToken}` : "") + `&key=${activeKey}`;
+          const searchRes = await fetch(searchUrl);
+          const searchJson = await searchRes.json().catch(() => ({}));
+          if (!searchRes.ok || searchJson?.error) throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
+          youtubeSearchSucceeded = true;
+          if (!pageCount) totalResults = Number(searchJson.pageInfo?.totalResults || 0);
+          allIds.push(...(searchJson.items||[]).map(v=>v.id?.videoId).filter(Boolean));
+          nextPageToken=searchJson.nextPageToken||""; pageCount++; if(!nextPageToken) break;
         }
-
-        if (!searchRes.ok || searchJson?.error) {
-          throw new Error(searchJson?.error?.message || `youtube_search_http_${searchRes.status}`);
+        const uniqueIds=[...new Set(allIds)];
+        for(let i=0;i<uniqueIds.length;i+=50){
+          const ids=uniqueIds.slice(i,i+50).join(",");
+          const r=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids}&key=${activeKey}`);
+          const j=await r.json().catch(()=>({})); if(!r.ok||j?.error) throw new Error(j?.error?.message||`youtube_videos_http_${r.status}`);
+          items.push(...(j.items||[]));
         }
-
-        youtubeSearchSucceeded = true;
-        if (pageCount === 0) {
-          totalResults = Number(searchJson.pageInfo?.totalResults || 0);
-        }
-
-        const ids = (searchJson.items || [])
-          .map(v => v.id?.videoId)
-          .filter(Boolean);
-
-        allIds.push(...ids);
-        nextPageToken = searchJson.nextPageToken || "";
-        pageCount++;
-
-        if (!nextPageToken) break;
-      }
-
-      const uniqueIds = [...new Set(allIds)];
-
-      // videos.list is already inexpensive and supports up to 50 IDs/request.
-      for (let i = 0; i < uniqueIds.length; i += 50) {
-        const chunk = uniqueIds.slice(i, i + 50).join(",");
-        if (!chunk) continue;
-
-        const videosUrl =
-          `https://www.googleapis.com/youtube/v3/videos` +
-          `?part=snippet,statistics&id=${chunk}&key=${activeKey}`;
-
-        const resVideos = await fetch(videosUrl);
-        const jsonVideos = await resVideos.json().catch(() => ({}));
-
-        const reason = jsonVideos?.error?.errors?.[0]?.reason || "";
-        if (resVideos.status === 403 || resVideos.status === 429) {
-          if (reason === "quotaExceeded" || reason === "dailyLimitExceeded" || resVideos.status === 429) {
-            throw new Error("quota_exceeded");
-          }
-          throw new Error(jsonVideos?.error?.message || `youtube_videos_http_${resVideos.status}`);
-        }
-
-        if (!resVideos.ok || jsonVideos?.error) {
-          throw new Error(jsonVideos?.error?.message || `youtube_videos_http_${resVideos.status}`);
-        }
-
-        if (Array.isArray(jsonVideos.items)) {
-          const filtered = jsonVideos.items.filter(v => {
-            const title = String(v?.snippet?.title || "").toLowerCase();
-            if (title.includes("#shorts")) return false;
-
-            const videoViews = Number(v?.statistics?.viewCount || 0);
-            const published = new Date(v?.snippet?.publishedAt).getTime();
-            const ageDays = (Date.now() - published) / (1000 * 60 * 60 * 24);
-
-            if (ageDays > 900 && videoViews < 5000) return false;
-            return true;
-          });
-
-          items.push(...filtered);
-        }
-      }
-
-      success = true;
-
-    } catch (e) {
-      console.warn("[TubeX] YouTube search failed:", e?.message || e);
+        success=true;
+      } catch(e){ console.warn("[TubeX] Data API fallback failed:", e?.message||e); }
     }
 
     if (youtubeSearchSucceeded) success = true;
@@ -678,6 +618,24 @@ else {
   let latestVideos = cachedChannel?.expires > Date.now() ? cachedChannel.data.latestVideos : null;
 
   if (!channel || !Array.isArray(latestVideos)) {
+    // Public channel data first: avoids the extra channel search.list call.
+    try {
+      if (snippet.channelId) {
+        const publicChannel = await getPublicChannel(snippet.channelId);
+        if (publicChannel?.channel) {
+          channel = publicChannel.channel;
+          latestVideos = publicChannel.videos || [];
+          global.tubexChannelCache[channelCacheKey] = {
+            data: { channel, latestVideos },
+            expires: Date.now() + (6 * 60 * 60 * 1000)
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[TubeX] Public channel metrics unavailable:", e?.message || e);
+    }
+
+    if (!channel || !Array.isArray(latestVideos) || !latestVideos.length) {
     const channelUrl =
       `https://www.googleapis.com/youtube/v3/channels` +
       `?part=snippet,statistics` +
@@ -731,8 +689,9 @@ else {
 
     global.tubexChannelCache[channelCacheKey] = {
       data: { channel, latestVideos },
-      expires: Date.now() + (15 * 60 * 1000)
+      expires: Date.now() + (6 * 60 * 60 * 1000)
     };
+    }
   }
 
   const channelSnippet = channel.snippet || {};
@@ -3286,7 +3245,7 @@ if (cacheKey) {
 
     expires:
       Date.now() +
-      (15 * 60 * 1000)
+      (6 * 60 * 60 * 1000)
 
   };
 

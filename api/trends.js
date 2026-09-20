@@ -11,7 +11,7 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
@@ -43,24 +43,35 @@ function formatTrendDate(date) {
   return `${y}-${m}-${d}`;
 }
 
-function trendsTime(range, exact12m = false) {
-  if (range === "7d") {
-    return "today 7-d";
+function trendsTime(range, exactRange = false) {
+  if (!exactRange) {
+    if (range === "7d") {
+      return "now 7-d";
+    }
+
+    if (range === "12m") {
+      return "today 12-m";
+    }
+
+    return "today 1-m";
   }
 
-  if (range === "12m") {
-    if (!exact12m) return "today 12-m";
+  // Real-data fallback using an explicit interval.
+  const end = new Date();
+  const days =
+    range === "7d"
+      ? 7
+      : range === "30d"
+        ? 30
+        : 365;
 
-    // Google Trends normally accepts "today 12-m". When the public
-    // widget returns an empty TIMESERIES for YouTube Search, an exact
-    // 365-day interval is a reliable second representation of the same
-    // requested period and avoids losing a real historical series.
-    const end = new Date();
-    const start = new Date(end.getTime() - (365 * 24 * 60 * 60 * 1000));
-    return `${formatTrendDate(start)} ${formatTrendDate(end)}`;
-  }
+  const start =
+    new Date(
+      end.getTime() -
+      (days * 24 * 60 * 60 * 1000)
+    );
 
-  return "today 1-m";
+  return `${formatTrendDate(start)} ${formatTrendDate(end)}`;
 }
 
 function normalizePoint(point) {
@@ -332,7 +343,7 @@ async function fetchGoogleTrendOnce(
   range,
   geo,
   property,
-  exact12m = false
+  exactRange = false
 ) {
 
   const exploreRequest =
@@ -341,7 +352,7 @@ async function fetchGoogleTrendOnce(
       range,
       geo,
       property,
-      exact12m
+      exactRange
     );
 
   const exploreUrl =
@@ -454,22 +465,8 @@ async function fetchGoogleTrendOnce(
     );
   }
 
-  const values = trend
-    .map(point => Number(point?.value))
-    .filter(Number.isFinite);
-
-  // Uma série inteira em 100 não representa demanda alta por si só.
-  // Em consultas malformadas/sem correspondência, o endpoint público
-  // pode devolver uma série degenerada. Nunca apresentá-la como alta.
-  if (
-    values.length >= 2 &&
-    values.every(value => Math.round(value) === 100)
-  ) {
-    throw new Error(
-      "Google Trends retornou uma série degenerada para esta palavra-chave"
-    );
-  }
-
+  // A single-keyword Trends series may legitimately be flat at 100.
+  // Keep valid real data instead of discarding it.
   return trend;
 }
 
@@ -480,56 +477,67 @@ async function fetchGoogleTrend(
   geo,
   property
 ) {
-  // Google Trends can rate-limit the denser 30d YouTube series.
-  // Retry the complete server-side session; never synthesize values.
-  const attempts = (range === "30d" || range === "7d") ? 3 : 2;
+  // Use Google's normal relative selector first.
+  const attempts =
+    range === "30d" || range === "7d"
+      ? 3
+      : 2;
+
   let lastError = null;
 
   for(let attempt = 1; attempt <= attempts; attempt++){
     try{
-      return await fetchGoogleTrendOnce(keyword, range, geo, property);
+      return await fetchGoogleTrendOnce(
+        keyword,
+        range,
+        geo,
+        property,
+        false
+      );
     }catch(error){
       lastError = error;
+
       console.warn(
         `[TubeX] Google Trends ${range} tentativa ${attempt}/${attempts}:`,
         error?.message || error
       );
 
       if(attempt < attempts){
-        const waitMs = range === "30d"
-          ? (attempt === 1 ? 1200 : 2500)
-          : range === "7d"
-            ? (attempt === 1 ? 900 : 1800)
-            : 900;
-        await new Promise(resolve => setTimeout(resolve, waitMs));
+        const waitMs =
+          range === "30d"
+            ? (attempt === 1 ? 1200 : 2500)
+            : range === "7d"
+              ? (attempt === 1 ? 900 : 1800)
+              : 900;
+
+        await new Promise(
+          resolve => setTimeout(resolve, waitMs)
+        );
       }
     }
   }
 
-  // 12 months has a second real-data path. Google Trends can occasionally
-  // expose an empty TIMESERIES for the relative "today 12-m" selector,
-  // especially for YouTube Search. Retry the same source and keyword with
-  // an exact 365-day interval. This is not synthetic data: it is another
-  // Google Trends query for the same historical window.
-  if(range === "12m"){
-    try{
-      console.warn(
-        `[TubeX] Google Trends 12m: tentando intervalo exato de 365 dias para ${property || "Google Web"}`
-      );
-      return await fetchGoogleTrendOnce(
-        keyword,
-        range,
-        geo,
-        property,
-        true
-      );
-    }catch(error){
-      lastError = error;
-      console.warn(
-        "[TubeX] Google Trends 12m fallback exato falhou:",
-        error?.message || error
-      );
-    }
+  // Important: 7d and 30d now get the same real-data fallback
+  // previously reserved for 12m. No zeros and no synthetic values.
+  try{
+    console.warn(
+      `[TubeX] Google Trends ${range}: tentando intervalo exato`
+    );
+
+    return await fetchGoogleTrendOnce(
+      keyword,
+      range,
+      geo,
+      property,
+      true
+    );
+  }catch(error){
+    lastError = error;
+
+    console.warn(
+      `[TubeX] Google Trends ${range} fallback exato falhou:`,
+      error?.message || error
+    );
   }
 
   throw lastError || new Error("google_trends_failed");

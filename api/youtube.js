@@ -151,7 +151,13 @@ const accessToken =
         });
       }
 
-      const apiKey = activeKey;
+      // Resolve the YouTube Data API key locally inside this isolated branch.
+      // IMPORTANT: activeKey is declared later in the SEO pipeline, so referencing
+      // it here would trigger a Temporal Dead Zone ReferenceError and make the
+      // engaged_views endpoint return no data.
+      const apiKey = String(process.env.YOUTUBE_API_KEY || "")
+        .split(",")[0]
+        .trim();
       const dateAtStartOfDay = offsetDays => {
         const d = new Date();
         d.setHours(0, 0, 0, 0);

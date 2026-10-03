@@ -22,6 +22,126 @@ export default async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const channelId = body?.channelId;
 
+
+  // =========================================================
+  // 🔒 ISOLATED DASHBOARD METRIC — ENGAGED VIEWS
+  // Normal /youtube-channel behavior remains untouched.
+  // =========================================================
+  if (body?.mode === "engaged_views") {
+    const token = String(body?.accessToken || "").trim();
+    const requestedDays = Number(body?.days);
+    const days = [7, 28, 30].includes(requestedDays) ? requestedDays : 28;
+
+    if (!token) {
+      return res.status(200).json({
+        success: false,
+        error: "analytics_auth_required",
+        engagedViews: null,
+        days
+      });
+    }
+
+    const dateAtStartOfDay = offsetDays => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - Number(offsetDays || 0));
+      return d.toISOString().slice(0, 10);
+    };
+
+    const queryAnalytics = async (startDate, endDate, dimensions = "") => {
+      const url = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
+      url.searchParams.set("ids", "channel==MINE");
+      url.searchParams.set("startDate", startDate);
+      url.searchParams.set("endDate", endDate);
+      url.searchParams.set("metrics", "views,engagedViews");
+      if (dimensions) url.searchParams.set("dimensions", dimensions);
+      if (dimensions === "day") url.searchParams.set("sort", "day");
+
+      const response = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const error = new Error(
+          payload?.error?.errors?.[0]?.reason ||
+          payload?.error?.message ||
+          `analytics_http_${response.status}`
+        );
+        error.status = response.status;
+        throw error;
+      }
+
+      return payload;
+    };
+
+    const startDate = dateAtStartOfDay(days);
+    const endDates = [dateAtStartOfDay(1), dateAtStartOfDay(2)];
+    let lastError = null;
+
+    for (const endDate of endDates) {
+      try {
+        const data = await queryAnalytics(startDate, endDate, "day");
+        const headers = Array.isArray(data?.columnHeaders)
+          ? data.columnHeaders.map(x => String(x?.name || ""))
+          : [];
+        const rows = Array.isArray(data?.rows) ? data.rows : [];
+
+        if (rows.length) {
+          const engagedIndex = headers.indexOf("engagedViews");
+          const viewsIndex = headers.indexOf("views");
+
+          return res.status(200).json({
+            success: true,
+            engagedViews: rows.reduce(
+              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
+              0
+            ),
+            views: rows.reduce(
+              (sum, row) => sum + Number(viewsIndex >= 0 ? row[viewsIndex] : 0),
+              0
+            ),
+            days,
+            startDate,
+            endDate,
+            source: "youtube-analytics-api"
+          });
+        }
+
+        const exact = await queryAnalytics(startDate, endDate);
+        const exactHeaders = Array.isArray(exact?.columnHeaders)
+          ? exact.columnHeaders.map(x => String(x?.name || ""))
+          : [];
+        const first = Array.isArray(exact?.rows) ? exact.rows[0] : null;
+
+        if (first) {
+          const engagedIndex = exactHeaders.indexOf("engagedViews");
+          const viewsIndex = exactHeaders.indexOf("views");
+
+          return res.status(200).json({
+            success: true,
+            engagedViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
+            views: Number(viewsIndex >= 0 ? first[viewsIndex] : 0),
+            days,
+            startDate,
+            endDate,
+            source: "youtube-analytics-api"
+          });
+        }
+      } catch (error) {
+        lastError = error;
+        if (error?.status === 401 || error?.status === 403) break;
+      }
+    }
+
+    return res.status(200).json({
+      success: false,
+      error: lastError?.message || "engaged_views_unavailable",
+      engagedViews: null,
+      days
+    });
+  }
+
 // =====================================
 // 🔥 CACHE GLOBAL CHANNEL
 // =====================================

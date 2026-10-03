@@ -274,7 +274,9 @@ const accessToken =
           const exact = await queryAnalytics({
             startDate,
             endDate,
-            dimensions: target === "video" ? "video" : "",
+            // Basic user activity statistics is a dimensionless report;
+            // the individual video is selected by the video filter.
+            dimensions: "",
             filters: target === "video" ? `video==${videoId}` : ""
           });
 

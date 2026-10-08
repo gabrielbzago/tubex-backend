@@ -2,14 +2,6 @@ export default async function handler(req, res) {
 
   const origin = req.headers.origin || "*";
 
-  // IMPORTANTE: o Workspace não pode reutilizar respostas antigas.
-  // Especialmente o Script Workspace: cada título deve gerar um roteiro novo.
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-  res.setHeader("Surrogate-Control", "no-store");
-  res.setHeader("Vary", "Origin, x-client, x-request-id");
-
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -117,49 +109,12 @@ const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
 const tipo = body?.tipo || "";
 const youtube = body?.youtube || {};
-
-// 🎬 SCRIPT WORKSPACE — o título enviado pelo Workspace é a fonte de verdade.
-// A extensão atual envia o título em `scriptTitle` e também dentro de `youtube.title`.
-// O backend precisa priorizar esses campos; `body.title` não é garantido pelo bridge.
-const scriptTitle = String(
-  body?.scriptTitle ||
-  youtube?.title ||
-  body?.title ||
-  context?.title ||
-  ""
-).trim();
-
-const title = scriptTitle;
+const title = body?.title || "";
 const goal = body?.goal || "";
 const duration = body?.duration || "";
 const style = body?.style || "";
-
-if (tipo === "script_generator") {
-  // Nunca use o prompt anterior como título. O prompt pode conter instruções
-  // de uma geração e não deve substituir o título atual.
-  prompt = scriptTitle;
-
-  if (!scriptTitle) {
-    return res.status(400).json({
-      success: false,
-      error: "script_title_required",
-      text: ""
-    });
-  }
-
-  console.log("🎬 SCRIPT TITLE RECEIVED:", scriptTitle);
-}
-
 // 🔑 chave real de rate limit
 const userKey = userId !== "guest" ? userId : ip;
-
-// Cada execução do Script Workspace é uma nova geração.
-// O request id também ajuda a rastrear qualquer resposta antiga em logs/CDN.
-const requestId = String(req.headers["x-request-id"] || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
-res.setHeader("X-TubeX-Request-Id", requestId);
-if (tipo === "script_generator") {
-  res.setHeader("X-TubeX-Cache", "BYPASS");
-}
 
 // ======================================================
 // 🔒 VALIDAÇÃO PROMPT
@@ -2157,6 +2112,60 @@ Formato obrigatório:
 `;
 }
 
+else if (tipo === "channel_competitor_radar") {
+
+finalPrompt = `
+Você é o estrategista de crescimento do TubeX.
+
+Compare o canal do usuário com os concorrentes abaixo. Eles foram selecionados por relevância temática e sinais públicos, mas você deve validar a proximidade pelo conjunto dos títulos, assuntos e métricas recebidas.
+
+NICHO DETECTADO:
+${context?.niche?.name || "Não informado"}
+Confiança: ${context?.niche?.confidence ?? 0}%
+Motivo: ${context?.niche?.reason || ""}
+
+CANAL DO USUÁRIO:
+${JSON.stringify(context?.ownChannel || {}, null, 2)}
+
+CONCORRENTES:
+${JSON.stringify(context?.competitors || [], null, 2)}
+
+REGRAS CRÍTICAS:
+- Não invente números.
+- Não invente vídeos, assuntos ou características que não estejam nos dados.
+- Não trate inscritos como sinônimo de superioridade.
+- Identifique o concorrente que melhor combina relevância temática + consistência de conteúdo + sinais de performance.
+- Explique por que ele se destaca.
+- Compare assuntos recorrentes e abordagens.
+- Mostre vantagens reais do canal do usuário, mesmo que ele seja menor.
+- Mostre lacunas reais sem simplesmente recomendar "poste mais".
+- As oportunidades devem ser áreas temáticas ou ângulos ainda pouco explorados pelos concorrentes.
+- As dicas de IA devem ser específicas para este canal e para estes concorrentes.
+- Não recomende copiar títulos ou formatos literalmente.
+
+Retorne SOMENTE JSON válido neste formato:
+{
+  "standoutName":"",
+  "standoutReason":"",
+  "contentApproach":"",
+  "dominantTopics":[""],
+  "competitorPatterns":[""],
+  "ownPositioning":"",
+  "strengths":[""],
+  "gaps":[""],
+  "opportunities":[""],
+  "actionPlan":[""],
+  "titleAngles":[""],
+  "seriesIdeas":[""],
+  "aiPrompts":[""]
+}
+
+Gere pelo menos 4 itens em strengths, gaps, opportunities e actionPlan quando os dados permitirem.
+Gere pelo menos 3 itens em dominantTopics, competitorPatterns, titleAngles, seriesIdeas e aiPrompts.
+`;
+
+}
+
 else if (tipo === "channel_analysis") {
 
 finalPrompt = `
@@ -3036,10 +3045,8 @@ REGRA CRÍTICA — FIDELIDADE TOTAL AO TÍTULO + COBERTURA COMPLETA DO TEMA
 
 O TÍTULO É A FONTE PRINCIPAL DE TODO O ROTEIRO.
 
-TÍTULO EXATO DA REQUISIÇÃO ATUAL (NÃO reutilize o conteúdo de nenhuma geração anterior):
+TÍTULO EXATO:
 ${title}
-
-ID DA GERAÇÃO: ${requestId}
 
 Antes de escrever, identifique silenciosamente:
 
@@ -3679,10 +3686,6 @@ const videoCacheId =
 
     "";
 
-// Script Generator: não usa cache em hipótese alguma.
-// O título atual é parte obrigatória da requisição e cada clique deve gerar uma nova resposta.
-const scriptCacheBypass = tipo === "script_generator";
-
 const cacheKey =
 
 tipo === "video_analysis"
@@ -3711,8 +3714,7 @@ tipo === "video_analysis"
 
     "script",
 
-    normalizedScript,
-    String(title || "").trim().toLowerCase()
+    normalizedScript
 
 ].join("|")
 
@@ -3737,13 +3739,13 @@ tipo === "video_analysis"
 ].join("|");
 
 // procura cache
-const cached = scriptCacheBypass ? null : global.__tubexCache.get(cacheKey);
+const cached = global.__tubexCache.get(cacheKey);
 
 // TTL por tipo
 const TTL = {
   diagnosis: 6,
   strategy: 12,
-script_generator:0,
+script_generator:12,
 video_analysis:12,
   niche: 24,
   ideas: 24,
@@ -3753,7 +3755,8 @@ video_analysis:12,
 
   thumbnail_prompt: 24,
   viral_content: 24,
-  channel_analysis: 12
+  channel_analysis: 12,
+  channel_competitor_radar: 12
 };
 
 const ttlHours = TTL[tipo] ?? 6;
@@ -3857,6 +3860,8 @@ if (tipo==="viral_content")
  temp=0.95;
 if (tipo==="channel_analysis")
  temp=0.6;
+if (tipo==="channel_competitor_radar")
+ temp=0.45;
 if (tipo==="video_analysis")
  temp=0.25;
 
@@ -3945,6 +3950,19 @@ Nunca escreva texto fora do JSON.
 
 }
 
+if (tipo === "channel_competitor_radar") {
+
+  systemPrompt = `
+Você é um estrategista sênior de crescimento no YouTube e analista competitivo.
+Sua função é comparar um canal com concorrentes que realmente atuam no mesmo micro-nicho.
+Use SOMENTE os dados recebidos. Não invente métricas, vídeos ou fatos.
+Não confunda tamanho do canal com qualidade. Priorize relevância temática, padrões de conteúdo, abordagem, diferenciação e sinais públicos de performance.
+Sempre responda exclusivamente JSON válido.
+Nunca use markdown fora do JSON.
+`;
+
+}
+
 if (tipo === "video_analysis") {
 
 systemPrompt = `
@@ -3997,6 +4015,9 @@ const model =
     : tipo === "channel_analysis"
         ? "gpt-4.1-mini"
 
+    : tipo === "channel_competitor_radar"
+        ? "gpt-4.1-mini"
+
     : "gpt-4o-mini";
 
 // ==========================================
@@ -4028,6 +4049,10 @@ const temperature =
 
         ? 0.4
 
+    : tipo === "channel_competitor_radar"
+
+        ? 0.35
+
     : temp;
 
 
@@ -4056,6 +4081,10 @@ const maxTokens =
     : tipo === "channel_analysis"
 
         ? 3000
+
+    : tipo === "channel_competitor_radar"
+
+        ? 3200
 
     : tipo === "seo_workspace"
 
@@ -4436,8 +4465,10 @@ console.log(text);
 
         const parsed = JSON.parse(cleanScript);
 
-        // SCRIPT WORKSPACE NÃO USA CACHE.
-        // Cada clique em Generate deve gerar o roteiro novamente.
+        global.__tubexCache.set(cacheKey,{
+            text: parsed,
+            timestamp: Date.now()
+        });
 
         // ===========================================
         // monta o roteiro em texto
@@ -4595,6 +4626,49 @@ if (tipo === "title_score") {
 }
 
 // ======================================================
+// 🧠 CHANNEL COMPETITOR RADAR JSON PARSER
+// ======================================================
+
+if (tipo === "channel_competitor_radar") {
+  try {
+    let clean = String(text || "").trim()
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const start = clean.indexOf("{");
+    const end = clean.lastIndexOf("}");
+    if (start >= 0 && end > start) clean = clean.slice(start, end + 1);
+
+    const parsed = JSON.parse(clean);
+    const arr = k => Array.isArray(parsed[k]) ? parsed[k].map(x => String(x || "").trim()).filter(Boolean).slice(0, 10) : [];
+    const result = {
+      standoutName: String(parsed.standoutName || "").trim(),
+      standoutReason: String(parsed.standoutReason || "").trim(),
+      contentApproach: String(parsed.contentApproach || "").trim(),
+      dominantTopics: arr("dominantTopics"),
+      competitorPatterns: arr("competitorPatterns"),
+      ownPositioning: String(parsed.ownPositioning || "").trim(),
+      strengths: arr("strengths"),
+      gaps: arr("gaps"),
+      opportunities: arr("opportunities"),
+      actionPlan: arr("actionPlan"),
+      titleAngles: arr("titleAngles"),
+      seriesIdeas: arr("seriesIdeas"),
+      aiPrompts: arr("aiPrompts")
+    };
+
+    if (!result.standoutName) result.standoutName = "—";
+    global.__tubexCache.set(cacheKey, { text: result, timestamp: Date.now() });
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error("💥 RADAR JSON:", err);
+    return res.status(200).json({ success:false, error:"competitor_radar_parse_failed" });
+  }
+}
+
+// ======================================================
 // 🧠 NICHE JSON PARSER
 // ======================================================
 
@@ -4702,7 +4776,7 @@ return res.status(200).json({
 }
 
 // 💾 salvar só se válido
-if (tipo !== "seo_workspace" && tipo !== "script_generator") {
+if (tipo !== "seo_workspace") {
   global.__tubexCache.set(cacheKey, {
     text,
     timestamp: Date.now()

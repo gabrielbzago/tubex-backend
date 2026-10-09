@@ -4120,6 +4120,8 @@ const useJson =
 
 tipo === "seo_workspace" ||
 
+tipo === "channel_competitor_radar" ||
+
 tipo === "niche" ||
 
 tipo === "viral_content" ||

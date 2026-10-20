@@ -46,7 +46,7 @@ function formatTrendDate(date) {
 function trendsTime(range, exactRange = false) {
   if (!exactRange) {
     if (range === "7d") {
-      return "now 7-d";
+      return "today 7-d";
     }
 
     if (range === "12m") {

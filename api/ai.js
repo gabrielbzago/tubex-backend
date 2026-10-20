@@ -156,32 +156,6 @@ if (
 
 prompt = prompt ? String(prompt).slice(0, 2000) : "";
 
-// ======================================================
-// 🔥 RATE LIMIT (CORRIGIDO)
-// ======================================================
-global.__rateLimit = global.__rateLimit || {};
-const now = Date.now();
-
-if (!global.__rateLimit[userKey]) {
-  global.__rateLimit[userKey] = [];
-}
-
-// mantém só últimos 60s
-global.__rateLimit[userKey] =
-  global.__rateLimit[userKey].filter(t => now - t < 60000);
-
-// bloqueio
-if (global.__rateLimit[userKey].length >= 15) {
-  return res.status(429).json({
-    success: false,
-    error: "rate_limit",
-    text: ""
-  });
-}
-
-// registra requisição
-global.__rateLimit[userKey].push(now);
-
     // ======================================================
     // 🎥 CONTEXT SAFE
     // ======================================================
@@ -2273,6 +2247,51 @@ Formato:
 // 🎬 VIDEO ANALYSIS
 // ======================================================
 
+else if (tipo === "tubex_insight") {
+
+const insightData = context?.insightData && typeof context.insightData === "object" ? context.insightData : {};
+finalPrompt = `
+Você é um analista sênior de YouTube Analytics e consultor de crescimento de canais.
+Sua tarefa é diagnosticar o desempenho do próprio canal e transformar dados observáveis em ações práticas.
+
+DADOS REAIS DO CANAL (JSON):
+${JSON.stringify(insightData, null, 2).slice(0, 24000)}
+
+REGRAS OBRIGATÓRIAS:
+- Use somente os dados fornecidos. Não invente CTR, impressões, retenção, views ou resultados futuros.
+- Se métricas privadas estiverem ausentes/null, declare isso e não estime valores ausentes.
+- Considere idade do vídeo e coorte antes de comparar resultados. Não compare diretamente vídeos de idades muito diferentes sem ressalva.
+- CTR depende de origem de tráfego, público e impressões; CTR baixo isolado não prova que a thumbnail é ruim.
+- Retenção depende de duração, assunto e intenção; não conclua causalidade com dados observacionais.
+- Não afirme que uma ação vai aumentar views. Formule hipóteses testáveis e indique a métrica a acompanhar.
+- Priorize exatamente 3 ações específicas, ordenadas por impacto potencial e confiança, com evidência observada.
+- Quando a amostra for pequena ou os dados não sustentarem conclusão, diga isso explicitamente.
+- Responda em português do Brasil, exclusivamente com JSON válido, sem markdown e sem texto fora do JSON.
+
+FORMATO JSON:
+{
+  "diagnosis": "Resumo objetivo do estado do canal com referência aos dados disponíveis",
+  "mainBottleneck": "Principal gargalo provável ou explicação de por que não é possível isolá-lo",
+  "confidence": 0,
+  "strengths": [{"text":"Ponto forte observado", "evidence":"dado que sustenta a leitura"}],
+  "evidence": [{"title":"Sinal observado", "reason":"interpretação cautelosa baseada nos dados", "metric":"métrica e valor reais"}],
+  "winners": [{"title":"Título exato de vídeo recebido", "reason":"por que ficou acima do padrão usando dados fornecidos", "metric":"métrica real"}],
+  "underperformers": [{"title":"Título exato de vídeo recebido", "reason":"por que ficou abaixo do padrão usando dados fornecidos", "metric":"métrica real"}],
+  "contentPatterns": ["Padrão observável nos títulos ou desempenho"],
+  "actions": [
+    {"priority":"1 — Alta", "action":"ação concreta", "reason":"evidência que justifica", "metric":"métrica para acompanhar", "confidence":"Alta/Média/Baixa"},
+    {"priority":"2 — Média", "action":"ação concreta", "reason":"evidência que justifica", "metric":"métrica para acompanhar", "confidence":"Alta/Média/Baixa"},
+    {"priority":"3 — Média", "action":"ação concreta", "reason":"evidência que justifica", "metric":"métrica para acompanhar", "confidence":"Alta/Média/Baixa"}
+  ],
+  "experiments": [{"title":"Hipótese ou experimento", "reason":"o que mudar e por quê", "metric":"métrica de sucesso"}],
+  "limitations": "Limitações e avisos importantes sobre amostra, correlação e causalidade"
+}
+
+Use títulos de vídeos apenas se eles constarem literalmente nos dados. Se não houver evidência suficiente para uma lista, retorne uma lista vazia em vez de inventar.
+`;
+
+}
+
 else if (tipo === "video_analysis") {
 
 finalPrompt = `
@@ -3686,9 +3705,23 @@ const videoCacheId =
 
     "";
 
+const insightCachePayload = tipo === "tubex_insight"
+  ? JSON.stringify(context?.insightData && typeof context.insightData === "object" ? context.insightData : {})
+  : "";
+
+// The Insight cache key includes a fingerprint of the actual channel metrics so
+// updated data naturally produces a new analysis instead of reusing stale output.
+const insightFingerprint = insightCachePayload
+  ? insightCachePayload.split("").reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261).toString(36)
+  : "";
+
 const cacheKey =
 
-tipo === "video_analysis"
+tipo === "tubex_insight"
+
+? ["tubex_insight_v2", userId, channelId, insightFingerprint].join("|")
+
+: tipo === "video_analysis"
 
 ? [
 
@@ -3756,7 +3789,10 @@ video_analysis:12,
   thumbnail_prompt: 24,
   viral_content: 24,
   channel_analysis: 12,
-  channel_competitor_radar: 12
+  channel_competitor_radar: 12,
+  // Reuse identical Insight analyses for 15 minutes to prevent repeated
+  // Studio opens/retries from consuming another OpenAI request.
+  tubex_insight: 0.25
 };
 
 const ttlHours = TTL[tipo] ?? 6;
@@ -3775,6 +3811,10 @@ if (
   cached &&
   (Date.now() - cached.timestamp) < ttl
 ) {
+
+  if (tipo === "tubex_insight") {
+    return res.status(200).json({ success: true, ...(cached.text || {}) });
+  }
 
   if (tipo === "niche") {
 
@@ -3867,6 +3907,19 @@ if (tipo==="video_analysis")
 
 
  // ======================================================
+// 🔥 RATE LIMIT — APENAS REQUISIÇÕES QUE VÃO GERAR IA
+// Cache hits retornam antes deste ponto e não consomem a janela.
+// ======================================================
+global.__rateLimit = global.__rateLimit || {};
+const rateNow = Date.now();
+if (!global.__rateLimit[userKey]) global.__rateLimit[userKey] = [];
+global.__rateLimit[userKey] = global.__rateLimit[userKey].filter(t => rateNow - t < 60000);
+if (global.__rateLimit[userKey].length >= 15) {
+  return res.status(429).json({ success: false, error: "rate_limit", text: "" });
+}
+global.__rateLimit[userKey].push(rateNow);
+
+// ======================================================
 // 🤖 OPENAI
 // ======================================================
 
@@ -3963,6 +4016,10 @@ Nunca use markdown fora do JSON.
 
 }
 
+if (tipo === "tubex_insight") {
+  systemPrompt = `Você é um analista profissional de YouTube Analytics. Responda exclusivamente JSON válido. Nunca invente métricas nem confunda correlação com causalidade. Quando não houver dados suficientes, declare a limitação.`;
+}
+
 if (tipo === "video_analysis") {
 
 systemPrompt = `
@@ -4016,6 +4073,9 @@ const model =
         ? "gpt-4.1-mini"
 
     : tipo === "channel_competitor_radar"
+        ? "gpt-4.1-mini"
+
+    : tipo === "tubex_insight"
         ? "gpt-4.1-mini"
 
     : "gpt-4o-mini";
@@ -4120,7 +4180,7 @@ const useJson =
 
 tipo === "seo_workspace" ||
 
-tipo === "channel_competitor_radar" ||
+tipo === "tubex_insight" ||
 
 tipo === "niche" ||
 
@@ -4625,6 +4685,52 @@ if (tipo === "title_score") {
 
     }
 
+}
+
+// ======================================================
+// 🔎 TUBEX INSIGHT JSON PARSER
+// ======================================================
+if (tipo === "tubex_insight") {
+  try {
+    let clean = String(text || "").trim()
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+    const start = clean.indexOf("{");
+    const end = clean.lastIndexOf("}");
+    if (start >= 0 && end > start) clean = clean.slice(start, end + 1);
+    const parsed = JSON.parse(clean);
+    const asText = v => String(v ?? "").trim();
+    const arr = (key, max = 6) => Array.isArray(parsed[key]) ? parsed[key].slice(0, max).map(item => {
+      if (typeof item === "string") return item.trim();
+      if (!item || typeof item !== "object") return "";
+      const out = {};
+      ["priority", "action", "reason", "metric", "confidence", "text", "title", "evidence", "name", "pattern", "why"].forEach(k => {
+        if (item[k] !== undefined && item[k] !== null) out[k] = String(item[k]).trim();
+      });
+      return out;
+    }).filter(x => typeof x === "string" ? x : Object.keys(x).length) : [];
+    const result = {
+      diagnosis: asText(parsed.diagnosis),
+      mainBottleneck: asText(parsed.mainBottleneck),
+      confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || 0)),
+      strengths: arr("strengths", 6),
+      evidence: arr("evidence", 6),
+      winners: arr("winners", 5),
+      underperformers: arr("underperformers", 5),
+      contentPatterns: arr("contentPatterns", 6),
+      actions: arr("actions", 3),
+      experiments: arr("experiments", 5),
+      limitations: asText(parsed.limitations)
+    };
+    if (!result.diagnosis && !result.mainBottleneck) throw new Error("empty_insight_json");
+    global.__tubexCache.set(cacheKey, { text: result, timestamp: Date.now() });
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    console.error("💥 TUBEX INSIGHT JSON:", err);
+    return res.status(200).json({ success: false, error: "tubex_insight_parse_failed" });
+  }
 }
 
 // ======================================================

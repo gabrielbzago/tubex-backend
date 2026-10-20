@@ -4720,10 +4720,66 @@ if (tipo === "tubex_insight") {
       winners: arr("winners", 5),
       underperformers: arr("underperformers", 5),
       contentPatterns: arr("contentPatterns", 6),
-      actions: arr("actions", 3),
+      // Accept older/model variants as well as the canonical "actions" field.
+      actions: arr("actions", 3).length ? arr("actions", 3)
+        : (arr("recommendations", 3).length ? arr("recommendations", 3) : arr("actionPlan", 3)),
       experiments: arr("experiments", 5),
       limitations: asText(parsed.limitations)
     };
+
+    // Fail-safe: do not leave the Studio panel empty just because the model
+    // returned a valid JSON object with missing/empty recommendation fields.
+    // These are cautious next steps, not claims about private metrics.
+    if (!result.actions.length) {
+      const winner = result.winners[0];
+      const underperformer = result.underperformers[0];
+      const winnerTitle = winner && typeof winner === "object" ? asText(winner.title) : "";
+      const winnerMetric = winner && typeof winner === "object" ? asText(winner.metric) : "";
+      const underTitle = underperformer && typeof underperformer === "object" ? asText(underperformer.title) : "";
+      const underMetric = underperformer && typeof underperformer === "object" ? asText(underperformer.metric) : "";
+
+      result.actions = [
+        {
+          priority: "1 — Alta",
+          action: "Conecte o YouTube Analytics e repita a análise para incluir impressões, CTR e retenção.",
+          reason: "O painel informa que as métricas privadas não estão disponíveis; sem elas, não é possível isolar com segurança um gargalo de embalagem ou retenção.",
+          metric: "Disponibilidade de impressões, CTR e duração média/retensão",
+          confidence: "Alta"
+        },
+        {
+          priority: "2 — Média",
+          action: winnerTitle
+            ? `Use "${winnerTitle}" como hipótese de pauta e compare com vídeos de idade semelhante antes de replicar o formato.`
+            : "Compare vídeos publicados em períodos semelhantes, normalizando visualizações pela idade de cada vídeo.",
+          reason: winnerTitle
+            ? `O modelo identificou esse vídeo entre os destaques${winnerMetric ? ` (${winnerMetric})` : ""}; isso justifica testar a hipótese, não assumir causalidade.`
+            : "As visualizações acumuladas não são diretamente comparáveis quando os vídeos têm idades diferentes.",
+          metric: "Visualizações por dia e desempenho relativo em coortes de idade semelhante",
+          confidence: "Média"
+        },
+        {
+          priority: "3 — Média",
+          action: underTitle
+            ? `Revise título e promessa de "${underTitle}" e teste uma única alteração por vez.`
+            : "Escolha um vídeo abaixo da mediana do canal e teste uma única alteração de título por vez.",
+          reason: underTitle
+            ? `Esse vídeo foi listado entre os abaixo do padrão${underMetric ? ` (${underMetric})` : ""}; sem CTR e impressões, o motivo da diferença ainda não pode ser atribuído ao título ou à thumbnail.`
+            : "Uma comparação controlada permite aprender sem atribuir a diferença a uma causa não medida.",
+          metric: "CTR e impressões após a alteração; se indisponíveis, acompanhe visualizações por dia como sinal secundário",
+          confidence: "Baixa"
+        }
+      ];
+      if (!result.mainBottleneck) {
+        result.mainBottleneck = "Não é possível isolar um gargalo específico sem CTR, impressões e retenção do YouTube Analytics.";
+      }
+      if (!result.diagnosis) {
+        result.diagnosis = "A análise pública permite comparar visualizações e idade dos vídeos, mas não determina sozinha se o principal gargalo é título, thumbnail ou retenção.";
+      }
+      if (!result.limitations) {
+        result.limitations = "As recomendações acima são hipóteses de teste. CTR, impressões e retenção privados não foram disponibilizados nesta consulta.";
+      }
+    }
+
     if (!result.diagnosis && !result.mainBottleneck) throw new Error("empty_insight_json");
     global.__tubexCache.set(cacheKey, { text: result, timestamp: Date.now() });
     return res.status(200).json({ success: true, ...result });

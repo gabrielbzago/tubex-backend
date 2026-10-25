@@ -3641,6 +3641,44 @@ Return exactly this structure:
 }
 
 // ======================================================
+// 🎯 OUTLIERS MODULE — ADDITIVE ROUTES
+// Dedicated types used only by TubeX Outliers. Existing
+// AI types and their prompts are intentionally unchanged.
+// ======================================================
+if (tipo === "outliers_ideas") {
+  finalPrompt = `
+Você é um estrategista sênior de YouTube especializado em identificar oportunidades editoriais a partir de vídeos outliers.
+
+Use o nicho, os títulos e os multiplicadores de desempenho fornecidos no contexto abaixo. Não invente métricas nem afirme que um vídeo viralizou por uma causa comprovada quando os dados mostram apenas correlação.
+
+Gere EXATAMENTE 12 ideias originais e acionáveis para o nicho. Para cada ideia, inclua:
+1. Título sugerido com alto potencial de CTR, sem clickbait enganoso.
+2. Ângulo/diferencial em relação aos vídeos de referência.
+3. Gancho para os primeiros 5 a 10 segundos.
+4. Por que a ideia pode funcionar, relacionando-a aos padrões observados.
+5. Sugestão breve de conceito visual para a miniatura.
+
+Não copie títulos nem proponha apenas pequenas variações dos vídeos de referência. Priorize combinações novas, lacunas de conteúdo e formatos replicáveis. Seja específico ao nicho informado. Se os dados forem insuficientes, sinalize isso brevemente e trate as conclusões como hipóteses.
+
+Solicitação e dados do módulo Outliers:
+${prompt}
+
+Responda em português do Brasil, com títulos e subtítulos claros. Use Markdown simples para separar as 12 ideias.
+`;
+} else if (tipo === "outlier_analysis") {
+  finalPrompt = `
+Analise o vídeo informado como um estrategista experiente de YouTube, usando exclusivamente os dados fornecidos. Não invente informações sobre a miniatura se ela não estiver descrita e não confunda correlação com causalidade.
+
+Entregue: (1) hipóteses plausíveis para o desempenho; (2) estrutura e gatilhos do título; (3) o que pode ser inferido — e o que não pode — sobre a miniatura; (4) elementos que podem ser adaptados sem copiar; (5) três ideias derivadas e distintas; (6) próximos testes recomendados. Diferencie fatos fornecidos de hipóteses.
+
+Dados do vídeo:
+${prompt}
+
+Responda em português do Brasil, com seções curtas e recomendações práticas.
+`;
+}
+
+// ======================================================
 // ❌ INVALID TYPE
 // ======================================================
 
@@ -4018,6 +4056,14 @@ Nunca use markdown fora do JSON.
 
 if (tipo === "tubex_insight") {
   systemPrompt = `Você é um analista profissional de YouTube Analytics. Responda exclusivamente JSON válido. Nunca invente métricas nem confunda correlação com causalidade. Quando não houver dados suficientes, declare a limitação.`;
+}
+
+if (tipo === "outliers_ideas") {
+  systemPrompt = `Você é um estrategista sênior de conteúdo para YouTube. Gere ideias originais, específicas e úteis a partir dos sinais de desempenho fornecidos. Nunca invente dados, não copie títulos de referência e diferencie hipóteses de fatos. Responda em português do Brasil com Markdown simples.`;
+}
+
+if (tipo === "outlier_analysis") {
+  systemPrompt = `Você é um analista de desempenho de vídeos do YouTube. Use somente os dados recebidos, não invente métricas nem alegue conhecer elementos visuais que não foram fornecidos. Diferencie observações de hipóteses e responda em português do Brasil com recomendações práticas.`;
 }
 
 if (tipo === "video_analysis") {

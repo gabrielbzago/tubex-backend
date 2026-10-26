@@ -3647,23 +3647,41 @@ Return exactly this structure:
 // ======================================================
 if (tipo === "outliers_ideas") {
   finalPrompt = `
-Você é um estrategista sênior de YouTube especializado em identificar oportunidades editoriais a partir de vídeos outliers.
+Você é diretor de estratégia editorial e especialista em psicologia do clique para YouTube. Sua função é encontrar novas ideias que preservem a força emocional e a promessa do vídeo outlier escolhido, mas ofereçam uma descoberta genuinamente nova.
 
-Use o nicho, os títulos e os multiplicadores de desempenho fornecidos no contexto abaixo. Não invente métricas nem afirme que um vídeo viralizou por uma causa comprovada quando os dados mostram apenas correlação.
+PRINCÍPIO CENTRAL: o título de referência é uma evidência do tipo de promessa que atraiu atenção. Analise a intenção do espectador, o benefício ou risco percebido, a lacuna de curiosidade, a especificidade e a intensidade emocional. Preserve esse PESO PSICOLÓGICO — não copie as palavras.
 
-Gere EXATAMENTE 12 ideias originais e acionáveis para o nicho. Para cada ideia, inclua:
-1. Título sugerido com alto potencial de CTR, sem clickbait enganoso.
-2. Ângulo/diferencial em relação aos vídeos de referência.
-3. Gancho para os primeiros 5 a 10 segundos.
-4. Por que a ideia pode funcionar, relacionando-a aos padrões observados.
-5. Sugestão breve de conceito visual para a miniatura.
+REGRAS DE COERÊNCIA INEGOCIÁVEIS:
+- Leia o título original como uma promessa factual, não como um conjunto de palavras-chave.
+- Não misture formatos, métricas ou conceitos que não se aplicam entre si.
+- Shorts não contam para as 4.000 horas públicas de exibição exigidas no caminho de monetização por horas. Shorts têm critérios próprios. Portanto, se o título original for sobre alcançar 4.000 horas, NÃO proponha “4.000 horas com vídeos curtos/Shorts”. Desenvolva ângulos coerentes com vídeos longos, horas públicas válidas, estratégias de retenção ou descoberta realista.
+- Se o original contiver número, prazo, resultado ou regra de plataforma, preserve o contexto correto e não invente garantias.
+- Não sugira uma promessa que o criador não possa entregar no vídeo.
 
-Não copie títulos nem proponha apenas pequenas variações dos vídeos de referência. Priorize combinações novas, lacunas de conteúdo e formatos replicáveis. Seja específico ao nicho informado. Se os dados forem insuficientes, sinalize isso brevemente e trate as conclusões como hipóteses.
+QUALIDADE DOS TÍTULOS:
+- Cada título deve ter uma descoberta específica, tensão emocional e motivo claro para clicar.
+- Priorize revelação, erro pouco percebido, mecanismo oculto, risco de perder uma oportunidade, contraste surpreendente, prova verificável ou consequência inesperada — somente quando coerentes com o tema.
+- Preserve a intensidade do original. Não reduza uma promessa forte a um tutorial genérico.
+- Evite títulos genéricos como “Como conseguir…”, “Dicas para…”, “Tudo sobre…” quando não houver um diferencial concreto.
+- Não use urgência artificial (“agora”, “antes que seja tarde”) sem motivo real.
+- Não copie o título original nem faça mera substituição de sinônimos.
+- Gere cinco ideias realmente distintas, não cinco variações da mesma ideia. Títulos naturais em português brasileiro, preferencialmente até 70 caracteres.
+- Não afirme causalidade com base apenas em visualizações ou multiplicador outlier.
 
-Solicitação e dados do módulo Outliers:
+DADOS E SOLICITAÇÃO:
 ${prompt}
 
-Responda em português do Brasil, com títulos e subtítulos claros. Use Markdown simples para separar as 12 ideias.
+Gere EXATAMENTE 5 ideias. Para cada uma, inclua:
+## Ideia 1
+**Título sugerido:** [título final — apenas uma linha, sem comentários]
+**Título de referência:** [título original exato]
+**Promessa preservada:** [o motivo emocional e a recompensa que continuam relevantes]
+**Ângulo/diferencial:** [descoberta nova e coerente]
+**Gancho inicial:** [abertura concreta para os primeiros segundos]
+**Por que pode funcionar:** [hipótese ligada à referência, sem afirmar causalidade]
+**Conceito visual da miniatura:** [imagem e contraste que reforçam a descoberta]
+
+Repita até Ideia 5. Antes de responder, faça uma verificação factual de cada título e descarte qualquer ideia incoerente com o tema, com as regras do YouTube ou com a promessa original. Responda somente em português brasileiro, com Markdown simples.
 `;
 } else if (tipo === "outlier_analysis") {
   finalPrompt = `
@@ -4059,7 +4077,7 @@ if (tipo === "tubex_insight") {
 }
 
 if (tipo === "outliers_ideas") {
-  systemPrompt = `Você é um estrategista sênior de conteúdo para YouTube. Gere ideias originais, específicas e úteis a partir dos sinais de desempenho fornecidos. Nunca invente dados, não copie títulos de referência e diferencie hipóteses de fatos. Responda em português do Brasil com Markdown simples.`;
+  systemPrompt = `Você é um diretor editorial especialista em títulos de YouTube, psicologia do clique e coerência factual. Preserve o peso emocional, a curiosidade e a promessa do título de referência, mas gere descobertas novas. Valide a lógica de cada título. Nunca misture métricas ou regras incompatíveis: Shorts não contam para as 4.000 horas públicas de exibição do caminho de monetização por horas. Não invente fatos nem prometa resultados não sustentados. Evite fórmulas genéricas. Responda em português brasileiro com Markdown simples.`;
 }
 
 if (tipo === "outlier_analysis") {

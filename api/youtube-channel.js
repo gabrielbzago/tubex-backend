@@ -91,21 +91,19 @@ export default async function handler(req, res) {
         if (rows.length) {
           const engagedIndex = headers.indexOf("engagedViews");
           const viewsIndex = headers.indexOf("views");
+          if (engagedIndex < 0 || viewsIndex < 0) {
+            console.warn("[TubeX][ActiveViews][Channel] required Analytics columns missing", { headers, startDate, endDate });
+            continue;
+          }
+          const engagedViews = rows.reduce((sum, row) => sum + Number(row[engagedIndex] ?? 0), 0);
+          const views = rows.reduce((sum, row) => sum + Number(row[viewsIndex] ?? 0), 0);
+          if (!Number.isFinite(engagedViews) || !Number.isFinite(views) || engagedViews < 0 || views < 0 || engagedViews > views) continue;
 
           return res.status(200).json({
             success: true,
-            activeViews: rows.reduce(
-              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
-              0
-            ),
-            engagedViews: rows.reduce(
-              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
-              0
-            ),
-            views: rows.reduce(
-              (sum, row) => sum + Number(viewsIndex >= 0 ? row[viewsIndex] : 0),
-              0
-            ),
+            activeViews: engagedViews,
+            engagedViews,
+            views,
             days,
             startDate,
             endDate,
@@ -122,12 +120,18 @@ export default async function handler(req, res) {
         if (first) {
           const engagedIndex = exactHeaders.indexOf("engagedViews");
           const viewsIndex = exactHeaders.indexOf("views");
-
+          if (engagedIndex < 0 || viewsIndex < 0) {
+            console.warn("[TubeX][ActiveViews][Channel] required fallback columns missing", { headers: exactHeaders, startDate, endDate });
+            continue;
+          }
+          const engagedViews = Number(first[engagedIndex]);
+          const views = Number(first[viewsIndex]);
+          if (!Number.isFinite(engagedViews) || !Number.isFinite(views) || engagedViews < 0 || views < 0 || engagedViews > views) continue;
           return res.status(200).json({
             success: true,
-            activeViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
-            engagedViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
-            views: Number(viewsIndex >= 0 ? first[viewsIndex] : 0),
+            activeViews: engagedViews,
+            engagedViews,
+            views,
             days,
             startDate,
             endDate,

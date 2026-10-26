@@ -198,12 +198,19 @@ const accessToken =
       };
 
       let videoId = String(body?.videoId || "").trim();
+      const requestedPublishedAt = String(body?.publishedAt || "").trim();
       let startDate = target === "channel" ? dateAtStartOfDay(days) : dateAtStartOfDay(30);
 
       // For video metrics we try to preserve lifetime semantics by resolving
       // the video's publication date. If it cannot be resolved, 30 days is
       // used as a safe fallback.
       if (target === "video") {
+        if (requestedPublishedAt) {
+          const parsedPublishedAt = new Date(requestedPublishedAt);
+          if (!Number.isNaN(parsedPublishedAt.getTime())) {
+            startDate = parsedPublishedAt.toISOString().slice(0, 10);
+          }
+        }
         if (!videoId) {
           return res.status(200).json({
             success: false,
@@ -257,19 +264,27 @@ const accessToken =
             const engagedIndex = headers.indexOf("engagedViews");
             const viewsIndex = headers.indexOf("views");
 
+            if (engagedIndex < 0 || viewsIndex < 0) {
+              console.warn("[TubeX][ActiveViews] required Analytics columns missing", { target, headers, startDate, endDate });
+              continue;
+            }
             const engagedViews = rows.reduce(
-              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
+              (sum, row) => sum + Number(row[engagedIndex] ?? 0),
               0
             );
             const views = rows.reduce(
-              (sum, row) => sum + Number(viewsIndex >= 0 ? row[viewsIndex] : 0),
+              (sum, row) => sum + Number(row[viewsIndex] ?? 0),
               0
             );
+            if (!Number.isFinite(engagedViews) || !Number.isFinite(views) || engagedViews < 0 || views < 0 || engagedViews > views) {
+              console.warn("[TubeX][ActiveViews] inconsistent Analytics values", { target, engagedViews, views, headers });
+              continue;
+            }
 
             return res.status(200).json({
               success: true,
-              activeViews: Number.isFinite(engagedViews) ? engagedViews : 0,
-              engagedViews: Number.isFinite(engagedViews) ? engagedViews : 0,
+              activeViews: engagedViews,
+              engagedViews,
               views: Number.isFinite(views) ? views : 0,
               target,
               videoId: target === "video" ? videoId : undefined,
@@ -299,11 +314,18 @@ const accessToken =
             const engagedIndex = exactHeaders.indexOf("engagedViews");
             const viewsIndex = exactHeaders.indexOf("views");
 
+            if (engagedIndex < 0 || viewsIndex < 0) {
+              console.warn("[TubeX][ActiveViews] required fallback columns missing", { target, headers: exactHeaders, startDate, endDate });
+              continue;
+            }
+            const engagedViews = Number(first[engagedIndex]);
+            const views = Number(first[viewsIndex]);
+            if (!Number.isFinite(engagedViews) || !Number.isFinite(views) || engagedViews < 0 || views < 0 || engagedViews > views) continue;
             return res.status(200).json({
               success: true,
-              activeViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
-              engagedViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
-              views: Number(viewsIndex >= 0 ? first[viewsIndex] : 0),
+              activeViews: engagedViews,
+              engagedViews,
+              views,
               target,
               videoId: target === "video" ? videoId : undefined,
               days: target === "channel" ? days : undefined,

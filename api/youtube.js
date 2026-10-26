@@ -146,6 +146,7 @@ const accessToken =
         return res.status(200).json({
           success: false,
           error: "analytics_auth_required",
+          activeViews: null,
           engagedViews: null,
           target
         });
@@ -160,8 +161,8 @@ const accessToken =
         .trim();
       const dateAtStartOfDay = offsetDays => {
         const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        d.setDate(d.getDate() - Number(offsetDays || 0));
+        d.setUTCHours(0, 0, 0, 0);
+        d.setUTCDate(d.getUTCDate() - Number(offsetDays || 0));
         return d.toISOString().slice(0, 10);
       };
 
@@ -231,20 +232,19 @@ const accessToken =
 
       // Analytics can lag recent dates. Use yesterday first and two days ago
       // as a fallback without changing any existing SEO behavior.
-      const endDates = [dateAtStartOfDay(1), dateAtStartOfDay(2)];
+      const endDates = target === "video"
+        ? [dateAtStartOfDay(0), dateAtStartOfDay(1), dateAtStartOfDay(2)]
+        : [dateAtStartOfDay(1), dateAtStartOfDay(2)];
       let lastError = null;
 
       for (const endDate of endDates) {
         if (endDate < startDate) continue;
 
         try {
-          // Keep video and channel scopes separate. For a video request,
-          // include the video dimension and verify every returned row belongs
-          // to the requested video before summing any metric.
           const data = await queryAnalytics({
             startDate,
             endDate,
-            dimensions: target === "video" ? "video,day" : "day",
+            dimensions: "day",
             filters: target === "video" ? `video==${videoId}` : ""
           });
 
@@ -252,78 +252,65 @@ const accessToken =
             ? data.columnHeaders.map(x => String(x?.name || ""))
             : [];
           const rows = Array.isArray(data?.rows) ? data.rows : [];
-          const videoIndex = headers.indexOf("video");
-          const engagedIndex = headers.indexOf("engagedViews");
-          const viewsIndex = headers.indexOf("views");
 
-          const scopedRows = target === "video"
-            ? rows.filter(row => videoIndex >= 0 && String(row?.[videoIndex] || "") === videoId)
-            : rows;
+          if (rows.length) {
+            const engagedIndex = headers.indexOf("engagedViews");
+            const viewsIndex = headers.indexOf("views");
 
-          if (scopedRows.length && engagedIndex >= 0 && viewsIndex >= 0) {
-            const engagedViews = scopedRows.reduce(
-              (sum, row) => sum + Number(row[engagedIndex] || 0), 0
+            const engagedViews = rows.reduce(
+              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
+              0
             );
-            const views = scopedRows.reduce(
-              (sum, row) => sum + Number(row[viewsIndex] || 0), 0
+            const views = rows.reduce(
+              (sum, row) => sum + Number(viewsIndex >= 0 ? row[viewsIndex] : 0),
+              0
             );
 
-            // Analytics metrics can have slightly different definitions, but
-            // engaged views should not be allowed to exceed the same report's
-            // views by an implausible amount. Return unavailable instead of
-            // displaying a potentially mismatched/aggregate value.
-            if (
-              Number.isFinite(engagedViews) &&
-              Number.isFinite(views) &&
-              engagedViews >= 0 &&
-              views >= 0 &&
-              (target !== "video" || engagedViews <= views)
-            ) {
-              return res.status(200).json({
-                success: true,
-                engagedViews,
-                views,
-                target,
-                videoId: target === "video" ? videoId : undefined,
-                days: target === "channel" ? days : undefined,
-                startDate,
-                endDate,
-                source: "youtube-analytics-api",
-                scopeVerified: target === "video"
-              });
-            }
-
-            console.warn("[TubeX] engagedViews rejected inconsistent metrics", {
-              target, videoId, views, engagedViews, startDate, endDate
+            return res.status(200).json({
+              success: true,
+              activeViews: Number.isFinite(engagedViews) ? engagedViews : 0,
+              engagedViews: Number.isFinite(engagedViews) ? engagedViews : 0,
+              views: Number.isFinite(views) ? views : 0,
+              target,
+              videoId: target === "video" ? videoId : undefined,
+              days: target === "channel" ? days : undefined,
+              startDate,
+              endDate,
+              source: "youtube-analytics-api"
             });
           }
 
-          // IMPORTANT: do not use a dimensionless fallback for video requests.
-          // A response without a video dimension cannot be verified as belonging
-          // to the requested video. Channel-level requests may safely retry
-          // without dimensions because their scope is the whole channel.
-          if (target === "channel") {
-            const exact = await queryAnalytics({ startDate, endDate });
-            const exactHeaders = Array.isArray(exact?.columnHeaders)
-              ? exact.columnHeaders.map(x => String(x?.name || ""))
-              : [];
-            const first = Array.isArray(exact?.rows) ? exact.rows[0] : null;
-            const exactEngagedIndex = exactHeaders.indexOf("engagedViews");
-            const exactViewsIndex = exactHeaders.indexOf("views");
+          // Exact, dimensionless fallback.
+          const exact = await queryAnalytics({
+            startDate,
+            endDate,
+            // Basic user activity statistics is a dimensionless report;
+            // the individual video is selected by the video filter.
+            dimensions: "",
+            filters: target === "video" ? `video==${videoId}` : ""
+          });
 
-            if (first && exactEngagedIndex >= 0 && exactViewsIndex >= 0) {
-              return res.status(200).json({
-                success: true,
-                engagedViews: Number(first[exactEngagedIndex] || 0),
-                views: Number(first[exactViewsIndex] || 0),
-                target,
-                days,
-                startDate,
-                endDate,
-                source: "youtube-analytics-api",
-                scopeVerified: true
-              });
-            }
+          const exactHeaders = Array.isArray(exact?.columnHeaders)
+            ? exact.columnHeaders.map(x => String(x?.name || ""))
+            : [];
+          const first = Array.isArray(exact?.rows) ? exact.rows[0] : null;
+
+          if (first) {
+            const engagedIndex = exactHeaders.indexOf("engagedViews");
+            const viewsIndex = exactHeaders.indexOf("views");
+
+            return res.status(200).json({
+              success: true,
+              activeViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
+              engagedViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
+              views: Number(viewsIndex >= 0 ? first[viewsIndex] : 0),
+              target,
+              videoId: target === "video" ? videoId : undefined,
+              days: target === "channel" ? days : undefined,
+              startDate,
+              endDate,
+              source: "youtube-analytics-api"
+            });
           }
         } catch (error) {
           lastError = error;
@@ -335,6 +322,7 @@ const accessToken =
       return res.status(200).json({
         success: false,
         error: lastError?.message || "engaged_views_unavailable",
+        activeViews: null,
         engagedViews: null,
         target,
         videoId: target === "video" ? videoId : undefined,

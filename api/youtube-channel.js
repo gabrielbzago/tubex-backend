@@ -29,46 +29,40 @@ export default async function handler(req, res) {
   // =========================================================
   if (body?.mode === "engaged_views") {
     const token = String(body?.accessToken || "").trim();
-    const target = body?.target === "video" ? "video" : "channel";
-    const videoId = String(body?.videoId || "").trim();
     const requestedDays = Number(body?.days);
     const days = [7, 28, 30].includes(requestedDays) ? requestedDays : 28;
 
     if (!token) {
       return res.status(200).json({
-        success: false, error: "analytics_auth_required",
-        engagedViews: null, target, videoId: target === "video" ? videoId : undefined
-      });
-    }
-
-    if (target === "video" && !videoId) {
-      return res.status(200).json({
-        success: false, error: "video_id_required",
-        engagedViews: null, target
+        success: false,
+        error: "analytics_auth_required",
+        activeViews: null,
+        engagedViews: null,
+        days
       });
     }
 
     const dateAtStartOfDay = offsetDays => {
       const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - Number(offsetDays || 0));
+      d.setUTCHours(0, 0, 0, 0);
+      d.setUTCDate(d.getUTCDate() - Number(offsetDays || 0));
       return d.toISOString().slice(0, 10);
     };
 
-    const queryAnalytics = async (startDate, endDate, dimensions, filters = "") => {
+    const queryAnalytics = async (startDate, endDate, dimensions = "") => {
       const url = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
       url.searchParams.set("ids", "channel==MINE");
       url.searchParams.set("startDate", startDate);
       url.searchParams.set("endDate", endDate);
       url.searchParams.set("metrics", "views,engagedViews");
       if (dimensions) url.searchParams.set("dimensions", dimensions);
-      if (filters) url.searchParams.set("filters", filters);
-      if (dimensions?.includes("day")) url.searchParams.set("sort", "day");
+      if (dimensions === "day") url.searchParams.set("sort", "day");
 
       const response = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const payload = await response.json().catch(() => ({}));
+
       if (!response.ok) {
         const error = new Error(
           payload?.error?.errors?.[0]?.reason ||
@@ -78,98 +72,70 @@ export default async function handler(req, res) {
         error.status = response.status;
         throw error;
       }
+
       return payload;
     };
 
-    let startDate = dateAtStartOfDay(days);
-    if (target === "video") {
-      // For an individual video, use its publication date when the Data API
-      // can confirm it. Never substitute channel-level analytics.
-      const key = String(process.env.YOUTUBE_API_KEY || "").split(",")[0].trim();
-      if (key) {
-        try {
-          const videoUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
-          videoUrl.searchParams.set("part", "snippet");
-          videoUrl.searchParams.set("id", videoId);
-          videoUrl.searchParams.set("key", key);
-          const videoRes = await fetch(videoUrl.toString());
-          const videoJson = await videoRes.json().catch(() => ({}));
-          const item = (videoJson?.items || []).find(v => String(v?.id || "") === videoId);
-          if (item?.snippet?.publishedAt) {
-            startDate = new Date(item.snippet.publishedAt).toISOString().slice(0, 10);
-          }
-        } catch (error) {
-          console.warn("[TubeX] engaged views publication lookup failed:", error?.message || error);
-        }
-      }
-    }
-
+    const startDate = dateAtStartOfDay(days);
     const endDates = [dateAtStartOfDay(1), dateAtStartOfDay(2)];
     let lastError = null;
 
     for (const endDate of endDates) {
-      if (endDate < startDate) continue;
       try {
-        const data = await queryAnalytics(
-          startDate,
-          endDate,
-          target === "video" ? "video,day" : "day",
-          target === "video" ? `video==${videoId}` : ""
-        );
+        const data = await queryAnalytics(startDate, endDate, "day");
         const headers = Array.isArray(data?.columnHeaders)
-          ? data.columnHeaders.map(x => String(x?.name || "")) : [];
+          ? data.columnHeaders.map(x => String(x?.name || ""))
+          : [];
         const rows = Array.isArray(data?.rows) ? data.rows : [];
-        const videoIndex = headers.indexOf("video");
-        const engagedIndex = headers.indexOf("engagedViews");
-        const viewsIndex = headers.indexOf("views");
-        const scopedRows = target === "video"
-          ? rows.filter(row => videoIndex >= 0 && String(row?.[videoIndex] || "") === videoId)
-          : rows;
 
-        if (scopedRows.length && engagedIndex >= 0 && viewsIndex >= 0) {
-          const engagedViews = scopedRows.reduce((sum, row) => sum + Number(row[engagedIndex] || 0), 0);
-          const views = scopedRows.reduce((sum, row) => sum + Number(row[viewsIndex] || 0), 0);
+        if (rows.length) {
+          const engagedIndex = headers.indexOf("engagedViews");
+          const viewsIndex = headers.indexOf("views");
 
-          if (
-            Number.isFinite(engagedViews) && Number.isFinite(views) &&
-            engagedViews >= 0 && views >= 0 &&
-            (target !== "video" || engagedViews <= views)
-          ) {
-            return res.status(200).json({
-              success: true, engagedViews, views, target,
-              videoId: target === "video" ? videoId : undefined,
-              days: target === "channel" ? days : undefined,
-              startDate, endDate, source: "youtube-analytics-api",
-              scopeVerified: target === "video"
-            });
-          }
-          console.warn("[TubeX] engaged views rejected inconsistent metrics", {
-            target, videoId, views, engagedViews, startDate, endDate
+          return res.status(200).json({
+            success: true,
+            activeViews: rows.reduce(
+              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
+              0
+            ),
+            engagedViews: rows.reduce(
+              (sum, row) => sum + Number(engagedIndex >= 0 ? row[engagedIndex] : 0),
+              0
+            ),
+            views: rows.reduce(
+              (sum, row) => sum + Number(viewsIndex >= 0 ? row[viewsIndex] : 0),
+              0
+            ),
+            days,
+            startDate,
+            endDate,
+            source: "youtube-analytics-api"
           });
         }
 
-        // Dimensionless reports are allowed only for channel-wide metrics.
-        // For a video request, missing exact-video rows mean unavailable.
-        if (target === "channel") {
-          const exact = await queryAnalytics(startDate, endDate, "");
-          const exactHeaders = Array.isArray(exact?.columnHeaders)
-            ? exact.columnHeaders.map(x => String(x?.name || "")) : [];
-          const first = Array.isArray(exact?.rows) ? exact.rows[0] : null;
-          const eIndex = exactHeaders.indexOf("engagedViews");
-          const vIndex = exactHeaders.indexOf("views");
-          if (first && eIndex >= 0 && vIndex >= 0) {
-            return res.status(200).json({
-              success: true,
-              engagedViews: Number(first[eIndex] || 0),
-              views: Number(first[vIndex] || 0),
-              target, days, startDate, endDate,
-              source: "youtube-analytics-api", scopeVerified: true
-            });
-          }
+        const exact = await queryAnalytics(startDate, endDate);
+        const exactHeaders = Array.isArray(exact?.columnHeaders)
+          ? exact.columnHeaders.map(x => String(x?.name || ""))
+          : [];
+        const first = Array.isArray(exact?.rows) ? exact.rows[0] : null;
+
+        if (first) {
+          const engagedIndex = exactHeaders.indexOf("engagedViews");
+          const viewsIndex = exactHeaders.indexOf("views");
+
+          return res.status(200).json({
+            success: true,
+            activeViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
+            engagedViews: Number(engagedIndex >= 0 ? first[engagedIndex] : 0),
+            views: Number(viewsIndex >= 0 ? first[viewsIndex] : 0),
+            days,
+            startDate,
+            endDate,
+            source: "youtube-analytics-api"
+          });
         }
       } catch (error) {
         lastError = error;
-        console.warn("[TubeX] engaged views analytics:", error?.message || error);
         if (error?.status === 401 || error?.status === 403) break;
       }
     }
@@ -177,10 +143,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: false,
       error: lastError?.message || "engaged_views_unavailable",
+      activeViews: null,
       engagedViews: null,
-      target,
-      videoId: target === "video" ? videoId : undefined,
-      days: target === "channel" ? days : undefined
+      days
     });
   }
 

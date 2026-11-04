@@ -423,7 +423,7 @@ if(
       }
 
       global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
-      const tagCacheKey = query.toLocaleLowerCase("pt-BR");
+      const tagCacheKey = "v2_" + query.toLocaleLowerCase("pt-BR");
       const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
       if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
         return res.status(200).json({
@@ -460,9 +460,26 @@ if(
         "canal","canais","conteudo","criador","criadores","dicas","melhor",
         "melhores","estrategia","estrategias","coisas","segredos","guia"
       ]);
-      const titleTokens = normalizeTagText(query).split(" ").filter(w => w.length > 2 && !stopwords.has(w));
-      const coreTokens = titleTokens.filter(w => !genericTerms.has(w));
-      const anchorTokens = (coreTokens.length ? coreTokens : titleTokens).slice(0, 5);
+      const canonicalToken = token => {
+        let value = normalizeTagText(token);
+        // Normalize common Portuguese inflections without an external NLP service.
+        if (value.endsWith("ais") && value.length > 5) value = value.slice(0, -3) + "al";
+        else if (value.endsWith("oes") && value.length > 5) value = value.slice(0, -3) + "ao";
+        else if (value.endsWith("s") && value.length > 4) value = value.slice(0, -1);
+        if (/^(cresce|crescer|crescem|cresceu|crescendo|crescimento)$/.test(value)) value = "crescimento";
+        if (/^(canal|canais)$/.test(value)) value = "canal";
+        if (/^(visualizacao|visualizacoes|views)$/.test(value)) value = "views";
+        if (/^(criador|criadores|creator|creators)$/.test(value)) value = "criador";
+        return value;
+      };
+      // Keep meaningful subject nouns such as "canais". The previous code
+      // removed generic/domain words and reduced this title to just "cresce",
+      // causing autocomplete to return unrelated "massa não cresce" phrases.
+      const titleTokens = normalizeTagText(query).split(" ")
+        .filter(w => w.length > 2 && !stopwords.has(w))
+        .map(canonicalToken);
+      const coreTokens = [...new Set(titleTokens)];
+      const anchorTokens = coreTokens.slice(0, 6);
       const anchorQuery = anchorTokens.join(" ") || query;
       const queryKey = normalizeTagText(query);
       const candidates = new Map();
@@ -471,19 +488,21 @@ if(
         const keyword = String(raw || "").trim().replace(/\s+/g, " ");
         const key = normalizeTagText(keyword);
         if (!key || key.length < 3 || key.length > 90 || key === queryKey) return;
-        const words = [...new Set(key.split(" ").filter(w => w.length > 2 && !stopwords.has(w)))];
+        const words = [...new Set(key.split(" ")
+          .filter(w => w.length > 2 && !stopwords.has(w))
+          .map(canonicalToken))];
         if (!words.length || words.length > 8) return;
 
         const matchedCore = words.filter(w => coreTokens.includes(w)).length;
-        const matchedTitle = words.filter(w => titleTokens.includes(w)).length;
+        const matchedTitle = matchedCore;
         const coreCoverage = matchedCore / Math.max(1, Math.min(words.length, 4));
         const titleCoverage = matchedTitle / Math.max(1, Math.min(words.length, 5));
 
-        // Não basta compartilhar palavras genéricas como "canal" ou "vídeo".
-        // Exigimos correspondência com ao menos um conceito específico.
-        if (coreTokens.length && matchedCore === 0) return;
-        if (coreTokens.length >= 2 && matchedCore < 1) return;
-        if (words.length >= 4 && coreCoverage < 0.25) return;
+        // For titles with multiple meaningful concepts, a suggestion must
+        // match at least two. A lone shared verb ("cresce") is ambiguous.
+        if (coreTokens.length >= 2 && matchedCore < 2) return;
+        if (coreTokens.length === 1 && matchedCore === 0) return;
+        if (words.length >= 3 && coreCoverage < 0.34) return;
 
         const exactPhrase = queryKey.includes(key) || key.includes(queryKey);
         const rankSignal = Math.max(0, 1 - Number(rank || 0) / 50);
@@ -566,7 +585,8 @@ if(
           const relevance = Math.round(item.scoreTotal / Math.max(1, item.count));
           return {
             keyword: item.keyword,
-            score: Math.max(35, Math.min(98, relevance + corroboration + sourceBonus)),
+            // Confidence is a relative relevance estimate, not YouTube search volume.
+            score: Math.max(30, Math.min(94, Math.round(relevance * 0.82 + corroboration + sourceBonus))),
             frequency: item.videoIds.size || item.count,
             source: [...item.sources].join("+")
           };

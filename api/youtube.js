@@ -423,7 +423,7 @@ if(
       }
 
       global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
-      const tagCacheKey = "v3_" + query.toLocaleLowerCase("pt-BR");
+      const tagCacheKey = "v4_niche_" + query.toLocaleLowerCase("pt-BR");
       const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
       if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
         return res.status(200).json({
@@ -454,7 +454,7 @@ if(
         "seus","isso","esta","este","estas","estes","essas","esses","coisas",
         "simples","maioria","ignora","tres","3","mais","menos","muito","muita",
         "ser","ter","fazer","sobre","ainda","voce","seu","sua","meu","minha",
-        "video","videos","youtube","oficial","novo","nova","2024","2025","2026"
+        "video","videos","oficial","novo","nova","faz","qualquer","hoje","2024","2025","2026"
       ]);
       const genericTerms = new Set([
         "canal","canais","conteudo","criador","criadores","dicas","melhor",
@@ -494,29 +494,30 @@ if(
         if (!words.length || words.length > 8) return;
 
         const matchedCore = words.filter(w => coreTokens.includes(w)).length;
-        const matchedTitle = matchedCore;
         const coreCoverage = matchedCore / Math.max(1, Math.min(words.length, 4));
-        const titleCoverage = matchedTitle / Math.max(1, Math.min(words.length, 5));
+        const titleCoverage = matchedCore / Math.max(1, Math.min(words.length, 5));
 
-        // For titles with multiple meaningful concepts, a suggestion must
-        // match at least two. A lone shared verb ("cresce") is ambiguous.
-        if (coreTokens.length >= 2 && matchedCore < 2) return;
-        if (coreTokens.length === 1 && matchedCore === 0) return;
-        if (words.length >= 3 && coreCoverage < 0.34) return;
+        // Two relevance layers: direct title concepts rank first; broader
+        // niche tags are admitted when corroborated by multiple relevant videos.
+        if (source === "youtube_autocomplete" && matchedCore === 0) return;
+        if (source !== "public_video_tags" && matchedCore === 0) return;
 
         const exactPhrase = queryKey.includes(key) || key.includes(queryKey);
         const rankSignal = Math.max(0, 1 - Number(rank || 0) / 50);
         const specificity = Math.min(words.length, 4) / 4;
+        const directBonus = matchedCore >= 2 ? 24 : matchedCore === 1 ? 10 : 0;
         const score = Math.min(100, Math.round(
-          18 + coreCoverage * 42 + titleCoverage * 18 +
+          16 + coreCoverage * 34 + titleCoverage * 12 + directBonus +
           rankSignal * 10 + specificity * 7 + (exactPhrase ? 5 : 0)
         ));
 
         const old = candidates.get(key) || {
-          keyword, scoreTotal: 0, count: 0, videoIds: new Set(), sources: new Set()
+          keyword, scoreTotal: 0, count: 0, bestMatch: 0,
+          videoIds: new Set(), sources: new Set()
         };
         old.scoreTotal += score;
         old.count += 1;
+        old.bestMatch = Math.max(old.bestMatch || 0, matchedCore);
         if (videoId) old.videoIds.add(videoId);
         old.sources.add(source);
         candidates.set(key, old);
@@ -525,9 +526,9 @@ if(
       // Busca em até 3 variações semânticas para ampliar a coleta sem
       // depender de uma única consulta muito restritiva.
       const queryVariants = [...new Set([
-        anchorQuery,
-        coreTokens.slice(0, 3).join(" "),
-        coreTokens.slice(1, 5).join(" ")
+        query, // título integral e intenção completa
+        anchorQuery, // conceitos centrais identificados no título
+        [anchorTokens[0], anchorTokens[1], anchorTokens[anchorTokens.length - 1]].filter(Boolean).join(" ")
       ].map(v => String(v || "").trim()).filter(v => v.length >= 3))].slice(0, 3);
 
       let youtubeIds = [];
@@ -609,18 +610,27 @@ if(
       }
 
       const tags = [...candidates.values()]
+        // A title match is enough for a direct suggestion. A broader niche
+        // term must recur in at least two independently discovered videos.
+        .filter(item => (item.bestMatch || 0) >= 1 || item.videoIds.size >= 2)
         .map(item => {
-          const corroboration = Math.min(item.videoIds.size, 5) * 3;
-          const sourceBonus = item.sources.size > 1 ? 5 : 0;
+          const corroboration = Math.min(item.videoIds.size, 8) * 4;
+          const sourceBonus = item.sources.size > 1 ? 6 : 0;
           const relevance = Math.round(item.scoreTotal / Math.max(1, item.count));
+          const directBonus = (item.bestMatch || 0) >= 2 ? 8 : (item.bestMatch || 0) === 1 ? 3 : 0;
           return {
             keyword: item.keyword,
-            score: Math.max(30, Math.min(94, Math.round(relevance * 0.82 + corroboration + sourceBonus))),
+            // Relative relevance estimate, not YouTube search volume.
+            score: Math.max(25, Math.min(96, Math.round(relevance * 0.78 + corroboration + sourceBonus + directBonus))),
             frequency: item.videoIds.size || item.count,
+            relevanceLayer: (item.bestMatch || 0) >= 1 ? "title" : "niche",
             source: [...item.sources].join("+")
           };
         })
-        .sort((a, b) => b.score - a.score || b.frequency - a.frequency)
+        .sort((a, b) => {
+          if (a.relevanceLayer !== b.relevanceLayer) return a.relevanceLayer === "title" ? -1 : 1;
+          return b.score - a.score || b.frequency - a.frequency;
+        })
         // Retorna até 150 sugestões relevantes; a inserção continua respeitando
         // o limite real de 500 caracteres imposto pelo YouTube.
         .slice(0, 150);

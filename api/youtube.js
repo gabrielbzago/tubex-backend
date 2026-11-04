@@ -444,20 +444,61 @@ if(
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
 
-      const queryTerms = new Set(normalizeTagText(query).split(" ").filter(w => w.length > 2));
+      // Retira palavras funcionais e termos genéricos. O título completo
+      // continua sendo preservado para a busca, mas a relevância é medida
+      // pelos conceitos que realmente identificam o assunto.
+      const stopwords = new Set([
+        "a","o","as","os","um","uma","uns","umas","de","da","do","das","dos",
+        "em","no","na","nos","nas","por","para","com","sem","e","ou","que",
+        "porque","como","qual","quais","quando","onde","se","sua","seu","suas",
+        "seus","isso","esta","este","estas","estes","essas","esses","coisas",
+        "simples","maioria","ignora","tres","3","mais","menos","muito","muita",
+        "ser","ter","fazer","sobre","ainda","voce","seu","sua","meu","minha",
+        "video","videos","youtube","oficial","novo","nova","2024","2025","2026"
+      ]);
+      const genericTerms = new Set([
+        "canal","canais","conteudo","criador","criadores","dicas","melhor",
+        "melhores","estrategia","estrategias","coisas","segredos","guia"
+      ]);
+      const titleTokens = normalizeTagText(query).split(" ").filter(w => w.length > 2 && !stopwords.has(w));
+      const coreTokens = titleTokens.filter(w => !genericTerms.has(w));
+      const anchorTokens = (coreTokens.length ? coreTokens : titleTokens).slice(0, 5);
+      const anchorQuery = anchorTokens.join(" ") || query;
+      const queryKey = normalizeTagText(query);
       const candidates = new Map();
-      const addTag = (raw, weight, source) => {
+
+      const addTag = (raw, rank, source, videoId = "") => {
         const keyword = String(raw || "").trim().replace(/\s+/g, " ");
         const key = normalizeTagText(keyword);
-        if (!key || key.length < 3 || key.length > 100 || key === normalizeTagText(query)) return;
-        const words = key.split(" ");
-        if (words.length > 8) return;
-        const overlap = words.filter(w => queryTerms.has(w)).length / Math.max(1, words.length);
-        // Keep related phrases, but prevent unrelated tags from entering the panel.
-        if (queryTerms.size && overlap === 0) return;
-        const old = candidates.get(key) || { keyword, score: 0, frequency: 0, sources: new Set() };
-        old.score += weight * (0.55 + overlap * 0.9);
-        old.frequency += 1;
+        if (!key || key.length < 3 || key.length > 90 || key === queryKey) return;
+        const words = [...new Set(key.split(" ").filter(w => w.length > 2 && !stopwords.has(w)))];
+        if (!words.length || words.length > 8) return;
+
+        const matchedCore = words.filter(w => coreTokens.includes(w)).length;
+        const matchedTitle = words.filter(w => titleTokens.includes(w)).length;
+        const coreCoverage = matchedCore / Math.max(1, Math.min(words.length, 4));
+        const titleCoverage = matchedTitle / Math.max(1, Math.min(words.length, 5));
+
+        // Não basta compartilhar palavras genéricas como "canal" ou "vídeo".
+        // Exigimos correspondência com ao menos um conceito específico.
+        if (coreTokens.length && matchedCore === 0) return;
+        if (coreTokens.length >= 2 && matchedCore < 1) return;
+        if (words.length >= 4 && coreCoverage < 0.25) return;
+
+        const exactPhrase = queryKey.includes(key) || key.includes(queryKey);
+        const rankSignal = Math.max(0, 1 - Number(rank || 0) / 50);
+        const specificity = Math.min(words.length, 4) / 4;
+        const score = Math.min(100, Math.round(
+          18 + coreCoverage * 42 + titleCoverage * 18 +
+          rankSignal * 10 + specificity * 7 + (exactPhrase ? 5 : 0)
+        ));
+
+        const old = candidates.get(key) || {
+          keyword, scoreTotal: 0, count: 0, videoIds: new Set(), sources: new Set()
+        };
+        old.scoreTotal += score;
+        old.count += 1;
+        if (videoId) old.videoIds.add(videoId);
         old.sources.add(source);
         candidates.set(key, old);
       };
@@ -469,7 +510,7 @@ if(
         searchUrl.searchParams.set("type", "video");
         searchUrl.searchParams.set("order", "relevance");
         searchUrl.searchParams.set("maxResults", "50");
-        searchUrl.searchParams.set("q", query);
+        searchUrl.searchParams.set("q", anchorQuery);
         searchUrl.searchParams.set("relevanceLanguage", "pt");
         searchUrl.searchParams.set("regionCode", "BR");
         searchUrl.searchParams.set("key", activeKey);
@@ -492,7 +533,7 @@ if(
             const rank = rankMap.get(video.id) ?? 49;
             const rankWeight = 1 / (1 + rank * 0.035);
             (Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [])
-              .forEach(tag => addTag(tag, 45 * rankWeight, "public_video_tags"));
+              .forEach(tag => addTag(tag, rank, "public_video_tags", video.id));
           });
         }
       } catch (error) {
@@ -505,26 +546,31 @@ if(
         const suggestUrl = new URL("https://suggestqueries.google.com/complete/search");
         suggestUrl.searchParams.set("client", "firefox");
         suggestUrl.searchParams.set("ds", "yt");
-        suggestUrl.searchParams.set("q", query);
+        suggestUrl.searchParams.set("q", anchorQuery);
         suggestUrl.searchParams.set("hl", "pt-BR");
         suggestUrl.searchParams.set("gl", "BR");
         const suggestResponse = await fetch(suggestUrl.toString(), { headers: { Accept: "application/json" } });
         if (suggestResponse.ok) {
           const suggestData = await suggestResponse.json();
           (Array.isArray(suggestData?.[1]) ? suggestData[1] : [])
-            .forEach((term, index) => addTag(term, 35 - Math.min(index, 10), "youtube_autocomplete"));
+            .forEach((term, index) => addTag(term, index, "youtube_autocomplete"));
         }
       } catch (error) {
         console.warn("[TubeX] tag suggestions autocomplete:", error?.message || error);
       }
 
       const tags = [...candidates.values()]
-        .map(item => ({
-          keyword: item.keyword,
-          score: Math.max(1, Math.min(100, Math.round(item.score / Math.max(1, item.frequency) + Math.min(item.frequency, 5) * 7))),
-          frequency: item.frequency,
-          source: [...item.sources].join("+")
-        }))
+        .map(item => {
+          const corroboration = Math.min(item.videoIds.size, 5) * 3;
+          const sourceBonus = item.sources.size > 1 ? 5 : 0;
+          const relevance = Math.round(item.scoreTotal / Math.max(1, item.count));
+          return {
+            keyword: item.keyword,
+            score: Math.max(35, Math.min(98, relevance + corroboration + sourceBonus)),
+            frequency: item.videoIds.size || item.count,
+            source: [...item.sources].join("+")
+          };
+        })
         .sort((a, b) => b.score - a.score || b.frequency - a.frequency)
         .slice(0, 40);
 

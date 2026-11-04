@@ -423,7 +423,7 @@ if(
       }
 
       global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
-      const tagCacheKey = "v2_" + query.toLocaleLowerCase("pt-BR");
+      const tagCacheKey = "v3_" + query.toLocaleLowerCase("pt-BR");
       const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
       if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
         return res.status(200).json({
@@ -522,60 +522,90 @@ if(
         candidates.set(key, old);
       };
 
-      let youtubeIds = [];
-      try {
-        const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-        searchUrl.searchParams.set("part", "snippet");
-        searchUrl.searchParams.set("type", "video");
-        searchUrl.searchParams.set("order", "relevance");
-        searchUrl.searchParams.set("maxResults", "50");
-        searchUrl.searchParams.set("q", anchorQuery);
-        searchUrl.searchParams.set("relevanceLanguage", "pt");
-        searchUrl.searchParams.set("regionCode", "BR");
-        searchUrl.searchParams.set("key", activeKey);
-        const searchResponse = await fetch(searchUrl.toString());
-        const searchData = await searchResponse.json().catch(() => ({}));
-        if (!searchResponse.ok) throw new Error(searchData?.error?.message || `youtube_search_http_${searchResponse.status}`);
-        youtubeIds = (searchData.items || []).map(v => v?.id?.videoId).filter(Boolean);
+      // Busca em até 3 variações semânticas para ampliar a coleta sem
+      // depender de uma única consulta muito restritiva.
+      const queryVariants = [...new Set([
+        anchorQuery,
+        coreTokens.slice(0, 3).join(" "),
+        coreTokens.slice(1, 5).join(" ")
+      ].map(v => String(v || "").trim()).filter(v => v.length >= 3))].slice(0, 3);
 
-        for (let i = 0; i < youtubeIds.length; i += 50) {
+      let youtubeIds = [];
+      const rankMap = new Map();
+      for (const searchQuery of queryVariants) {
+        try {
+          const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+          searchUrl.searchParams.set("part", "snippet");
+          searchUrl.searchParams.set("type", "video");
+          searchUrl.searchParams.set("order", "relevance");
+          searchUrl.searchParams.set("maxResults", "50");
+          searchUrl.searchParams.set("q", searchQuery);
+          searchUrl.searchParams.set("relevanceLanguage", "pt");
+          searchUrl.searchParams.set("regionCode", "BR");
+          searchUrl.searchParams.set("key", activeKey);
+          const searchResponse = await fetch(searchUrl.toString());
+          const searchData = await searchResponse.json().catch(() => ({}));
+          if (!searchResponse.ok) {
+            console.warn("[TubeX] tag search variant failed:", searchQuery,
+              searchData?.error?.message || searchResponse.status);
+            continue;
+          }
+          (searchData.items || []).forEach(video => {
+            const id = video?.id?.videoId;
+            if (id && !rankMap.has(id)) {
+              rankMap.set(id, youtubeIds.length);
+              youtubeIds.push(id);
+            }
+          });
+        } catch (error) {
+          console.warn("[TubeX] tag search variant error:", searchQuery, error?.message || error);
+        }
+      }
+
+      // videos.list aceita até 50 IDs por chamada. Coletamos as tags públicas
+      // de todos os vídeos encontrados nas consultas relevantes.
+      for (let i = 0; i < youtubeIds.length; i += 50) {
+        try {
           const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
           detailsUrl.searchParams.set("part", "snippet");
           detailsUrl.searchParams.set("id", youtubeIds.slice(i, i + 50).join(","));
           detailsUrl.searchParams.set("key", activeKey);
           const detailsResponse = await fetch(detailsUrl.toString());
           const detailsData = await detailsResponse.json().catch(() => ({}));
-          if (!detailsResponse.ok) throw new Error(detailsData?.error?.message || `youtube_videos_http_${detailsResponse.status}`);
+          if (!detailsResponse.ok) {
+            console.warn("[TubeX] tag details batch failed:", detailsData?.error?.message || detailsResponse.status);
+            continue;
+          }
 
-          const rankMap = new Map(youtubeIds.map((id, index) => [id, index]));
           (detailsData.items || []).forEach(video => {
-            const rank = rankMap.get(video.id) ?? 49;
-            const rankWeight = 1 / (1 + rank * 0.035);
+            const rank = rankMap.get(video.id) ?? 149;
             (Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [])
               .forEach(tag => addTag(tag, rank, "public_video_tags", video.id));
           });
+        } catch (error) {
+          console.warn("[TubeX] tag details batch error:", error?.message || error);
         }
-      } catch (error) {
-        console.warn("[TubeX] tag suggestions YouTube Data API:", error?.message || error);
       }
 
-      // Autocomplete is a separate signal and can still provide suggestions
-      // when public tags are disabled on the ranking videos.
-      try {
-        const suggestUrl = new URL("https://suggestqueries.google.com/complete/search");
-        suggestUrl.searchParams.set("client", "firefox");
-        suggestUrl.searchParams.set("ds", "yt");
-        suggestUrl.searchParams.set("q", anchorQuery);
-        suggestUrl.searchParams.set("hl", "pt-BR");
-        suggestUrl.searchParams.set("gl", "BR");
-        const suggestResponse = await fetch(suggestUrl.toString(), { headers: { Accept: "application/json" } });
-        if (suggestResponse.ok) {
+      // Autocomplete em cada variação amplia as sugestões de pesquisa do YouTube.
+      for (const suggestQuery of queryVariants) {
+        try {
+          const suggestUrl = new URL("https://suggestqueries.google.com/complete/search");
+          suggestUrl.searchParams.set("client", "firefox");
+          suggestUrl.searchParams.set("ds", "yt");
+          suggestUrl.searchParams.set("q", suggestQuery);
+          suggestUrl.searchParams.set("hl", "pt-BR");
+          suggestUrl.searchParams.set("gl", "BR");
+          const suggestResponse = await fetch(suggestUrl.toString(), {
+            headers: { Accept: "application/json" }
+          });
+          if (!suggestResponse.ok) continue;
           const suggestData = await suggestResponse.json();
           (Array.isArray(suggestData?.[1]) ? suggestData[1] : [])
             .forEach((term, index) => addTag(term, index, "youtube_autocomplete"));
+        } catch (error) {
+          console.warn("[TubeX] tag autocomplete variant failed:", error?.message || error);
         }
-      } catch (error) {
-        console.warn("[TubeX] tag suggestions autocomplete:", error?.message || error);
       }
 
       const tags = [...candidates.values()]
@@ -585,14 +615,15 @@ if(
           const relevance = Math.round(item.scoreTotal / Math.max(1, item.count));
           return {
             keyword: item.keyword,
-            // Confidence is a relative relevance estimate, not YouTube search volume.
             score: Math.max(30, Math.min(94, Math.round(relevance * 0.82 + corroboration + sourceBonus))),
             frequency: item.videoIds.size || item.count,
             source: [...item.sources].join("+")
           };
         })
         .sort((a, b) => b.score - a.score || b.frequency - a.frequency)
-        .slice(0, 40);
+        // Retorna até 150 sugestões relevantes; a inserção continua respeitando
+        // o limite real de 500 caracteres imposto pelo YouTube.
+        .slice(0, 150);
 
       const source = tags.some(t => t.source.includes("public_video_tags"))
         ? "youtube_data_api_and_autocomplete"
@@ -608,6 +639,7 @@ if(
         tags, total: tags.length, source, cached: false,
         diagnostics: {
           searchVideos: youtubeIds.length,
+          searchQueries: queryVariants.length,
           tagsReturned: tags.length,
           publicTagsAvailable: tags.some(t => t.source.includes("public_video_tags"))
         }

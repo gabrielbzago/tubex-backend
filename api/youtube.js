@@ -410,6 +410,144 @@ if(
       .split(",")[0]
       .trim();
 
+
+    // =========================================================
+    // 🏷️ TAG SUGGESTIONS MODE — isolated from the SEO pipeline
+    // Uses YouTube Search relevance + public tags + YouTube autocomplete.
+    // Independent cache; does not execute volume/competition/Trends/SerpApi.
+    // =========================================================
+    if (mode === "tag_suggestions") {
+      const query = String(body?.keyword || body?.title || "").trim().slice(0, 180);
+      if (!query) {
+        return res.status(400).json({ success: false, error: "keyword_required", tags: [] });
+      }
+
+      global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
+      const tagCacheKey = query.toLocaleLowerCase("pt-BR");
+      const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
+      if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
+        return res.status(200).json({
+          success: true, mode: "tag_suggestions", keyword: query,
+          tags: cachedTags.tags, total: cachedTags.tags.length,
+          source: cachedTags.source || "youtube_data_api", cached: true
+        });
+      }
+
+      if (!activeKey) {
+        return res.status(200).json({
+          success: false, mode: "tag_suggestions", keyword: query,
+          tags: [], total: 0, error: "youtube_api_unavailable"
+        });
+      }
+
+      const normalizeTagText = value => String(value || "").toLocaleLowerCase("pt-BR")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim();
+
+      const queryTerms = new Set(normalizeTagText(query).split(" ").filter(w => w.length > 2));
+      const candidates = new Map();
+      const addTag = (raw, weight, source) => {
+        const keyword = String(raw || "").trim().replace(/\s+/g, " ");
+        const key = normalizeTagText(keyword);
+        if (!key || key.length < 3 || key.length > 100 || key === normalizeTagText(query)) return;
+        const words = key.split(" ");
+        if (words.length > 8) return;
+        const overlap = words.filter(w => queryTerms.has(w)).length / Math.max(1, words.length);
+        // Keep related phrases, but prevent unrelated tags from entering the panel.
+        if (queryTerms.size && overlap === 0) return;
+        const old = candidates.get(key) || { keyword, score: 0, frequency: 0, sources: new Set() };
+        old.score += weight * (0.55 + overlap * 0.9);
+        old.frequency += 1;
+        old.sources.add(source);
+        candidates.set(key, old);
+      };
+
+      let youtubeIds = [];
+      try {
+        const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+        searchUrl.searchParams.set("part", "snippet");
+        searchUrl.searchParams.set("type", "video");
+        searchUrl.searchParams.set("order", "relevance");
+        searchUrl.searchParams.set("maxResults", "50");
+        searchUrl.searchParams.set("q", query);
+        searchUrl.searchParams.set("relevanceLanguage", "pt");
+        searchUrl.searchParams.set("regionCode", "BR");
+        searchUrl.searchParams.set("key", activeKey);
+        const searchResponse = await fetch(searchUrl.toString());
+        const searchData = await searchResponse.json().catch(() => ({}));
+        if (!searchResponse.ok) throw new Error(searchData?.error?.message || `youtube_search_http_${searchResponse.status}`);
+        youtubeIds = (searchData.items || []).map(v => v?.id?.videoId).filter(Boolean);
+
+        for (let i = 0; i < youtubeIds.length; i += 50) {
+          const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+          detailsUrl.searchParams.set("part", "snippet");
+          detailsUrl.searchParams.set("id", youtubeIds.slice(i, i + 50).join(","));
+          detailsUrl.searchParams.set("key", activeKey);
+          const detailsResponse = await fetch(detailsUrl.toString());
+          const detailsData = await detailsResponse.json().catch(() => ({}));
+          if (!detailsResponse.ok) throw new Error(detailsData?.error?.message || `youtube_videos_http_${detailsResponse.status}`);
+
+          const rankMap = new Map(youtubeIds.map((id, index) => [id, index]));
+          (detailsData.items || []).forEach(video => {
+            const rank = rankMap.get(video.id) ?? 49;
+            const rankWeight = 1 / (1 + rank * 0.035);
+            (Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [])
+              .forEach(tag => addTag(tag, 45 * rankWeight, "public_video_tags"));
+          });
+        }
+      } catch (error) {
+        console.warn("[TubeX] tag suggestions YouTube Data API:", error?.message || error);
+      }
+
+      // Autocomplete is a separate signal and can still provide suggestions
+      // when public tags are disabled on the ranking videos.
+      try {
+        const suggestUrl = new URL("https://suggestqueries.google.com/complete/search");
+        suggestUrl.searchParams.set("client", "firefox");
+        suggestUrl.searchParams.set("ds", "yt");
+        suggestUrl.searchParams.set("q", query);
+        suggestUrl.searchParams.set("hl", "pt-BR");
+        suggestUrl.searchParams.set("gl", "BR");
+        const suggestResponse = await fetch(suggestUrl.toString(), { headers: { Accept: "application/json" } });
+        if (suggestResponse.ok) {
+          const suggestData = await suggestResponse.json();
+          (Array.isArray(suggestData?.[1]) ? suggestData[1] : [])
+            .forEach((term, index) => addTag(term, 35 - Math.min(index, 10), "youtube_autocomplete"));
+        }
+      } catch (error) {
+        console.warn("[TubeX] tag suggestions autocomplete:", error?.message || error);
+      }
+
+      const tags = [...candidates.values()]
+        .map(item => ({
+          keyword: item.keyword,
+          score: Math.max(1, Math.min(100, Math.round(item.score / Math.max(1, item.frequency) + Math.min(item.frequency, 5) * 7))),
+          frequency: item.frequency,
+          source: [...item.sources].join("+")
+        }))
+        .sort((a, b) => b.score - a.score || b.frequency - a.frequency)
+        .slice(0, 40);
+
+      const source = tags.some(t => t.source.includes("public_video_tags"))
+        ? "youtube_data_api_and_autocomplete"
+        : "youtube_autocomplete";
+      if (tags.length) {
+        global.tubexTagSuggestionsCache[tagCacheKey] = {
+          tags, source, expires: Date.now() + 10 * 60 * 1000
+        };
+      }
+
+      return res.status(200).json({
+        success: true, mode: "tag_suggestions", keyword: query,
+        tags, total: tags.length, source, cached: false,
+        diagnostics: {
+          searchVideos: youtubeIds.length,
+          tagsReturned: tags.length,
+          publicTagsAvailable: tags.some(t => t.source.includes("public_video_tags"))
+        }
+      });
+    }
+
     let items = [];
     let success = false;
     let youtubeSearchSucceeded = false;

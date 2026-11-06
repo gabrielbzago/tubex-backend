@@ -259,6 +259,7 @@ if (
     tipo === "tituloSEO" ||
     tipo === "tituloImpactante" ||
     tipo === "tituloEmocional" ||
+
     tipo === "tituloSEO_panel" ||
     tipo === "tituloImpactante_panel" ||
     tipo === "tituloEmocional_panel"
@@ -266,94 +267,190 @@ if (
 
 const painelIA = tipo.endsWith("_panel");
 const quantidade = painelIA ? 1 : 4;
-const temaOriginal = String(prompt || "").trim();
 
 finalPrompt = `
-Você é diretor editorial e estrategista sênior de YouTube, especialista em embalagem de conteúdo (title packaging), intenção de busca, psicologia do clique e CTR.
 
-Sua tarefa é transformar o TEMA/TÍTULO DE REFERÊNCIA em títulos mais fortes, específicos e atraentes — sem mudar o assunto e sem prometer algo que o vídeo não entrega.
+Você é um dos maiores especialistas do mundo em crescimento de canais no YouTube.
 
-FONTE PRINCIPAL — NÃO IGNORAR:
-"${temaOriginal}"
+Sua missão NÃO é apenas criar títulos.
 
-REGRA DE FIDELIDADE:
-- Preserve o assunto central, a entidade, o público e a promessa que podem ser inferidos do texto de referência.
-- Não troque o tema por "crescer no YouTube", marketing ou qualquer outro assunto genérico.
-- Não invente resultados, números, testes, estatísticas, experiências pessoais, notícias ou garantias que não estejam no texto.
-- Não transforme um tema amplo em uma afirmação factual específica sem evidência.
-- Se o texto for curto ou amplo, crie ângulos interessantes dentro dele, sem inventar detalhes.
+Sua missão é criar títulos capazes de gerar o maior CTR possível sem sacrificar o SEO.
 
-OBJETIVO:
-Entregar ${quantidade} título(s) que tenham uma razão clara para receber o clique. Cada opção deve combinar:
-1. Clareza imediata sobre o assunto.
-2. Uma promessa ou benefício específico, quando houver base para isso.
-3. Curiosidade real — uma lacuna de informação que o vídeo possa satisfazer.
-4. Linguagem natural, concreta e humana.
-5. Palavra-chave principal integrada naturalmente, sem parecer uma lista de SEO.
+Pense como um criador que vive exclusivamente de milhões de visualizações.
 
-O QUE TORNA UM TÍTULO FORTE:
-- Especificidade vence frases vagas. Prefira indicar o que a pessoa vai descobrir, evitar, comparar, resolver ou aprender.
-- Use verbos fortes e substantivos concretos.
-- Mostre consequência, contraste, risco, transformação ou descoberta quando isso fizer sentido para o assunto.
-- Faça o espectador entender por que aquele vídeo merece atenção agora.
-- Diferencie o ângulo editorial, não apenas troque sinônimos.
-- Escreva para o público que realmente se interessa pelo tema, não para "todo mundo".
+Seu trabalho é competir contra os melhores títulos do YouTube.
 
-DIVERSIDADE OBRIGATÓRIA ENTRE AS OPÇÕES:
-Quando forem 4 títulos, produza quatro abordagens editoriais realmente diferentes:
-A) Busca/intenção: direto, claro e forte para quem já procura o assunto.
-B) Curiosidade: abre uma lacuna específica que o vídeo resolve.
-C) Benefício/transformação: destaca o ganho concreto para o espectador.
-D) Contraste/erro/descoberta: apresenta uma tensão ou ângulo inesperado, somente se for verdadeiro para o tema.
+Tema:
+"${prompt}"
 
-Não use essas letras ou rótulos na resposta. Não force uma abordagem que não combine com o assunto. Se uma abordagem não for adequada, escolha outra que seja fiel ao tema.
+--------------------------------------------------
 
-EVITE TÍTULOS FRACOS E CLICHÊS:
-Não use fórmulas vazias como:
-- "Você não vai acreditar..."
-- "O segredo que ninguém te conta"
-- "Isso mudou tudo"
-- "A verdade chocante"
-- "Veja o que aconteceu"
-- "O melhor método"
-- "Faça isso agora"
-a menos que o texto de referência sustente concretamente essa promessa.
+OBJETIVO
 
-SEO E COMPRIMENTO:
-- Identifique a expressão de busca principal no texto de referência.
-- Preserve essa expressão ou uma variação semântica próxima em cada opção, quando couber naturalmente.
-- Priorize aproximadamente 45–70 caracteres, mas não sacrifique clareza para atingir uma contagem artificial.
-- Coloque o termo principal cedo quando isso deixar o título natural.
-- Não faça keyword stuffing.
-- Não use maiúsculas excessivas, excesso de pontuação ou emojis.
-- Evite títulos longos com várias promessas acumuladas.
+Gerar títulos que façam o usuário sentir necessidade imediata de clicar.
 
-CONTROLE DE QUALIDADE — FAÇA INTERNAMENTE:
-Para cada candidato, avalie de 0 a 10:
-- fidelidade ao tema;
-- clareza da promessa;
-- especificidade;
-- força da curiosidade;
-- naturalidade;
-- potencial de busca;
-- diferenciação em relação às outras opções.
+Os títulos devem parecer escritos por grandes criadores, nunca por uma IA.
 
-Descarte qualquer candidato que:
-- poderia servir para centenas de vídeos diferentes;
-- apenas repete o texto original com pequenas alterações;
-- usa curiosidade sem entregar contexto suficiente;
-- promete algo que o conteúdo pode não cumprir;
-- se afasta do tema principal.
+Nunca escreva títulos comuns.
 
-Escolha os ${quantidade} melhores, ordenados do mais forte ao menos forte. Não revele a avaliação nem o raciocínio.
+Nunca escreva títulos genéricos.
 
-FORMATO DE SAÍDA:
-${painelIA ? "Retorne exatamente 1 título." : "Retorne exatamente 4 títulos, um por linha."}
-Sem numeração, bullets, aspas, rótulos, markdown ou explicações.
-Português brasileiro.
-`;
+Nunca escreva títulos parecidos entre si.
 
+Nunca reutilize a mesma estrutura.
+
+--------------------------------------------------
+
+REGRAS
+
+• Crie EXATAMENTE ${quantidade} título${quantidade > 1 ? "s" : ""}.
+
+• Cada título deve utilizar um gatilho psicológico diferente.
+
+• Cada título deve utilizar uma estrutura completamente diferente.
+
+Varie entre formatos como:
+
+- Pergunta
+- Erro
+- Descoberta
+- Comparação
+- Tutorial
+- Alerta
+- Mito
+- Verdade inesperada
+- Opinião forte
+- Mudança recente
+- Lista
+- Caso real
+- Antes e Depois
+- Resultado inesperado
+
+Nunca repita a mesma abertura.
+
+Exemplos de aberturas:
+
+Como...
+Por que...
+O erro...
+Você está...
+Nunca...
+Antes de...
+O YouTube...
+Este simples...
+Pare de...
+A maioria...
+Quase ninguém...
+Todo criador...
+
+--------------------------------------------------
+
+GATILHOS PSICOLÓGICOS
+
+Utilize apenas um gatilho principal por título.
+
+Exemplos:
+
+- curiosidade
+- surpresa
+- choque
+- medo de perder
+- descoberta
+- benefício
+- autoridade
+- erro
+- comparação
+- urgência
+- conflito
+- prova
+- transformação
+- oportunidade
+
+Nunca repita o mesmo gatilho.
+
+--------------------------------------------------
+
+SEO
+
+Sempre que possível:
+
+• coloque a palavra-chave principal naturalmente no início
+
+• mantenha entre 45 e 68 caracteres
+
+• preserve legibilidade
+
+• escreva como uma pessoa real
+
+• evite clickbait enganoso
+
+• maximize CTR sem prejudicar SEO
+
+--------------------------------------------------
+
+ESTILO
+
+Os títulos devem parecer publicados por canais como:
+
+- MrBeast
+- Film Booth
+- Think Media
+- VidIQ
+- TubeBuddy
+
+Mas nunca copie títulos existentes.
+
+Inspire-se apenas no nível de qualidade.
+
+--------------------------------------------------
+
+PENSE COMO O USUÁRIO
+
+Antes de responder imagine:
+
+"Existem mais de 20 vídeos iguais na busca."
+
+"Qual destes títulos faria alguém clicar imediatamente?"
+
+Se um título não vencer essa disputa mental, descarte-o.
+
+--------------------------------------------------
+
+PROCESSO INTERNO
+
+Antes de responder:
+
+1. Crie mentalmente 40 títulos.
+
+2. Elimine imediatamente os 30 mais fracos.
+
+3. Dê uma nota de CTR para os 10 restantes.
+
+4. Escolha apenas os ${quantidade} melhores.
+
+5. Ordene do melhor para o pior.
+
+Nunca revele esse processo.
+
+--------------------------------------------------
+
+FORMATO
+
+${painelIA
+    ? "Retorne apenas UM título."
+    : "Retorne apenas os 4 títulos.\n\nUm por linha."
 }
+
+Sem números.
+
+Sem aspas.
+
+Sem markdown.
+
+Sem explicações.
+
+`;
+    }
 
   else if (tipo === "descricao") {
 
@@ -4621,35 +4718,70 @@ if (tipo === "advanced_tags") {
 
 if (tipo === "title_score") {
 
-    try{
+    try {
+        let clean = String(text || "").trim()
+            .replace(/^```(?:json)?\\s*/i, "")
+            .replace(/\\s*```$/i, "")
+            .trim();
 
-        const parsed = JSON.parse(text);
+        const start = clean.indexOf("{");
+        const end = clean.lastIndexOf("}");
+        if (start >= 0 && end > start) {
+            clean = clean.slice(start, end + 1);
+        }
 
-        global.__tubexCache.set(cacheKey,{
-            text:parsed,
-            timestamp:Date.now()
+        const parsed = JSON.parse(clean);
+        const numeric = value => {
+            const n = Number(value);
+            return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+        };
+
+        const seo = numeric(parsed.seo);
+        const ctr = numeric(parsed.ctr);
+        const trend = numeric(parsed.trend);
+        let overall = numeric(parsed.overall ?? parsed.score ?? parsed.nota);
+
+        // If the model omits only the overall field, derive a transparent
+        // weighted score from the three returned dimensions instead of
+        // showing an empty badge.
+        if (overall === null && seo !== null && ctr !== null) {
+            overall = Math.round(seo * 0.40 + ctr * 0.45 + (trend ?? 70) * 0.15);
+        }
+
+        if (overall === null) {
+            throw new Error("title_score_missing_overall");
+        }
+
+        const result = {
+            overall,
+            seo: seo ?? overall,
+            ctr: ctr ?? overall,
+            trend: trend ?? 70,
+            keyword: String(parsed.keyword || "").slice(0, 120),
+            strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 5) : [],
+            weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 5) : [],
+            suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 5) : [],
+            reason: String(parsed.reason || "").slice(0, 500)
+        };
+
+        global.__tubexCache.set(cacheKey, {
+            text: result,
+            timestamp: Date.now()
         });
 
         return res.status(200).json({
-
-            success:true,
-
-            ...parsed
-
+            success: true,
+            ...result
         });
 
-    }catch(err){
+    } catch (err) {
+        console.error("[TubeX] TITLE SCORE JSON ERROR:", err, text);
 
-        console.error(err);
-
-        return res.status(500).json({
-
-            success:false,
-
-            error:"invalid_json"
-
+        return res.status(502).json({
+            success: false,
+            error: "title_score_invalid_response",
+            text: ""
         });
-
     }
 
 }

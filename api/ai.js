@@ -259,7 +259,6 @@ if (
     tipo === "tituloSEO" ||
     tipo === "tituloImpactante" ||
     tipo === "tituloEmocional" ||
-
     tipo === "tituloSEO_panel" ||
     tipo === "tituloImpactante_panel" ||
     tipo === "tituloEmocional_panel"
@@ -267,190 +266,94 @@ if (
 
 const painelIA = tipo.endsWith("_panel");
 const quantidade = painelIA ? 1 : 4;
+const temaOriginal = String(prompt || "").trim();
 
 finalPrompt = `
-
-Você é um dos maiores especialistas do mundo em crescimento de canais no YouTube.
-
-Sua missão NÃO é apenas criar títulos.
-
-Sua missão é criar títulos capazes de gerar o maior CTR possível sem sacrificar o SEO.
-
-Pense como um criador que vive exclusivamente de milhões de visualizações.
-
-Seu trabalho é competir contra os melhores títulos do YouTube.
-
-Tema:
-"${prompt}"
-
---------------------------------------------------
-
-OBJETIVO
-
-Gerar títulos que façam o usuário sentir necessidade imediata de clicar.
-
-Os títulos devem parecer escritos por grandes criadores, nunca por uma IA.
-
-Nunca escreva títulos comuns.
-
-Nunca escreva títulos genéricos.
-
-Nunca escreva títulos parecidos entre si.
-
-Nunca reutilize a mesma estrutura.
-
---------------------------------------------------
-
-REGRAS
-
-• Crie EXATAMENTE ${quantidade} título${quantidade > 1 ? "s" : ""}.
-
-• Cada título deve utilizar um gatilho psicológico diferente.
-
-• Cada título deve utilizar uma estrutura completamente diferente.
-
-Varie entre formatos como:
-
-- Pergunta
-- Erro
-- Descoberta
-- Comparação
-- Tutorial
-- Alerta
-- Mito
-- Verdade inesperada
-- Opinião forte
-- Mudança recente
-- Lista
-- Caso real
-- Antes e Depois
-- Resultado inesperado
-
-Nunca repita a mesma abertura.
-
-Exemplos de aberturas:
-
-Como...
-Por que...
-O erro...
-Você está...
-Nunca...
-Antes de...
-O YouTube...
-Este simples...
-Pare de...
-A maioria...
-Quase ninguém...
-Todo criador...
-
---------------------------------------------------
-
-GATILHOS PSICOLÓGICOS
-
-Utilize apenas um gatilho principal por título.
-
-Exemplos:
-
-- curiosidade
-- surpresa
-- choque
-- medo de perder
-- descoberta
-- benefício
-- autoridade
-- erro
-- comparação
-- urgência
-- conflito
-- prova
-- transformação
-- oportunidade
-
-Nunca repita o mesmo gatilho.
-
---------------------------------------------------
-
-SEO
-
-Sempre que possível:
-
-• coloque a palavra-chave principal naturalmente no início
-
-• mantenha entre 45 e 68 caracteres
-
-• preserve legibilidade
-
-• escreva como uma pessoa real
-
-• evite clickbait enganoso
-
-• maximize CTR sem prejudicar SEO
-
---------------------------------------------------
-
-ESTILO
-
-Os títulos devem parecer publicados por canais como:
-
-- MrBeast
-- Film Booth
-- Think Media
-- VidIQ
-- TubeBuddy
-
-Mas nunca copie títulos existentes.
-
-Inspire-se apenas no nível de qualidade.
-
---------------------------------------------------
-
-PENSE COMO O USUÁRIO
-
-Antes de responder imagine:
-
-"Existem mais de 20 vídeos iguais na busca."
-
-"Qual destes títulos faria alguém clicar imediatamente?"
-
-Se um título não vencer essa disputa mental, descarte-o.
-
---------------------------------------------------
-
-PROCESSO INTERNO
-
-Antes de responder:
-
-1. Crie mentalmente 40 títulos.
-
-2. Elimine imediatamente os 30 mais fracos.
-
-3. Dê uma nota de CTR para os 10 restantes.
-
-4. Escolha apenas os ${quantidade} melhores.
-
-5. Ordene do melhor para o pior.
-
-Nunca revele esse processo.
-
---------------------------------------------------
-
-FORMATO
-
-${painelIA
-    ? "Retorne apenas UM título."
-    : "Retorne apenas os 4 títulos.\n\nUm por linha."
-}
-
-Sem números.
-
-Sem aspas.
-
-Sem markdown.
-
-Sem explicações.
-
+Você é diretor editorial e estrategista sênior de YouTube, especialista em embalagem de conteúdo (title packaging), intenção de busca, psicologia do clique e CTR.
+
+Sua tarefa é transformar o TEMA/TÍTULO DE REFERÊNCIA em títulos mais fortes, específicos e atraentes — sem mudar o assunto e sem prometer algo que o vídeo não entrega.
+
+FONTE PRINCIPAL — NÃO IGNORAR:
+"${temaOriginal}"
+
+REGRA DE FIDELIDADE:
+- Preserve o assunto central, a entidade, o público e a promessa que podem ser inferidos do texto de referência.
+- Não troque o tema por "crescer no YouTube", marketing ou qualquer outro assunto genérico.
+- Não invente resultados, números, testes, estatísticas, experiências pessoais, notícias ou garantias que não estejam no texto.
+- Não transforme um tema amplo em uma afirmação factual específica sem evidência.
+- Se o texto for curto ou amplo, crie ângulos interessantes dentro dele, sem inventar detalhes.
+
+OBJETIVO:
+Entregar ${quantidade} título(s) que tenham uma razão clara para receber o clique. Cada opção deve combinar:
+1. Clareza imediata sobre o assunto.
+2. Uma promessa ou benefício específico, quando houver base para isso.
+3. Curiosidade real — uma lacuna de informação que o vídeo possa satisfazer.
+4. Linguagem natural, concreta e humana.
+5. Palavra-chave principal integrada naturalmente, sem parecer uma lista de SEO.
+
+O QUE TORNA UM TÍTULO FORTE:
+- Especificidade vence frases vagas. Prefira indicar o que a pessoa vai descobrir, evitar, comparar, resolver ou aprender.
+- Use verbos fortes e substantivos concretos.
+- Mostre consequência, contraste, risco, transformação ou descoberta quando isso fizer sentido para o assunto.
+- Faça o espectador entender por que aquele vídeo merece atenção agora.
+- Diferencie o ângulo editorial, não apenas troque sinônimos.
+- Escreva para o público que realmente se interessa pelo tema, não para "todo mundo".
+
+DIVERSIDADE OBRIGATÓRIA ENTRE AS OPÇÕES:
+Quando forem 4 títulos, produza quatro abordagens editoriais realmente diferentes:
+A) Busca/intenção: direto, claro e forte para quem já procura o assunto.
+B) Curiosidade: abre uma lacuna específica que o vídeo resolve.
+C) Benefício/transformação: destaca o ganho concreto para o espectador.
+D) Contraste/erro/descoberta: apresenta uma tensão ou ângulo inesperado, somente se for verdadeiro para o tema.
+
+Não use essas letras ou rótulos na resposta. Não force uma abordagem que não combine com o assunto. Se uma abordagem não for adequada, escolha outra que seja fiel ao tema.
+
+EVITE TÍTULOS FRACOS E CLICHÊS:
+Não use fórmulas vazias como:
+- "Você não vai acreditar..."
+- "O segredo que ninguém te conta"
+- "Isso mudou tudo"
+- "A verdade chocante"
+- "Veja o que aconteceu"
+- "O melhor método"
+- "Faça isso agora"
+a menos que o texto de referência sustente concretamente essa promessa.
+
+SEO E COMPRIMENTO:
+- Identifique a expressão de busca principal no texto de referência.
+- Preserve essa expressão ou uma variação semântica próxima em cada opção, quando couber naturalmente.
+- Priorize aproximadamente 45–70 caracteres, mas não sacrifique clareza para atingir uma contagem artificial.
+- Coloque o termo principal cedo quando isso deixar o título natural.
+- Não faça keyword stuffing.
+- Não use maiúsculas excessivas, excesso de pontuação ou emojis.
+- Evite títulos longos com várias promessas acumuladas.
+
+CONTROLE DE QUALIDADE — FAÇA INTERNAMENTE:
+Para cada candidato, avalie de 0 a 10:
+- fidelidade ao tema;
+- clareza da promessa;
+- especificidade;
+- força da curiosidade;
+- naturalidade;
+- potencial de busca;
+- diferenciação em relação às outras opções.
+
+Descarte qualquer candidato que:
+- poderia servir para centenas de vídeos diferentes;
+- apenas repete o texto original com pequenas alterações;
+- usa curiosidade sem entregar contexto suficiente;
+- promete algo que o conteúdo pode não cumprir;
+- se afasta do tema principal.
+
+Escolha os ${quantidade} melhores, ordenados do mais forte ao menos forte. Não revele a avaliação nem o raciocínio.
+
+FORMATO DE SAÍDA:
+${painelIA ? "Retorne exatamente 1 título." : "Retorne exatamente 4 títulos, um por linha."}
+Sem numeração, bullets, aspas, rótulos, markdown ou explicações.
+Português brasileiro.
 `;
-    }
+
+}
 
   else if (tipo === "descricao") {
 
@@ -945,45 +848,44 @@ ${prompt}
 
 else if (tipo === "ideas") {
 
-const requestedTopic = String(prompt || body.keyword || "").trim();
-
 finalPrompt = `
-Você é um estrategista sênior de conteúdo para YouTube.
 
-TEMA OBRIGATÓRIO INFORMADO PELO USUÁRIO:
-"${requestedTopic || "Crescimento de canais no YouTube"}"
+Você é um estrategista especialista em crescimento no YouTube.
 
-REGRA DE PRIORIDADE:
-O tema digitado pelo usuário é a fonte principal e obrigatória para esta geração.
-Todas as cinco ideias devem tratar diretamente desse tema, mesmo que ele não tenha relação com o nicho habitual do canal.
-NÃO substitua, amplie ou redirecione o tema para o nicho do canal.
-NÃO use os vídeos do canal como tema quando eles forem diferentes do tema solicitado.
+Analise os vídeos abaixo.
 
-CONTEXTO OPCIONAL DO CANAL:
-${videoSummary || "Nenhum histórico de vídeos disponível."}
+${videoSummary}
 
-Use o histórico do canal somente como referência secundária para evitar repetir assuntos claramente relacionados ao tema solicitado. Se o histórico pertencer a outro assunto, ignore-o completamente.
+Sua missão é identificar oportunidades que o canal ainda não explorou.
 
-TAREFA:
-Crie exatamente 5 ideias de vídeos para YouTube sobre "${requestedTopic || "Crescimento de canais no YouTube"}".
+Crie exatamente 5 ideias de vídeos.
 
-CRITÉRIOS:
-- Cada ideia deve ter relação direta e inequívoca com o tema informado.
-- Explore ângulos diferentes: dúvidas reais, problemas, descobertas, comparações, erros, tutoriais ou consequências ligados ao tema.
-- Desperte curiosidade e tenha potencial de clique sem promessas enganosas.
-- Não invente notícias, dados, fatos recentes ou resultados.
-- Não repita a mesma ideia com palavras diferentes.
-- Não exija que o título repita literalmente a palavra-chave; relevância semântica é suficiente.
-- Não inclua assuntos paralelos apenas porque aparecem no histórico do canal.
+Cada ideia deve:
 
-VALIDAÇÃO:
-Antes de responder, confirme que cada ideia seria relevante para um espectador interessado em "${requestedTopic || "Crescimento de canais no YouTube"}". Se não for, substitua-a.
+• ter alto potencial de CTR
 
-FORMATO DE SAÍDA:
-Retorne EXATAMENTE 5 títulos, um por linha.
-Sem numeração, bullets, markdown, introdução ou explicações.
-Responda em português brasileiro.
+• resolver uma dor real
+
+• despertar curiosidade
+
+• ser evergreen quando possível
+
+• não repetir temas existentes
+
+• parecer digna de um canal grande
+
+Retorne apenas os títulos.
+
+Uma ideia por linha.
+
+Sem números.
+
+Sem markdown.
+
+Sem explicações.
+
 `;
+
 }
 
 // ======================================================
@@ -3810,7 +3712,7 @@ tipo === "tubex_insight"
 
 : [
 
-    (tipo === "niche" ? "niche_v8_taxonomy" : tipo === "ideas" ? "ideas_v2_topic_first" : "v7"),
+    (tipo === "niche" ? "niche_v8_taxonomy" : "v7"),
 
     userId,
 

@@ -945,44 +945,45 @@ ${prompt}
 
 else if (tipo === "ideas") {
 
+const requestedTopic = String(prompt || body.keyword || "").trim();
+
 finalPrompt = `
+Você é um estrategista sênior de conteúdo para YouTube.
 
-Você é um estrategista especialista em crescimento no YouTube.
+TEMA OBRIGATÓRIO INFORMADO PELO USUÁRIO:
+"${requestedTopic || "Crescimento de canais no YouTube"}"
 
-Analise os vídeos abaixo.
+REGRA DE PRIORIDADE:
+O tema digitado pelo usuário é a fonte principal e obrigatória para esta geração.
+Todas as cinco ideias devem tratar diretamente desse tema, mesmo que ele não tenha relação com o nicho habitual do canal.
+NÃO substitua, amplie ou redirecione o tema para o nicho do canal.
+NÃO use os vídeos do canal como tema quando eles forem diferentes do tema solicitado.
 
-${videoSummary}
+CONTEXTO OPCIONAL DO CANAL:
+${videoSummary || "Nenhum histórico de vídeos disponível."}
 
-Sua missão é identificar oportunidades que o canal ainda não explorou.
+Use o histórico do canal somente como referência secundária para evitar repetir assuntos claramente relacionados ao tema solicitado. Se o histórico pertencer a outro assunto, ignore-o completamente.
 
-Crie exatamente 5 ideias de vídeos.
+TAREFA:
+Crie exatamente 5 ideias de vídeos para YouTube sobre "${requestedTopic || "Crescimento de canais no YouTube"}".
 
-Cada ideia deve:
+CRITÉRIOS:
+- Cada ideia deve ter relação direta e inequívoca com o tema informado.
+- Explore ângulos diferentes: dúvidas reais, problemas, descobertas, comparações, erros, tutoriais ou consequências ligados ao tema.
+- Desperte curiosidade e tenha potencial de clique sem promessas enganosas.
+- Não invente notícias, dados, fatos recentes ou resultados.
+- Não repita a mesma ideia com palavras diferentes.
+- Não exija que o título repita literalmente a palavra-chave; relevância semântica é suficiente.
+- Não inclua assuntos paralelos apenas porque aparecem no histórico do canal.
 
-• ter alto potencial de CTR
+VALIDAÇÃO:
+Antes de responder, confirme que cada ideia seria relevante para um espectador interessado em "${requestedTopic || "Crescimento de canais no YouTube"}". Se não for, substitua-a.
 
-• resolver uma dor real
-
-• despertar curiosidade
-
-• ser evergreen quando possível
-
-• não repetir temas existentes
-
-• parecer digna de um canal grande
-
-Retorne apenas os títulos.
-
-Uma ideia por linha.
-
-Sem números.
-
-Sem markdown.
-
-Sem explicações.
-
+FORMATO DE SAÍDA:
+Retorne EXATAMENTE 5 títulos, um por linha.
+Sem numeração, bullets, markdown, introdução ou explicações.
+Responda em português brasileiro.
 `;
-
 }
 
 // ======================================================
@@ -3809,7 +3810,7 @@ tipo === "tubex_insight"
 
 : [
 
-    (tipo === "niche" ? "niche_v8_taxonomy" : "v7"),
+    (tipo === "niche" ? "niche_v8_taxonomy" : tipo === "ideas" ? "ideas_v2_topic_first" : "v7"),
 
     userId,
 

@@ -3528,116 +3528,47 @@ Formato:
 else if (tipo === "title_score") {
 
 finalPrompt = `
+Você é um avaliador técnico de títulos para YouTube. Avalie ESTE título específico, não dê uma nota padrão.
 
-You are one of the world's leading YouTube SEO experts.
-
-Analyze the following YouTube title exactly as a professional YouTube strategist would.
-
-TITLE
-
+TÍTULO EXATO A AVALIAR:
 "${prompt}"
 
-YOUR TASK
+Avalie somente o texto acima. Não suponha conteúdo do vídeo que não foi informado. Não reutilize notas de análises anteriores.
 
-Evaluate this title considering ONLY YouTube performance.
+CRITÉRIOS E PESOS:
+1. Clareza e compreensão imediata (20 pontos)
+2. Correspondência com intenção de busca e palavra-chave (20 pontos)
+3. Especificidade e benefício/promessa clara (15 pontos)
+4. Curiosidade e motivação legítima para clicar (20 pontos)
+5. Naturalidade, leitura e concisão (15 pontos)
+6. Credibilidade: evitar exagero, promessa vaga ou clickbait (10 pontos)
 
-Analyze:
+REGRAS DE NOTA:
+- Calcule cada dimensão de acordo com o título real.
+- A nota geral deve refletir a soma ponderada dos critérios.
+- Não use 85 como nota padrão. Não dê notas altas por cortesia.
+- Títulos genéricos, vagos, longos, repetitivos ou sem benefício claro devem perder pontos.
+- Títulos claros, específicos, relevantes e atraentes podem receber notas altas.
+- A nota deve variar conforme a qualidade real do título. Dois títulos diferentes podem receber notas diferentes.
+- Não invente volume de busca nem tendências em tempo real. A nota de SEO avalia a presença e adequação textual da palavra-chave.
+- CTR é potencial qualitativo de clique, não uma previsão real de taxa de cliques.
+- SEO, CTR e tendência devem ser notas inteiras de 0 a 100. Se não houver dados para tendência atual, avalie somente a adequação temática geral e deixe isso claro em reason.
 
-- Search SEO
-- Click Through Rate (CTR)
-- Search Intent
-- Keyword Quality
-- Curiosity Gap
-- Emotional Impact
-- Clarity
-- Readability
-- Title Length
-- Viral Potential
-- Recommendation Potential
-- Current search trends (based on your knowledge)
-
-SCORING RULES
-
-IMPORTANT:
-
-Every score MUST be an INTEGER from 0 to 100.
-
-Never use a 0-10 scale.
-
-Examples:
-
-30 = Very poor
-
-50 = Average
-
-70 = Good
-
-85 = Excellent
-
-95 = Outstanding
-
-100 = Nearly perfect
-
-The "overall" score must represent the final quality of the title.
-
-The "seo" score represents search optimization.
-
-The "ctr" score represents expected click potential.
-
-The "trend" score represents how well this topic aligns with current YouTube search interest based on your knowledge.
-
-KEYWORD
-
-Return the most important keyword or keyword phrase contained in the title.
-
-STRENGTHS
-
-List 2–5 strengths.
-
-WEAKNESSES
-
-List 2–5 weaknesses.
-
-SUGGESTIONS
-
-List 2–5 practical improvements that would increase SEO and CTR.
-
-REASON
-
-Briefly explain the overall score in one sentence.
-
-RESPONSE RULES
-
-Return ONLY valid JSON.
-
-Do NOT use Markdown.
-
-Do NOT wrap the JSON in code fences.
-
-Do NOT write any explanation.
-
-Return exactly this structure:
-
+Retorne:
 {
-  "overall": 92,
-  "seo": 95,
-  "ctr": 91,
-  "trend": 88,
-  "keyword": "youtube seo",
-  "strengths": [
-    "..."
-  ],
-  "weaknesses": [
-    "..."
-  ],
-  "suggestions": [
-    "..."
-  ],
-  "reason": "..."
+  "overall": 0,
+  "seo": 0,
+  "ctr": 0,
+  "trend": 0,
+  "keyword": "",
+  "strengths": ["", ""],
+  "weaknesses": ["", ""],
+  "suggestions": ["", ""],
+  "reason": "Explique objetivamente por que este título recebeu esta nota."
 }
 
+Responda somente com JSON válido, sem markdown, em português brasileiro.
 `;
-
 }
 
 // ======================================================
@@ -3773,7 +3704,10 @@ const insightFingerprint = insightCachePayload
 
 const cacheKey =
 
-tipo === "tubex_insight"
+tipo === "title_score"
+? ["title_score_v2", userId, normalizedKeyword].join("|")
+
+: tipo === "tubex_insight"
 
 ? ["tubex_insight_v2", userId, channelId, insightFingerprint].join("|")
 
@@ -3832,6 +3766,8 @@ const cached = global.__tubexCache.get(cacheKey);
 
 // TTL por tipo
 const TTL = {
+  // Reevaluate every title request; never reuse a previous title's score.
+  title_score: 0,
   diagnosis: 6,
   strategy: 12,
 script_generator:12,
@@ -4741,22 +4677,15 @@ if (tipo === "title_score") {
         const trend = numeric(parsed.trend);
         let overall = numeric(parsed.overall ?? parsed.score ?? parsed.nota);
 
-        // If the model omits only the overall field, derive a transparent
-        // weighted score from the three returned dimensions instead of
-        // showing an empty badge.
-        if (overall === null && seo !== null && ctr !== null) {
-            overall = Math.round(seo * 0.40 + ctr * 0.45 + (trend ?? 70) * 0.15);
-        }
-
         if (overall === null) {
             throw new Error("title_score_missing_overall");
         }
 
         const result = {
             overall,
-            seo: seo ?? overall,
-            ctr: ctr ?? overall,
-            trend: trend ?? 70,
+            seo,
+            ctr,
+            trend,
             keyword: String(parsed.keyword || "").slice(0, 120),
             strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 5) : [],
             weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 5) : [],

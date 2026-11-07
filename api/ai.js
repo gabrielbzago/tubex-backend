@@ -945,41 +945,23 @@ ${prompt}
 
 else if (tipo === "ideas") {
 
+const requestedTopic = String(prompt || body.keyword || "").trim();
+
 finalPrompt = `
 
-Você é um estrategista especialista em crescimento no YouTube.
+Você é um estrategista sênior de conteúdo para YouTube.
 
-Analise os vídeos abaixo.
+FONTE DE VERDADE: o tema EXATO digitado pelo usuário.
+TEMA OBRIGATÓRIO: <<<${requestedTopic}>>>
 
-${videoSummary}
-
-Sua missão é identificar oportunidades que o canal ainda não explorou.
-
-Crie exatamente 5 ideias de vídeos.
-
-Cada ideia deve:
-
-• ter alto potencial de CTR
-
-• resolver uma dor real
-
-• despertar curiosidade
-
-• ser evergreen quando possível
-
-• não repetir temas existentes
-
-• parecer digna de um canal grande
-
-Retorne apenas os títulos.
-
-Uma ideia por linha.
-
-Sem números.
-
-Sem markdown.
-
-Sem explicações.
+Gere exatamente 5 ideias de vídeos que tratem direta e especificamente desse tema.
+Não use títulos de vídeos antigos, assuntos de outras pesquisas ou contexto de solicitações anteriores.
+Não mude de nicho e não substitua o tema por outro assunto.
+Dados do canal, se existirem, podem orientar apenas o estilo e o nível do público; nunca podem alterar o tema.
+Cada título deve explorar um ângulo diferente do mesmo tema, com promessa clara e potencial de clique.
+Evite títulos genéricos que poderiam servir para qualquer assunto.
+Retorne somente os 5 títulos, um por linha.
+Sem números, sem markdown e sem explicações.
 
 `;
 
@@ -3773,7 +3755,14 @@ const TTL = {
 script_generator:12,
 video_analysis:12,
   niche: 24,
-  ideas: 24,
+  // Ideias e títulos do Workspace sempre são gerados novamente para a pesquisa atual.
+  ideas: 0,
+  tituloSEO: 0,
+  tituloImpactante: 0,
+  tituloEmocional: 0,
+  tituloSEO_panel: 0,
+  tituloImpactante_panel: 0,
+  tituloEmocional_panel: 0,
 
   // SEO Workspace NÃO USA CACHE
   seo_workspace: 0,

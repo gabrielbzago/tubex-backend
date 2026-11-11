@@ -10,6 +10,39 @@ const PORTUGUESE_LANGUAGE = "languageConstants/1014";
 function cleanKeyword(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
 }
+
+// O Planejador pode retornar poucas ideias quando recebe somente uma frase longa.
+// Mantemos a frase original como primeira semente e acrescentamos combinações
+// contíguas de 2–3 termos para ampliar as ideias sem alterar o volume da frase.
+function buildKeywordSeeds(keyword) {
+  const original = cleanKeyword(keyword);
+  const words = original.split(" ").filter(Boolean);
+  const seeds = [original];
+  const stopWords = new Set([
+    "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e",
+    "em", "no", "na", "nos", "nas", "para", "por", "com", "sem",
+    "um", "uma", "the", "for", "and", "of", "to", "in"
+  ]);
+  const meaningful = words.filter(word => !stopWords.has(word.toLowerCase()));
+
+  // Primeiro, combinações de 2 e 3 palavras da frase original.
+  for (const size of [3, 2]) {
+    for (let i = 0; i <= words.length - size; i++) {
+      const phrase = words.slice(i, i + size).join(" ");
+      if (phrase.length >= 4 && !seeds.some(item => item.toLowerCase() === phrase.toLowerCase())) {
+        seeds.push(phrase);
+      }
+    }
+  }
+
+  // Por último, termos relevantes isolados; limite da API: 10 sementes.
+  for (const word of meaningful) {
+    if (word.length >= 3 && !seeds.some(item => item.toLowerCase() === word.toLowerCase())) {
+      seeds.push(word);
+    }
+  }
+  return seeds.slice(0, 10);
+}
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
@@ -90,7 +123,7 @@ async function historicalMetrics(customerId, token, keywords) {
 }
 async function keywordIdeas(customerId, token, keyword) {
   return adsFetch(`customers/${customerId}:generateKeywordIdeas`, token, {
-    keywordSeed: { keywords: [keyword] },
+    keywordSeed: { keywords: buildKeywordSeeds(keyword) },
     geoTargetConstants: [BRAZIL_GEO],
     language: PORTUGUESE_LANGUAGE,
     keywordPlanNetwork: "GOOGLE_SEARCH",

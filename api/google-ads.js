@@ -68,70 +68,92 @@ function resultMatchesKeyword(item, requestedKey) {
   return Array.isArray(variants) && variants.some(value => normalizeKeywordKey(value) === requestedKey);
 }
 
-// Mantém a frase completa como semente. Enviar palavras isoladas (por
-// exemplo, "youtube" em "ferramentas de seo para youtube") dilui o contexto
-// e faz o Planejador devolver ideias genéricas de música, MP4 e downloads.
-function buildKeywordSeeds(keyword) {
-  return [cleanKeyword(keyword)];
-}
-
-const CONTEXT_TERMS = {
-  youtube: ["youtube", "youtuber", "youtubers", "canal", "canais", "shorts", "video", "videos"],
-  seo: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra", "palavras", "chave", "chaves"],
-  tools: ["ferramenta", "ferramentas", "software", "programa", "aplicativo", "app", "plataforma", "extensao"],
-  marketing: ["marketing", "digital", "trafego", "conteudo", "criador", "criadores"],
-  growth: ["viralizar", "viral", "crescer", "crescimento", "visualizacoes", "inscritos"]
-};
-
+// Mantém a consulta completa e cria sementes de frases do próprio contexto.
+// Isso permite ao Planejador encontrar variações de cauda longa sem reduzir
+// "ferramentas de SEO para YouTube" apenas a "YouTube".
 const STOP_WORDS = new Set([
   "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em",
-  "no", "na", "nos", "nas", "para", "por", "com", "sem", "um", "uma"
+  "no", "na", "nos", "nas", "para", "por", "com", "sem", "um", "uma",
+  "uns", "umas", "ao", "aos", "à", "às", "que", "como"
 ]);
+
+function meaningfulTokens(value) {
+  return normalizeKeywordKey(value)
+    .split(" ")
+    .filter(token => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function buildKeywordSeeds(keyword) {
+  const original = cleanKeyword(keyword);
+  const tokens = meaningfulTokens(original);
+  const seeds = [original];
+  const add = value => {
+    const cleaned = cleanKeyword(value);
+    const key = normalizeKeywordKey(cleaned);
+    if (cleaned && key && !seeds.some(seed => normalizeKeywordKey(seed) === key)) {
+      seeds.push(cleaned);
+    }
+  };
+
+  // Adiciona subfrases contíguas, preservando a ordem e o assunto pesquisado.
+  // Prioriza frases de 2–4 termos; não envia palavras soltas genéricas.
+  for (let size = Math.min(4, tokens.length); size >= 2; size--) {
+    for (let i = 0; i <= tokens.length - size; i++) {
+      add(tokens.slice(i, i + size).join(" "));
+      if (seeds.length >= 10) return seeds;
+    }
+  }
+  return seeds.slice(0, 10);
+}
 
 function contextualCandidate(seed, candidate) {
   const seedKey = normalizeKeywordKey(seed);
   const candidateKey = normalizeKeywordKey(candidate);
   if (!candidateKey || candidateKey === seedKey) return false;
 
-  const seedTokens = seedKey.split(" ").filter(w => w.length > 2 && !STOP_WORDS.has(w));
-  const candidateTokens = new Set(candidateKey.split(" ").filter(w => w.length > 2));
+  const seedTokens = meaningfulTokens(seed);
+  const candidateTokens = meaningfulTokens(candidate);
+  if (!seedTokens.length || !candidateTokens.length) return false;
 
-  // Conta equivalências semânticas dentro do mesmo grupo (ex.: ferramenta /
-  // software; otimizar / posicionamento), mas não aceita "youtube" sozinho
-  // como correspondência para uma busca que também fala de SEO ou ferramentas.
-  const matchedGroups = Object.entries(CONTEXT_TERMS)
-    .filter(([, terms]) => seedTokens.some(token => terms.includes(token)))
-    .filter(([, terms]) => terms.some(term => candidateTokens.has(term)))
-    .map(([group]) => group);
+  const candidateSet = new Set(candidateTokens);
+  const matched = seedTokens.filter(token => candidateSet.has(token));
+  const overlap = matched.length / Math.max(1, new Set(seedTokens).size);
 
-  const directMatches = seedTokens.filter(token => candidateTokens.has(token)).length;
-  const semanticMatches = matchedGroups.length;
-  const distinctMatches = new Set([
-    ...seedTokens.filter(token => candidateTokens.has(token)),
-    ...matchedGroups
-  ]).size;
+  // Evita sugestões que só compartilham um termo amplo quando a busca
+  // contém vários conceitos. Para consultas curtas, um termo específico basta.
+  const uniqueSeed = [...new Set(seedTokens)];
+  if (uniqueSeed.length >= 4 && matched.length < 2) return false;
+  if (uniqueSeed.length >= 2 && matched.length === 0) return false;
 
-  if (seedTokens.length <= 1) return directMatches >= 1 || semanticMatches >= 1;
-
-  // Para buscas compostas, exige pelo menos dois sinais de contexto.
-  // Isso elimina sugestões que só repetem o termo genérico "youtube".
-  if (seedTokens.length >= 2 && distinctMatches < 2) return false;
-
-  // Se a consulta contém um conceito específico (SEO, ferramentas,
-  // marketing ou crescimento), a sugestão precisa preservar ao menos um
-  // desses conceitos; compartilhar apenas "youtube" não é suficiente.
-  const specificGroups = ["seo", "tools", "marketing", "growth"];
-  const seedSpecificGroups = specificGroups.filter(group =>
-    CONTEXT_TERMS[group].some(term => seedTokens.includes(term))
-  );
-  if (seedSpecificGroups.length) {
-    const candidateHasSpecificGroup = seedSpecificGroups.some(group =>
-      CONTEXT_TERMS[group].some(term => candidateTokens.has(term))
-    );
-    if (!candidateHasSpecificGroup) return false;
+  // Recompensa a preservação de pares consecutivos da consulta: por exemplo,
+  // "seo youtube" em "ferramentas de seo para youtube".
+  let consecutive = 0;
+  for (let i = 0; i < seedTokens.length - 1; i++) {
+    const pair = `${seedTokens[i]} ${seedTokens[i + 1]}`;
+    if (candidateKey.includes(pair)) consecutive++;
   }
 
-  return directMatches >= 1 || semanticMatches >= 1;
+  // Uma ideia precisa manter parte do assunto; não basta conter uma palavra
+  // incidental ou apenas o primeiro termo da frase.
+  if (uniqueSeed.length >= 3 && overlap < 0.25 && consecutive === 0) return false;
+  return true;
+}
+
+function contextualRelevance(seed, candidate) {
+  const seedTokens = meaningfulTokens(seed);
+  const candidateTokens = meaningfulTokens(candidate);
+  const candidateSet = new Set(candidateTokens);
+  const matched = seedTokens.filter(token => candidateSet.has(token));
+  let consecutive = 0;
+  for (let i = 0; i < seedTokens.length - 1; i++) {
+    if (normalizeKeywordKey(candidate).includes(`${seedTokens[i]} ${seedTokens[i + 1]}`)) {
+      consecutive++;
+    }
+  }
+  const coverage = matched.length / Math.max(1, new Set(seedTokens).size);
+  const phraseBonus = normalizeKeywordKey(candidate).includes(normalizeKeywordKey(seed))
+    ? 3 : 0;
+  return coverage * 10 + consecutive * 2 + phraseBonus;
 }
 
 async function adsFetch(path, token, body) {
@@ -266,7 +288,12 @@ export default async function handler(req, res) {
             seen.add(key);
             return true;
           })
-          .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
+          .sort((a, b) => {
+            const relevance = contextualRelevance(keyword, b.keyword) -
+              contextualRelevance(keyword, a.keyword);
+            if (relevance !== 0) return relevance;
+            return (b.monthlySearches || 0) - (a.monthlySearches || 0);
+          })
           .slice(0, 50);
 
         const diagnostics = {
@@ -281,7 +308,7 @@ export default async function handler(req, res) {
           customerId,
           primary,
           relatedKeywords,
-          diagnostics,
+          diagnostics: { ...diagnostics, seedsUsed: buildKeywordSeeds(keyword) },
           resultCount: historyResults.length + ideaResults.length
         };
         if (!best || candidate.resultCount > best.resultCount) best = candidate;

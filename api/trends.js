@@ -10,12 +10,67 @@
  * Trends data used by the Google Trends website.
  */
 
-const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v8";
+const CACHE_TTL = 30 * 60 * 1000;
+const CACHE_VERSION = "v9-rate-limit";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
   (globalThis.__tubexGoogleTrendsCacheV2 = new Map());
+
+const STALE_TTL = 6 * 60 * 60 * 1000;
+const GOOGLE_TRENDS_COOLDOWN_MS = 2 * 60 * 1000;
+const sessionState =
+  globalThis.__tubexGoogleTrendsSessionV1 ||
+  (globalThis.__tubexGoogleTrendsSessionV1 = {
+    cookie: "",
+    expires: 0,
+    promise: null
+  });
+let trendsCooldownUntil =
+  Number(globalThis.__tubexGoogleTrendsCooldownUntil || 0);
+
+function markTrendsRateLimit() {
+  trendsCooldownUntil = Date.now() + GOOGLE_TRENDS_COOLDOWN_MS;
+  globalThis.__tubexGoogleTrendsCooldownUntil = trendsCooldownUntil;
+}
+
+function assertTrendsNotCoolingDown() {
+  const until = Math.max(
+    trendsCooldownUntil,
+    Number(globalThis.__tubexGoogleTrendsCooldownUntil || 0)
+  );
+  if (until > Date.now()) {
+    const error = new Error("Google Trends rate limit (HTTP 429). Aguarde antes de consultar novamente.");
+    error.status = 429;
+    error.retryAfter = Math.ceil((until - Date.now()) / 1000);
+    throw error;
+  }
+}
+
+
+let trendsRequestQueue = Promise.resolve();
+let lastTrendsRequestAt = 0;
+
+async function waitForGoogleTrendsSlot() {
+  const previous = trendsRequestQueue;
+  let release;
+  trendsRequestQueue = new Promise(resolve => { release = resolve; });
+  await previous;
+
+  try {
+    const waitMs = Math.max(
+      0,
+      900 - (Date.now() - lastTrendsRequestAt)
+    );
+    if (waitMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+    }
+    lastTrendsRequestAt = Date.now();
+  } finally {
+    release();
+  }
+}
+
 
 function stripXssi(text) {
   return String(text || "")
@@ -114,6 +169,9 @@ function normalizePoint(point) {
 
 async function requestJson(url, options = {}) {
 
+  assertTrendsNotCoolingDown();
+  await waitForGoogleTrendsSlot();
+
   const response =
     await fetch(url, {
       ...options,
@@ -137,6 +195,7 @@ async function requestJson(url, options = {}) {
     await response.text();
 
   if (!response.ok) {
+    if (response.status === 429) markTrendsRateLimit();
     const detail = text
       .replace(/^\\s+|\\s+$/g, "")
       .slice(0, 300);
@@ -283,25 +342,43 @@ function mergeCookies(...cookieValues) {
 }
 
 async function warmGoogleTrendsSession() {
+  assertTrendsNotCoolingDown();
 
-  const warmupUrl =
-    "https://trends.google.com/trends/" +
-    "?hl=pt-BR&geo=BR";
+  if (sessionState.expires > Date.now()) {
+    return sessionState.cookie || "";
+  }
 
-  const warmup =
-    await requestJsonText(
-      warmupUrl
-    );
+  if (sessionState.promise) {
+    return sessionState.promise;
+  }
 
-  return extractSetCookie(
-    warmup.headers
-  );
+  sessionState.promise = (async () => {
+    const warmupUrl =
+      "https://trends.google.com/trends/?hl=pt-BR&geo=BR";
+    const warmup = await requestJsonText(warmupUrl);
+    const cookie = extractSetCookie(warmup.headers);
+
+    // Reuse the session cookie instead of warming Google on every query.
+    // If Google supplies no cookie, memoize that result briefly as well.
+    sessionState.cookie = cookie;
+    sessionState.expires = Date.now() + (cookie ? 20 : 2) * 60 * 1000;
+    return cookie;
+  })();
+
+  try {
+    return await sessionState.promise;
+  } finally {
+    sessionState.promise = null;
+  }
 }
 
 async function requestJsonText(
   url,
   options = {}
 ) {
+
+  assertTrendsNotCoolingDown();
+  await waitForGoogleTrendsSlot();
 
   const response =
     await fetch(url, {
@@ -326,9 +403,12 @@ async function requestJsonText(
     await response.text();
 
   if (!response.ok) {
-    throw new Error(
+    if (response.status === 429) markTrendsRateLimit();
+    const error = new Error(
       `Google Trends warmup HTTP ${response.status}`
     );
+    error.status = response.status;
+    throw error;
   }
 
   return {
@@ -476,77 +556,24 @@ async function fetchGoogleTrend(
   geo,
   property
 ) {
-  // Use Google's normal relative selector first.
-  const attempts =
-    range === "30d" || range === "7d" || range === "60d" || range === "90d"
-      ? 3
-      : 2;
+  // Never retry HTTP 429. Nested retries previously multiplied requests.
+  assertTrendsNotCoolingDown();
 
-  let lastError = null;
-
-  // 60d/90d are requested as explicit date windows because Trends has
-  // no dedicated rolling 60-day/90-day preset. The response remains a
-  // normalized 0–100 relative-interest series, not search counts.
-  if (range === "60d" || range === "90d") {
-    return await fetchGoogleTrendOnce(keyword, range, geo, property, true);
-  }
-
-  for(let attempt = 1; attempt <= attempts; attempt++){
-    try{
-      return await fetchGoogleTrendOnce(
-        keyword,
-        range,
-        geo,
-        property,
-        false
-      );
-    }catch(error){
-      lastError = error;
-
-      console.warn(
-        `[TubeX] Google Trends ${range} tentativa ${attempt}/${attempts}:`,
-        error?.message || error
-      );
-
-      if(attempt < attempts){
-        const waitMs =
-          range === "30d" || range === "60d" || range === "90d"
-            ? (attempt === 1 ? 1200 : 2500)
-            : range === "7d"
-              ? (attempt === 1 ? 900 : 1800)
-              : 900;
-
-        await new Promise(
-          resolve => setTimeout(resolve, waitMs)
-        );
-      }
-    }
-  }
-
-  // Important: 7d and 30d now get the same real-data fallback
-  // previously reserved for 12m. No zeros and no synthetic values.
-  try{
-    console.warn(
-      `[TubeX] Google Trends ${range}: tentando intervalo exato`
-    );
-
+  try {
     return await fetchGoogleTrendOnce(
       keyword,
       range,
       geo,
       property,
-      true
+      range === "60d" || range === "90d"
     );
-  }catch(error){
-    lastError = error;
-
-    console.warn(
-      `[TubeX] Google Trends ${range} fallback exato falhou:`,
-      error?.message || error
-    );
+  } catch (error) {
+    if (Number(error?.status) === 429 || /HTTP 429/.test(error?.message || "")) {
+      markTrendsRateLimit();
+      error.status = 429;
+    }
+    throw error;
   }
-
-  throw lastError || new Error("google_trends_failed");
 }
 
 export default async function handler(req, res) {
@@ -699,6 +726,8 @@ export default async function handler(req, res) {
       {
         expires:
           Date.now() + CACHE_TTL,
+        staleUntil:
+          Date.now() + CACHE_TTL + STALE_TTL,
         data
       }
     );
@@ -706,6 +735,20 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (error) {
+
+    const stale = cache.get(cacheKey);
+    if (
+      stale &&
+      stale.staleUntil > Date.now() &&
+      (Number(error?.status) === 429 || /HTTP 429|rate limit/i.test(error?.message || ""))
+    ) {
+      return res.status(200).json({
+        ...stale.data,
+        cached: true,
+        stale: true,
+        staleReason: "google_trends_rate_limited"
+      });
+    }
 
     console.error(
       "[TubeX] Google Trends error:",
@@ -717,10 +760,16 @@ export default async function handler(req, res) {
       "google_trends_failed";
 
     const status =
-      message.includes("dados suficientes") ||
-      message.includes("série degenerada")
-        ? 422
-        : 502;
+      Number(error?.status) === 429 || /HTTP 429|rate limit/i.test(message)
+        ? 429
+        : message.includes("dados suficientes") ||
+          message.includes("série degenerada")
+          ? 422
+          : 502;
+
+    if (status === 429) {
+      res.setHeader("Retry-After", String(error?.retryAfter || 120));
+    }
 
     return res.status(status).json({
       success: false,

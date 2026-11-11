@@ -1,3 +1,33 @@
+
+// =========================================================
+// 🔎 KEYWORD SEARCH INTEREST — FREE / TRANSPARENT MODE
+// No paid DataForSEO or Zyla provider is called. Absolute search counts
+// are not exposed by the public YouTube Data API or Google Trends.
+// Relative 0–100 time series are served by the separate /api/trends route.
+// =========================================================
+async function tubexFetchKeywordVolume(keyword) {
+  const query = String(keyword || "").trim().replace(/\s+/g, " ").slice(0, 80);
+  if (!query) return { success: false, keyword: query, google: null, youtube: null };
+  const unavailable = (provider, note) => ({
+    available: false,
+    provider,
+    monthlySearches: null,
+    averageMonthlySearches: null,
+    latestMonthSearches: null,
+    period: "not_available_from_free_public_source",
+    note
+  });
+  return {
+    success: true,
+    keyword: query,
+    periodDays: 30,
+    google: unavailable("google_trends", "O Google Trends fornece índice relativo de interesse (0–100), não quantidade absoluta de pesquisas."),
+    youtube: unavailable("youtube_data_api", "A API pública do YouTube não fornece contagem de pesquisas por palavra-chave. Use o índice do Google Trends filtrado para YouTube Search."),
+    hasAnyProvider: false,
+    disclaimer: "Nenhum volume absoluto foi inventado. Consulte os índices reais do Google Trends nas abas Google e YouTube, separadamente."
+  };
+}
+
 export default async function handler(req, res) {
 
   // =========================
@@ -415,6 +445,16 @@ if(
 
 
     // =========================================================
+    // 🔎 KEYWORD VOLUME — independent provider lookup
+    // =========================================================
+    if (mode === "keyword_volume") {
+      const query = String(body?.keyword || "").trim().slice(0, 80);
+      if (!query) return res.status(400).json({ success: false, error: "keyword_required" });
+      const volume = await tubexFetchKeywordVolume(query);
+      return res.status(200).json({ ...volume, mode: "keyword_volume" });
+    }
+
+    // =========================================================
     // 📊 KEYWORD INSIGHTS — uploads recentes e total estimado
     // Fonte: YouTube Data API oficial, usando a mesma YOUTUBE_API_KEY
     // do backend. Não depende de OAuth da extensão.
@@ -524,9 +564,11 @@ if(
         .filter(video => video.videoId && video.relevance > 0)
         .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
 
+      const keywordVolume = await tubexFetchKeywordVolume(query);
       const insightData = {
         success: true,
         mode: "keyword_insights",
+        keywordVolume,
         keyword: query,
         totalResults: Number(insightPayload?.pageInfo?.totalResults || 0),
         totalResultsIsEstimate: true,
@@ -3872,9 +3914,17 @@ const requestedRelatedLimit =
 
 const relatedKeywords = buildRelatedKeywords(items, keyword, requestedRelatedLimit);
 
+const keywordVolume = await tubexFetchKeywordVolume(keyword);
+const monthlyGoogleSearches = keywordVolume?.google?.available
+  ? Number(keywordVolume.google.monthlySearches)
+  : null;
+
 const responseData = {
 
     success: true,
+    keywordVolume,
+    // Absolute monthly searches come only from the configured provider.
+    // The internal TubeX 0–100 demand score remains a separate proprietary index.
 
     items,
     totalResults,
@@ -3884,13 +3934,13 @@ const responseData = {
 
     // Backward-compatible fields for the Keyword Explorer.
     // `monthlySearches` is an estimate, not an official YouTube search count.
-    monthlySearches: monthlySearchesEstimated,
-    monthlySearchesEstimated,
-    monthlySearchesMin,
-    monthlySearchesMax,
-    searchVolume: monthlySearchesEstimated,
-    searchVolumeSource: monthlySearchesEstimated !== null ? "tubex_estimate" : "unavailable",
-    searchVolumeType: monthlySearchesEstimated !== null ? "estimated" : "unavailable",
+    monthlySearches: monthlyGoogleSearches,
+    monthlySearchesEstimated: null,
+    monthlySearchesMin: null,
+    monthlySearchesMax: null,
+    searchVolume: monthlyGoogleSearches,
+    searchVolumeSource: monthlyGoogleSearches !== null ? "dataforseo_google_ads" : "unavailable",
+    searchVolumeType: monthlyGoogleSearches !== null ? "provider_monthly_estimate" : "unavailable",
 
     competition: finalCompetition,
 competitionDetails,
@@ -3941,10 +3991,11 @@ velocityScore,
 strengthScore,
 serpDemandScore,
 
-    monthlySearches: monthlySearchesEstimated,
-    monthlySearchesEstimated,
-    monthlySearchesMin,
-    monthlySearchesMax,
+    monthlySearches: monthlyGoogleSearches,
+    monthlySearchesEstimated: null,
+    monthlySearchesMin: null,
+    monthlySearchesMax: null,
+    keywordVolume,
 
     medianViews: median
 

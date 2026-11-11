@@ -11,7 +11,7 @@
  */
 
 const CACHE_TTL = 15 * 60 * 1000;
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v8";
 
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
@@ -31,7 +31,7 @@ function cleanKeyword(value) {
 }
 
 function normalizeRange(value) {
-  return value === "7d" || value === "30d" || value === "12m"
+  return ["7d", "30d", "60d", "90d", "12m"].includes(value)
     ? value
     : "30d";
 }
@@ -58,12 +58,7 @@ function trendsTime(range, exactRange = false) {
 
   // Real-data fallback using an explicit interval.
   const end = new Date();
-  const days =
-    range === "7d"
-      ? 7
-      : range === "30d"
-        ? 30
-        : 365;
+  const days = ({ "7d": 7, "30d": 30, "60d": 60, "90d": 90, "12m": 365 })[range] || 30;
 
   const start =
     new Date(
@@ -485,6 +480,13 @@ async function fetchGoogleTrend(
 
   let lastError = null;
 
+  // 60d/90d are requested as explicit date windows because Trends has
+  // no dedicated rolling 60-day/90-day preset. The response remains a
+  // normalized 0–100 relative-interest series, not search counts.
+  if (range === "60d" || range === "90d") {
+    return await fetchGoogleTrendOnce(keyword, range, geo, property, true);
+  }
+
   for(let attempt = 1; attempt <= attempts; attempt++){
     try{
       return await fetchGoogleTrendOnce(
@@ -676,6 +678,10 @@ export default async function handler(req, res) {
         range === "30d"
           ? trend
           : undefined,
+      trend60d:
+        range === "60d" ? trend : undefined,
+      trend90d:
+        range === "90d" ? trend : undefined,
       trend12m:
         range === "12m"
           ? trend

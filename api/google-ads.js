@@ -11,37 +11,68 @@ function cleanKeyword(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
 }
 
-// O Planejador pode retornar poucas ideias quando recebe somente uma frase longa.
-// Mantemos a frase original como primeira semente e acrescentamos combinações
-// contíguas de 2–3 termos para ampliar as ideias sem alterar o volume da frase.
-function buildKeywordSeeds(keyword) {
-  const original = cleanKeyword(keyword);
-  const words = original.split(" ").filter(Boolean);
-  const seeds = [original];
-  const stopWords = new Set([
-    "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e",
-    "em", "no", "na", "nos", "nas", "para", "por", "com", "sem",
-    "um", "uma", "the", "for", "and", "of", "to", "in"
-  ]);
-  const meaningful = words.filter(word => !stopWords.has(word.toLowerCase()));
+// Context groups prevent broad Google Ads ideas from drifting to an unrelated
+// meaning (for example "ferramentas de SEO para YouTube" -> power drills).
+const CONTEXT_GROUPS = [
+  { id: "youtube", terms: ["youtube", "youtuber", "youtubers", "canal", "canais", "shorts", "video", "videos", "vídeo", "vídeos"] },
+  { id: "seo", terms: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra-chave", "palavras-chave", "busca", "pesquisa", "pesquisas"] },
+  { id: "tool", terms: ["ferramenta", "ferramentas", "software", "programa", "aplicativo", "app", "plataforma", "extensao", "extensão"] },
+  { id: "marketing", terms: ["marketing", "digital", "trafego", "tráfego", "conteudo", "conteúdo", "criador", "criadores"] }
+];
+const STOP_WORDS = new Set([
+  "a", "as", "o", "os", "um", "uma", "de", "do", "da", "dos", "das",
+  "para", "por", "no", "na", "nos", "nas", "com", "e", "em", "como"
+]);
+function foldText(value) {
+  return String(value || "").toLocaleLowerCase("pt-BR")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+function keywordTokens(value) {
+  return foldText(value).split(" ").filter(token => token && !STOP_WORDS.has(token));
+}
+function contextProfile(keyword) {
+  const folded = foldText(keyword);
+  const tokens = new Set(keywordTokens(keyword));
+  const groups = new Set();
+  for (const group of CONTEXT_GROUPS) {
+    if (group.terms.some(term => {
+      const normalized = foldText(term);
+      return normalized.includes(" ")
+        ? folded.includes(normalized)
+        : tokens.has(normalized);
+    })) groups.add(group.id);
+  }
+  return { tokens, groups };
+}
+function isContextuallyRelevant(seedKeyword, candidateKeyword) {
+  const seed = contextProfile(seedKeyword);
+  const candidate = contextProfile(candidateKeyword);
+  const candidateTokens = keywordTokens(candidateKeyword);
+  if (!candidateTokens.length) return false;
 
-  // Primeiro, combinações de 2 e 3 palavras da frase original.
-  for (const size of [3, 2]) {
-    for (let i = 0; i <= words.length - size; i++) {
-      const phrase = words.slice(i, i + size).join(" ");
-      if (phrase.length >= 4 && !seeds.some(item => item.toLowerCase() === phrase.toLowerCase())) {
-        seeds.push(phrase);
-      }
+  // For multi-word searches, require at least two matching concepts when
+  // the seed contains recognizable semantic groups. This keeps the intent.
+  if (seed.groups.size >= 2) {
+    let matchedGroups = 0;
+    for (const group of seed.groups) {
+      const definition = CONTEXT_GROUPS.find(item => item.id === group);
+      if (definition && definition.terms.some(term => {
+        const normalized = foldText(term);
+        return normalized.includes(" ")
+          ? foldText(candidateKeyword).includes(normalized)
+          : candidate.tokens.has(normalized);
+      })) matchedGroups++;
     }
+    return matchedGroups >= 2;
   }
 
-  // Por último, termos relevantes isolados; limite da API: 10 sementes.
-  for (const word of meaningful) {
-    if (word.length >= 3 && !seeds.some(item => item.toLowerCase() === word.toLowerCase())) {
-      seeds.push(word);
-    }
-  }
-  return seeds.slice(0, 10);
+  // Generic or single-concept searches: require meaningful token overlap.
+  const meaningfulSeedTokens = [...seed.tokens].filter(token => token.length > 2);
+  if (!meaningfulSeedTokens.length) return true;
+  const overlap = meaningfulSeedTokens.filter(token => candidate.tokens.has(token)).length;
+  const required = meaningfulSeedTokens.length >= 3 ? 2 : 1;
+  return overlap >= required;
 }
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -123,7 +154,7 @@ async function historicalMetrics(customerId, token, keywords) {
 }
 async function keywordIdeas(customerId, token, keyword) {
   return adsFetch(`customers/${customerId}:generateKeywordIdeas`, token, {
-    keywordSeed: { keywords: buildKeywordSeeds(keyword) },
+    keywordSeed: { keywords: [keyword] },
     geoTargetConstants: [BRAZIL_GEO],
     language: PORTUGUESE_LANGUAGE,
     keywordPlanNetwork: "GOOGLE_SEARCH",
@@ -175,9 +206,10 @@ export default async function handler(req, res) {
           historicalMetrics(customerId, token, [keyword]),
           keywordIdeas(customerId, token, keyword)
         ]);
+        const normalizedRequestedKeyword = foldText(keyword);
         const primaryRaw = (historyResponse.results || []).find(item =>
-          String(item.text || "").toLocaleLowerCase("pt-BR") === keyword.toLocaleLowerCase("pt-BR")
-        ) || historyResponse.results?.[0] || null;
+          foldText(item.text || item.keyword || "") === normalizedRequestedKeyword
+        ) || null;
         const primary = primaryRaw ? normalizeMetrics(primaryRaw) : {
           keyword, monthlySearches: null,
           periods: periodEstimates(null), monthlyHistory: [],
@@ -187,8 +219,9 @@ export default async function handler(req, res) {
         const seen = new Set([keyword.toLocaleLowerCase("pt-BR")]);
         const relatedKeywords = (ideasResponse.results || [])
           .map(normalizeMetrics)
-          .filter(item => item.keyword && !seen.has(item.keyword.toLocaleLowerCase("pt-BR")))
-          .filter(item => { const key = item.keyword.toLocaleLowerCase("pt-BR"); if (seen.has(key)) return false; seen.add(key); return true; })
+          .filter(item => item.keyword && !seen.has(foldText(item.keyword)))
+          .filter(item => isContextuallyRelevant(keyword, item.keyword))
+          .filter(item => { const key = foldText(item.keyword); if (seen.has(key)) return false; seen.add(key); return true; })
           .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
           .slice(0, 25);
         return res.status(200).json({
@@ -198,6 +231,8 @@ export default async function handler(req, res) {
           keyword,
           primary,
           relatedKeywords,
+          relatedKeywordsFiltering: "contextual_semantic_groups_v1",
+          primaryExactMatchOnly: true,
           geo: "BR",
           language: "pt",
           monthlySearchesSource: "Google Ads API average monthly searches",

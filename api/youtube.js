@@ -655,7 +655,10 @@ if(
         .map(canonicalToken);
       const contextTokens = [...new Set(queryTokens.filter(w => platformTerms.has(w)))];
       const titleTokens = queryTokens.filter(w => !stopwords.has(w) && !platformTerms.has(w));
-      const coreTokens = [...new Set(titleTokens)];
+      // Para buscas curtas compostas apenas por um termo de plataforma
+      // (ex.: "youtube"), esse termo passa a ser o próprio conceito-âncora.
+      // Assim o endpoint não descarta a consulta antes de buscar no YouTube.
+      const coreTokens = [...new Set(titleTokens.length ? titleTokens : contextTokens)];
       const anchorTokens = coreTokens.slice(0, 6);
       // Nunca pesquisar só o substantivo isolado quando a busca original
       // especifica plataforma/formato. Preserva o contexto na SERP.
@@ -679,7 +682,10 @@ if(
         if (!words.length || words.length > 8) return;
 
         const matchedCore = words.filter(w => coreTokens.includes(w)).length;
-        const phraseHasTopicContext = words.some(w => secondaryTopicTerms.has(w)) || matchedCore >= 2;
+        const phraseHasTopicContext =
+          words.some(w => secondaryTopicTerms.has(w)) ||
+          matchedCore >= 2 ||
+          (coreTokens.length === 1 && platformTerms.has(coreTokens[0]) && words.length >= 2);
         const sourceTitleTokens = normalizeTagText(sourceTitle).split(" ").map(canonicalToken);
         const sourceHasPlatformContext = sourceTitleTokens.some(w => contextTokens.includes(w));
         const phraseHasPlatformContext = words.some(w => contextTokens.includes(w));

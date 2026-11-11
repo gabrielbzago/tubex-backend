@@ -390,7 +390,7 @@ if(
 
     const normalizedPlan = String(body?.plan || "free").toLowerCase();
     const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
-    const cacheKey = keyword ? `seo_v6_estimate_related_${cachePlan}_${keyword.toLowerCase()}` : null;
+    const cacheKey = keyword ? `seo_v7_contextual_related_${cachePlan}_${keyword.toLowerCase()}` : null;
 
     // O cache SEO só pode atender ao modo SEO padrão.
     // Modos isolados (tags, keyword_insights etc.) nunca devem receber
@@ -555,7 +555,7 @@ if(
       }
 
       global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
-      const tagCacheKey = "v4_niche_" + query.toLocaleLowerCase("pt-BR");
+      const tagCacheKey = "v5_context_" + query.toLocaleLowerCase("pt-BR");
       const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
       if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
         return res.status(200).json({
@@ -607,16 +607,27 @@ if(
       // Keep meaningful subject nouns such as "canais". The previous code
       // removed generic/domain words and reduced this title to just "cresce",
       // causing autocomplete to return unrelated "massa não cresce" phrases.
-      const titleTokens = normalizeTagText(query).split(" ")
-        .filter(w => w.length > 2 && !stopwords.has(w))
+      const platformTerms = new Set(["youtube", "video", "canal", "shorts", "seo"]);
+      const queryTokens = normalizeTagText(query).split(" ")
+        .filter(w => w.length > 2)
         .map(canonicalToken);
+      const contextTokens = [...new Set(queryTokens.filter(w => platformTerms.has(w)))];
+      const titleTokens = queryTokens.filter(w => !stopwords.has(w) && !platformTerms.has(w));
       const coreTokens = [...new Set(titleTokens)];
       const anchorTokens = coreTokens.slice(0, 6);
-      const anchorQuery = anchorTokens.join(" ") || query;
+      // Nunca pesquisar só o substantivo isolado quando a busca original
+      // especifica plataforma/formato. Preserva o contexto na SERP.
+      const anchorQuery = [...anchorTokens, ...contextTokens].join(" ") || query;
       const queryKey = normalizeTagText(query);
+      const topicTerms = coreTokens.some(w => ["titulo", "headline"].includes(w))
+        ? new Set(["titulo","headline","viral","virais","chamativo","chamativos","atrativo","atrativos","clickbait","ctr","seo","youtube","video","canal","shorts","monetizar","views","visualizacao","algoritmo","engajamento","retencao","otimizado","otimizacao","modelo","modelos"])
+        : coreTokens.some(w => ["capa","thumbnail","thumb","miniatura"].includes(w))
+          ? new Set(["capa","thumbnail","thumb","miniatura","youtube","video","canal","shorts","canva","photoshop","design","arte","criativo","criativa","profissional","personalizada","clickbait","viral","imagem"])
+          : new Set([...coreTokens, ...contextTokens]);
+      const secondaryTopicTerms = new Set([...topicTerms].filter(w => !coreTokens.includes(w)));
       const candidates = new Map();
 
-      const addTag = (raw, rank, source, videoId = "") => {
+      const addTag = (raw, rank, source, videoId = "", sourceTitle = "") => {
         const keyword = String(raw || "").trim().replace(/\s+/g, " ");
         const key = normalizeTagText(keyword);
         if (!key || key.length < 3 || key.length > 90 || key === queryKey) return;
@@ -626,13 +637,19 @@ if(
         if (!words.length || words.length > 8) return;
 
         const matchedCore = words.filter(w => coreTokens.includes(w)).length;
+        const phraseHasTopicContext = words.some(w => secondaryTopicTerms.has(w)) || matchedCore >= 2;
+        const sourceTitleTokens = normalizeTagText(sourceTitle).split(" ").map(canonicalToken);
+        const sourceHasPlatformContext = sourceTitleTokens.some(w => contextTokens.includes(w));
+        const phraseHasPlatformContext = words.some(w => contextTokens.includes(w));
+
         const coreCoverage = matchedCore / Math.max(1, Math.min(words.length, 4));
         const titleCoverage = matchedCore / Math.max(1, Math.min(words.length, 5));
 
-        // Two relevance layers: direct title concepts rank first; broader
-        // niche tags are admitted when corroborated by multiple relevant videos.
-        if (source === "youtube_autocomplete" && matchedCore === 0) return;
-        if (source !== "public_video_tags" && matchedCore === 0) return;
+        // Uma tag precisa representar o conceito central e o contexto do tema.
+        // Em tags públicas, o contexto pode estar no título do vídeo-fonte.
+        if (matchedCore === 0 || !phraseHasTopicContext) return;
+        if (contextTokens.length && !phraseHasPlatformContext && !sourceHasPlatformContext) return;
+        if (source === "youtube_autocomplete" && contextTokens.length && !phraseHasPlatformContext) return;
 
         const exactPhrase = queryKey.includes(key) || key.includes(queryKey);
         const rankSignal = Math.max(0, 1 - Number(rank || 0) / 50);
@@ -658,10 +675,9 @@ if(
       // Busca em até 3 variações semânticas para ampliar a coleta sem
       // depender de uma única consulta muito restritiva.
       const queryVariants = [...new Set([
-        query, // título integral e intenção completa
-        anchorQuery, // conceitos centrais identificados no título
-        [anchorTokens[0], anchorTokens[1], anchorTokens[anchorTokens.length - 1]].filter(Boolean).join(" ")
-      ].map(v => String(v || "").trim()).filter(v => v.length >= 3))].slice(0, 3);
+        query,        // intenção completa digitada pelo usuário
+        anchorQuery   // assunto + contexto de plataforma/formato
+      ].map(v => String(v || "").trim()).filter(v => v.length >= 3))].slice(0, 2);
 
       let youtubeIds = [];
       const rankMap = new Map();
@@ -713,7 +729,7 @@ if(
           (detailsData.items || []).forEach(video => {
             const rank = rankMap.get(video.id) ?? 149;
             (Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [])
-              .forEach(tag => addTag(tag, rank, "public_video_tags", video.id));
+              .forEach(tag => addTag(tag, rank, "public_video_tags", video.id, video?.snippet?.title || ""));
           });
         } catch (error) {
           console.warn("[TubeX] tag details batch error:", error?.message || error);
@@ -3296,72 +3312,30 @@ function tokenize(text = ""){
 // EXTRAI TAGS DO TÍTULO
 // =====================================
 
-function extractTitleTags(title = ""){
-
-  const words = tokenize(title);
-
+function extractTitleTags(title = "") {
+  const stopwords = new Set([
+    "como","para","com","sem","mais","menos","muito","muita","muitos","muitas",
+    "de","da","do","das","dos","em","no","na","nos","nas","por","e","ou",
+    "que","se","um","uma","uns","umas","the","and","for","with","from"
+  ]);
+  const words = tokenize(title).filter(word => !stopwords.has(word));
   const tags = new Set();
+  if (!words.length) return [];
 
-  // =================================
-  // PALAVRAS
-  // =================================
+  // A frase original é preservada como uma tag de cauda longa.
+  const fullPhrase = normalizeText(title);
+  if (fullPhrase.length >= 4 && fullPhrase.length <= 90) tags.add(fullPhrase);
 
-  words.forEach(word => {
-
-    tags.add(word);
-
-  });
-
-  // =================================
-  // BIGRAMAS
-  // =================================
-
-  for(let i=0;i<words.length-1;i++){
-
-    tags.add(
-
-      words[i] +
-      " " +
-      words[i+1]
-
-    );
-
+  // Termos individuais e combinações são criados somente a partir dos
+  // conceitos úteis da pesquisa, nunca de preposições/artigos.
+  words.forEach(word => tags.add(word));
+  for (let i = 0; i < words.length - 1; i++) {
+    tags.add(words.slice(i, i + 2).join(" "));
   }
-
-  // =================================
-  // TRIGRAMAS
-  // =================================
-
-  for(let i=0;i<words.length-2;i++){
-
-    tags.add(
-
-      words[i] +
-      " " +
-      words[i+1] +
-      " " +
-      words[i+2]
-
-    );
-
+  for (let i = 0; i < words.length - 2; i++) {
+    tags.add(words.slice(i, i + 3).join(" "));
   }
-
-  // =================================
-  // FRASE COMPLETA
-  // =================================
-
-  if(words.length >= 4){
-
-    tags.add(
-
-      words.join(" ")
-
-    );
-
-  }
-
   return [...tags];
-
 }
 
 // =====================================
@@ -3425,21 +3399,81 @@ items
         return;
       }
 
-      // relevância contextual
-      const relevance =
-        titleTags.some(titleTag =>
+      // Relevância contextual por tokens completos, sem substring.
+      // A tag precisa corresponder ao conceito central e ao contexto da busca.
+      const relevanceStop = new Set([
+        "como","para","com","sem","mais","menos","muito","muita","muitos","muitas",
+        "de","da","do","das","dos","em","no","na","nos","nas","por","e","ou",
+        "que","se","um","uma","uns","umas","fazer","criar","montar","produzir"
+      ]);
+      const platformTerms = new Set(["youtube","video","canal","shorts","seo"]);
+      const canonical = value => {
+        let token = normalizeText(value);
+        if (token.endsWith("oes") && token.length > 5) token = token.slice(0, -3) + "ao";
+        else if (token.endsWith("s") && token.length > 4) token = token.slice(0, -1);
+        return token;
+      };
+      const queryTokens = tokenize(keyword).map(canonical);
+      const coreTokens = [...new Set(queryTokens.filter(token =>
+        !relevanceStop.has(token) && !platformTerms.has(token)
+      ))];
+      const contextTokens = [...new Set(queryTokens.filter(token => platformTerms.has(token)))];
+      const candidateTokens = [...new Set(tokenize(normalized).map(canonical))];
+      const sourceTokens = [
+        ...tokenize(video?.snippet?.title || ""),
+        ...(Array.isArray(video?.snippet?.tags) ? video.snippet.tags.flatMap(tokenize) : [])
+      ].map(canonical);
 
-          normalized.includes(titleTag)
+      const synonymGroups = [
+        ["capa","thumbnail","thumb","miniatura"],
+        ["titulo","headline"],
+        ["coleiro","coleirinho","papa","capim"],
+        ["passaro","ave","aves","passaros"],
+        ["gaiola","viveiro"]
+      ];
+      const expandedCore = new Set(coreTokens);
+      synonymGroups.forEach(group => {
+        if (group.some(term => coreTokens.includes(canonical(term)))) {
+          group.forEach(term => expandedCore.add(canonical(term)));
+        }
+      });
 
-          ||
+      const matchedCore = candidateTokens.filter(token => expandedCore.has(token));
+      const sourceCoreMatches = sourceTokens.filter(token => expandedCore.has(token));
+      const hasContext = tokens => !contextTokens.length ||
+        contextTokens.some(token => tokens.includes(token));
+      const titleTopicTerms = new Set([
+        "viral","virais","chamativo","chamativos","atrativo","atrativos",
+        "clickbait","ctr","seo","youtube","video","canal","shorts","monetizar",
+        "views","visualizacao","algoritmo","engajamento","retencao","busca",
+        "pesquisa","otimizado","otimizacao","modelo","modelos"
+      ]);
+      const coverTopicTerms = new Set([
+        "thumbnail","thumb","miniatura","youtube","video","canal","shorts",
+        "canva","photoshop","design","arte","criativo","criativa","profissional",
+        "personalizada","clickbait","viral","imagem"
+      ]);
+      const topicTerms = coreTokens.some(token => ["titulo","headline"].includes(token))
+        ? titleTopicTerms
+        : coreTokens.some(token => ["capa","thumbnail","thumb","miniatura"].includes(token))
+          ? coverTopicTerms
+          : new Set([...coreTokens, ...contextTokens]);
+      const secondaryTopicTerms = new Set([...topicTerms].filter(token => !expandedCore.has(canonical(token))));
 
-          titleTag.includes(normalized)
+      const candidateHasTopic = candidateTokens.some(token => secondaryTopicTerms.has(token));
+      const sourceHasContext = hasContext(sourceTokens);
+      const candidateHasContext = hasContext(candidateTokens);
+      const enoughCore = coreTokens.length >= 2
+        ? new Set(sourceCoreMatches).size >= 2
+        : sourceCoreMatches.length >= 1;
 
-        );
+      const relevance = matchedCore.length >= 1 &&
+        (candidateHasTopic || matchedCore.length >= 2) &&
+        enoughCore &&
+        sourceHasContext &&
+        (candidateHasContext || sourceHasContext);
 
-      if(!relevance){
-        return;
-      }
+      if (!relevance) return;
 
       // views
       const views =
@@ -3595,43 +3629,37 @@ function buildRelatedKeywords(items, seedKeyword, limit=30) {
     const videos = Array.isArray(items) ? items : [];
     const normalize = value => String(value || "")
         .toLocaleLowerCase("pt-BR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    const canonical = word => {
+        const value = normalize(word);
+        if (value.endsWith("oes") && value.length > 5) return value.slice(0, -3) + "ao";
+        if (value.endsWith("ais") && value.length > 5) return value.slice(0, -3) + "al";
+        return value.endsWith("s") && value.length > 4 ? value.slice(0, -1) : value;
+    };
     const stop = new Set([
         "a","o","as","os","um","uma","uns","umas","de","da","do","das","dos",
         "em","no","na","nos","nas","para","por","com","sem","e","ou","que",
-        "se","como","mais","menos","sobre","entre","video","videos","canal",
-        "youtube","melhor","melhores","muito","muita","muitos","muitas",
-        "fazer","fazendo","feito","criar","criado","criar","montar","produzir",
-        "the","and","for","with","from","how","what","this","that","your","you",
-        "los","las","con","una","del","here","there"
+        "se","como","mais","menos","sobre","entre","melhor","melhores","muito",
+        "muita","muitos","muitas","fazer","fazendo","feito","criar","criado",
+        "montar","produzir","the","and","for","with","from","how","what",
+        "this","that","your","you","los","las","con","una","del","here","there"
     ]);
-
-    // Normaliza plural simples para evitar falso negativo entre "capa" e "capas".
-    const canonical = word => {
-        const value = normalize(word);
-        return value.endsWith("s") && value.length > 4 ? value.slice(0, -1) : value;
-    };
-
-    const rawTerms = normalize(seedKeyword).split(" ").filter(Boolean);
-    const anchors = [...new Set(rawTerms
-        .map(canonical)
-        .filter(word => word.length >= 3 && !stop.has(word)))];
-
+    const platformTerms = new Set(["youtube","video","canal","shorts","seo"]);
+    const rawTokens = normalize(seedKeyword).split(" ").filter(Boolean).map(canonical);
+    const anchors = [...new Set(rawTokens.filter(token =>
+        token.length >= 3 && !stop.has(token) && !platformTerms.has(token)
+    ))];
+    const contextTerms = [...new Set(rawTokens.filter(token => platformTerms.has(token)))];
     if (!anchors.length || !videos.length) return [];
 
-    // Sinônimos explícitos e limitados por assunto. Não usamos similaridade
-    // por substring, pois "do" dentro de "donjone" gerava falsos positivos.
     const synonymGroups = [
         ["capa","thumbnail","thumb","miniatura"],
         ["coleiro","coleirinho","papa","capim"],
         ["passaro","ave","aves","passaros"],
         ["gaiola","viveiro"],
-        ["semente","sementes"]
+        ["semente","sementes"],
+        ["titulo","headline"]
     ];
     const expandedAnchors = new Set(anchors);
     synonymGroups.forEach(group => {
@@ -3640,45 +3668,84 @@ function buildRelatedKeywords(items, seedKeyword, limit=30) {
         }
     });
 
-    const tokenSet = value => new Set(normalize(value).split(" ").filter(Boolean).map(canonical));
-    const hasAnchor = value => {
-        const tokens = tokenSet(value);
-        return [...expandedAnchors].some(anchor => tokens.has(anchor));
+    const titleTopicTerms = new Set([
+        "viral","virais","chamativo","chamativos","chamativa","chamativas",
+        "atrativo","atrativos","atrativa","atrativas","clique","clickbait",
+        "ctr","seo","youtube","video","canal","shorts","monetizar","views",
+        "visualizacao","visualizacoes","algoritmo","engajamento","retencao",
+        "busca","pesquisa","titulo","titulos","headline","ideia","ideias",
+        "otimizado","otimizacao","copiar","modelo","modelos"
+    ]);
+    const coverTopicTerms = new Set([
+        "thumbnail","thumb","miniatura","youtube","video","canal","shorts",
+        "canva","photoshop","design","arte","criativo","criativa","atrativo",
+        "atrativa","clickbait","viral","virais","imagem","imagens"
+    ]);
+    const birdTopicTerms = new Set([
+        "coleiro","coleirinho","passaro","ave","alimentacao","manejo",
+        "reproducao","criar","criadouro","gaiola","viveiro","semente",
+        "papa","capim","canto","fibra","ninho"
+    ]);
+    const topicTerms = anchors.some(a => ["titulo","headline"].includes(a))
+        ? titleTopicTerms
+        : anchors.some(a => ["capa","thumbnail","thumb","miniatura"].includes(a))
+            ? coverTopicTerms
+            : anchors.some(a => ["coleiro","coleirinho","passaro","ave"].includes(a))
+                ? birdTopicTerms
+                : new Set([...anchors, ...contextTerms]);
+
+    const secondaryTopicTerms = new Set([...topicTerms].filter(term => !expandedAnchors.has(canonical(term))));
+    const tokensOf = value => normalize(value).split(" ").filter(Boolean).map(canonical);
+    const hasAny = (tokens, set) => tokens.some(token => set.has(token));
+    const hasAnchor = value => hasAny(tokensOf(value), expandedAnchors);
+    const sourceIsRelevant = video => {
+        const title = tokensOf(video?.snippet?.title || "");
+        const description = tokensOf(video?.snippet?.description || "");
+        const tags = (Array.isArray(video?.snippet?.tags) ? video.snippet.tags : []).flatMap(tokensOf);
+        const all = [...title, ...description, ...tags];
+        const matchedAnchors = [...expandedAnchors].filter(anchor => all.includes(anchor));
+        if (!matchedAnchors.length) return false;
+
+        // Quando a busca especifica plataforma/formato, a fonte precisa
+        // confirmar esse contexto no título, descrição ou tags do vídeo.
+        if (contextTerms.length && !contextTerms.some(term => all.includes(term))) return false;
+
+        // Evita resultados incidentais com apenas a palavra principal.
+        // Para uma busca com um único conceito, exige também contexto de nicho.
+        if (anchors.length === 1 && !hasAny(all, secondaryTopicTerms) && !contextTerms.length) return false;
+        return true;
+    };
+    const phraseIsRelevant = (phrase, sourceVideo) => {
+        const phraseTokens = tokensOf(phrase);
+        if (!hasAny(phraseTokens, expandedAnchors)) return false;
+        // A frase sugerida precisa fazer sentido dentro do tema, não basta
+        // conter uma palavra solta como "título" ou "capa".
+        if (!hasAny(phraseTokens, secondaryTopicTerms) && anchors.length < 2) return false;
+        if (contextTerms.length &&
+            !contextTerms.some(term => phraseTokens.includes(term)) &&
+            !hasAny(phraseTokens, topicTerms)) return false;
+        return sourceIsRelevant(sourceVideo);
     };
 
     const candidates = new Map();
     const addCandidate = (raw, video, sourceWeight = 1) => {
         const phrase = normalize(raw);
-        if (!phrase || phrase.length < 3 || phrase.length > 70 || phrase === normalize(seedKeyword)) return;
-
+        if (!phrase || phrase.length < 3 || phrase.length > 70 ||
+            phrase === normalize(seedKeyword)) return;
         const words = phrase.split(" ").filter(Boolean);
-        if (words.length < 1 || words.length > 5) return;
-        if (stop.has(words[0])) return;
-        const lastWord = words[words.length - 1];
-        if (stop.has(lastWord) && !["youtube", "canal"].includes(lastWord)) return;
-        const meaningfulWords = words.filter(word => !stop.has(word));
-        if (!meaningfulWords.length || meaningfulWords.some(word => word.length < 3)) return;
+        const allowedConnectors = new Set(["para","de","do","da","no","na","em"]);
+        if (words.length < 1 || words.length > 5 || stop.has(words[0]) || stop.has(words[words.length - 1])) return;
+        if (words.some(word => stop.has(word) && !allowedConnectors.has(word))) return;
+        if (words.some(word => word.length < 3 && !stop.has(word))) return;
+        if (!phraseIsRelevant(phrase, video)) return;
 
-        // A sugestão precisa conter um termo central da busca (ou sinônimo).
         const matchedAnchors = [...expandedAnchors].filter(anchor =>
             words.some(word => canonical(word) === anchor)
         );
-        if (!matchedAnchors.length) return;
-
-        // O próprio vídeo que originou a sugestão também precisa demonstrar
-        // relação com o assunto, no título ou nas tags públicas.
-        const title = String(video?.snippet?.title || "");
-        const tags = Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [];
-        if (!hasAnchor(title) && !tags.some(tag => hasAnchor(tag))) return;
-
-        // Consolida singular/plural para que "capa" e "capas" contem
-        // como a mesma oportunidade sem duplicar cartões no painel.
         const key = words.map(canonical).join(" ");
         const videoId = String(video?.id || video?.snippet?.title || "");
         const entry = candidates.get(key) || {
-            keyword: phrase,
-            videos: new Map(),
-            sourceWeight: 0,
+            keyword: phrase, videos: new Map(), sourceWeight: 0,
             matchedAnchors: new Set()
         };
         if (videoId && !entry.videos.has(videoId)) entry.videos.set(videoId, video);
@@ -3688,16 +3755,11 @@ function buildRelatedKeywords(items, seedKeyword, limit=30) {
     };
 
     videos.forEach(video => {
-        const title = String(video?.snippet?.title || "").trim();
+        if (!sourceIsRelevant(video)) return;
         const tags = Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [];
-
-        // Só analisa vídeos cujo título ou tags realmente tenham relação com
-        // o termo pesquisado; vídeos incidentais da SERP não entram no cálculo.
-        if (!hasAnchor(title) && !tags.some(tag => hasAnchor(tag))) return;
-
         tags.forEach(tag => addCandidate(tag, video, 3));
 
-        const words = normalize(title).split(" ").filter(Boolean);
+        const words = normalize(video?.snippet?.title || "").split(" ").filter(Boolean);
         for (let n = 2; n <= 4; n++) {
             for (let i = 0; i + n <= words.length; i++) {
                 const phraseWords = words.slice(i, i + n);
@@ -3712,11 +3774,9 @@ function buildRelatedKeywords(items, seedKeyword, limit=30) {
     for (const entry of candidates.values()) {
         const support = [...entry.videos.values()];
         if (support.length < minimumSupport) continue;
-
         const views = support.map(video => Number(video?.statistics?.viewCount || 0))
             .filter(value => Number.isFinite(value) && value >= 0);
         if (!views.length) continue;
-
         const averageViews = Math.round(views.reduce((sum, value) => sum + value, 0) / views.length);
         const supportRate = support.length / Math.max(videos.length, 1);
         const anchorCoverage = entry.matchedAnchors.size / Math.max(expandedAnchors.size, 1);
@@ -3727,36 +3787,23 @@ function buildRelatedKeywords(items, seedKeyword, limit=30) {
             supportRate * 55 + Math.min(1, support.length / 8) * 25
         )));
         const demand = Math.max(10, Math.min(100, Math.round(
-            Math.log10(averageViews + 1) * 12 +
-            relevance * 0.35 +
+            Math.log10(averageViews + 1) * 12 + relevance * 0.35 +
             Math.min(100, supportRate * 100) * 0.25
         )));
         const opportunity = Math.max(10, Math.min(100, Math.round(
             demand * 0.45 + competition * 0.30 + relevance * 0.25
         )));
-
         rows.push({
-            keyword: entry.keyword,
-            avgViews: averageViews,
-            videosAnalyzed: support.length,
-            competition,
-            opportunity,
-            score: opportunity,
-            relevance,
-            searchDemand: demand,
-            searchVolume: null,
-            searchVolumeSource: "unavailable"
+            keyword: entry.keyword, avgViews: averageViews,
+            videosAnalyzed: support.length, competition, opportunity,
+            score: opportunity, relevance, searchDemand: demand,
+            searchVolume: null, searchVolumeSource: "unavailable"
         });
     }
-
-    return rows
-        .sort((a, b) =>
-            b.relevance - a.relevance ||
-            b.searchDemand - a.searchDemand ||
-            b.opportunity - a.opportunity ||
-            b.videosAnalyzed - a.videosAnalyzed
-        )
-        .slice(0, Math.max(3, Math.min(30, Number(limit) || 30)));
+    return rows.sort((a,b) =>
+        b.relevance-a.relevance || b.searchDemand-a.searchDemand ||
+        b.opportunity-a.opportunity || b.videosAnalyzed-a.videosAnalyzed
+    ).slice(0, Math.max(3, Math.min(30, Number(limit) || 30)));
 }
 
 

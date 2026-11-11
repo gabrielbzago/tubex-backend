@@ -10,6 +10,16 @@ const PORTUGUESE_LANGUAGE = "languageConstants/1014";
 function cleanKeyword(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
 }
+function keywordKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\\s+/g, " ");
+}
+
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
@@ -142,20 +152,46 @@ export default async function handler(req, res) {
           historicalMetrics(customerId, token, [keyword]),
           keywordIdeas(customerId, token, keyword)
         ]);
-        const primaryRaw = (historyResponse.results || []).find(item =>
-          String(item.text || "").toLocaleLowerCase("pt-BR") === keyword.toLocaleLowerCase("pt-BR")
-        ) || historyResponse.results?.[0] || null;
-        const primary = primaryRaw ? normalizeMetrics(primaryRaw) : {
-          keyword, monthlySearches: null,
-          periods: periodEstimates(null), monthlyHistory: [],
-          source: "google_ads_keyword_planner",
-          metricType: "average_monthly_searches"
+        // The historical-metrics endpoint can omit a seed term when Google
+        // has no reportable history for it. Never use results[0] as a fallback:
+        // that row may belong to a different keyword and would mislabel its volume.
+        const requestedKey = keywordKey(keyword);
+        const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
+        const ideaResults = Array.isArray(ideasResponse.results) ? ideasResponse.results : [];
+        const primaryHistoricalRaw = historyResults.find(item =>
+          keywordKey(item.text || item.keyword) === requestedKey
+        ) || null;
+        const primaryIdeaRaw = ideaResults.find(item =>
+          keywordKey(item.text || item.keyword) === requestedKey
+        ) || null;
+        const primaryRaw = primaryHistoricalRaw || primaryIdeaRaw;
+        const primaryMetrics = primaryRaw ? normalizeMetrics(primaryRaw) : null;
+        const primary = {
+          ...(primaryMetrics || {
+            monthlySearches: null,
+            periods: periodEstimates(null),
+            monthlyHistory: [],
+            competition: "UNSPECIFIED",
+            competitionIndex: null,
+            lowTopOfPageBidMicros: null,
+            highTopOfPageBidMicros: null,
+            source: "google_ads_keyword_planner",
+            metricType: "average_monthly_searches"
+          }),
+          keyword,
+          metricMatchSource: primaryHistoricalRaw
+            ? "historical_metrics_exact_match"
+            : primaryIdeaRaw
+              ? "keyword_ideas_exact_match"
+              : "exact_match_not_returned",
+          dataAvailable: primaryMetrics?.monthlySearches !== null &&
+            primaryMetrics?.monthlySearches !== undefined
         };
-        const seen = new Set([keyword.toLocaleLowerCase("pt-BR")]);
+        const seen = new Set([requestedKey]);
         const relatedKeywords = (ideasResponse.results || [])
           .map(normalizeMetrics)
-          .filter(item => item.keyword && !seen.has(item.keyword.toLocaleLowerCase("pt-BR")))
-          .filter(item => { const key = item.keyword.toLocaleLowerCase("pt-BR"); if (seen.has(key)) return false; seen.add(key); return true; })
+          .filter(item => item.keyword && !seen.has(keywordKey(item.keyword)))
+          .filter(item => { const key = keywordKey(item.keyword); if (seen.has(key)) return false; seen.add(key); return true; })
           .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
           .slice(0, 25);
         return res.status(200).json({
@@ -164,6 +200,12 @@ export default async function handler(req, res) {
           customerId,
           keyword,
           primary,
+          primaryDiagnostics: {
+            historicalResultsCount: historyResults.length,
+            ideaResultsCount: ideaResults.length,
+            exactTermFoundInHistoricalMetrics: Boolean(primaryHistoricalRaw),
+            exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw)
+          },
           relatedKeywords,
           geo: "BR",
           language: "pt",
@@ -190,7 +232,7 @@ export default async function handler(req, res) {
     return res.status(status >= 400 && status < 600 ? status : 502).json({
       success: false, error: code, message,
       adsCode: error?.adsCode || null,
-      help: "Verifique se a Google Ads API está habilitada e se o projeto OAuth do TubeX possui acesso Explorer à API."
+      help: "Verifique se a Google Ads API está habilitada e se o projeto OAuth do TubeX possui acesso Básico ou superior à API."
     });
   }
 }

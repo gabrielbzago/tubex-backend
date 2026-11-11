@@ -68,42 +68,70 @@ function resultMatchesKeyword(item, requestedKey) {
   return Array.isArray(variants) && variants.some(value => normalizeKeywordKey(value) === requestedKey);
 }
 
-// Expande a semente para frases compostas sem perder a consulta original.
+// Mantém a frase completa como semente. Enviar palavras isoladas (por
+// exemplo, "youtube" em "ferramentas de seo para youtube") dilui o contexto
+// e faz o Planejador devolver ideias genéricas de música, MP4 e downloads.
 function buildKeywordSeeds(keyword) {
-  const words = normalizeKeywordKey(keyword).split(" ").filter(Boolean);
-  const seeds = [keyword];
-  const stop = new Set(["a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "para", "por", "com", "sem", "um", "uma"]);
-  for (const size of [3, 2]) {
-    for (let i = 0; i <= words.length - size; i++) {
-      const phrase = words.slice(i, i + size).join(" ");
-      if (phrase.length >= 4 && !seeds.some(s => normalizeKeywordKey(s) === phrase)) seeds.push(phrase);
-    }
-  }
-  for (const word of words.filter(w => !stop.has(w) && w.length >= 3)) {
-    if (!seeds.some(s => normalizeKeywordKey(s) === word)) seeds.push(word);
-  }
-  return seeds.slice(0, 10);
+  return [cleanKeyword(keyword)];
 }
 
 const CONTEXT_TERMS = {
   youtube: ["youtube", "youtuber", "youtubers", "canal", "canais", "shorts", "video", "videos"],
-  seo: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra chave", "palavras chave"],
+  seo: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra", "palavras", "chave", "chaves"],
   tools: ["ferramenta", "ferramentas", "software", "programa", "aplicativo", "app", "plataforma", "extensao"],
-  marketing: ["marketing", "digital", "trafego", "conteudo", "criador", "criadores"]
+  marketing: ["marketing", "digital", "trafego", "conteudo", "criador", "criadores"],
+  growth: ["viralizar", "viral", "crescer", "crescimento", "visualizacoes", "inscritos"]
 };
+
+const STOP_WORDS = new Set([
+  "a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em",
+  "no", "na", "nos", "nas", "para", "por", "com", "sem", "um", "uma"
+]);
+
 function contextualCandidate(seed, candidate) {
   const seedKey = normalizeKeywordKey(seed);
   const candidateKey = normalizeKeywordKey(candidate);
   if (!candidateKey || candidateKey === seedKey) return false;
-  const seedTokens = seedKey.split(" ").filter(w => w.length > 2);
-  const candidateTokens = new Set(candidateKey.split(" "));
-  const overlap = seedTokens.filter(w => candidateTokens.has(w)).length;
-  const groupMatch = Object.values(CONTEXT_TERMS).some(terms =>
-    terms.some(term => seedKey.includes(term) && candidateKey.includes(term))
+
+  const seedTokens = seedKey.split(" ").filter(w => w.length > 2 && !STOP_WORDS.has(w));
+  const candidateTokens = new Set(candidateKey.split(" ").filter(w => w.length > 2));
+
+  // Conta equivalências semânticas dentro do mesmo grupo (ex.: ferramenta /
+  // software; otimizar / posicionamento), mas não aceita "youtube" sozinho
+  // como correspondência para uma busca que também fala de SEO ou ferramentas.
+  const matchedGroups = Object.entries(CONTEXT_TERMS)
+    .filter(([, terms]) => seedTokens.some(token => terms.includes(token)))
+    .filter(([, terms]) => terms.some(term => candidateTokens.has(term)))
+    .map(([group]) => group);
+
+  const directMatches = seedTokens.filter(token => candidateTokens.has(token)).length;
+  const semanticMatches = matchedGroups.length;
+  const distinctMatches = new Set([
+    ...seedTokens.filter(token => candidateTokens.has(token)),
+    ...matchedGroups
+  ]).size;
+
+  if (seedTokens.length <= 1) return directMatches >= 1 || semanticMatches >= 1;
+
+  // Para buscas compostas, exige pelo menos dois sinais de contexto.
+  // Isso elimina sugestões que só repetem o termo genérico "youtube".
+  if (seedTokens.length >= 2 && distinctMatches < 2) return false;
+
+  // Se a consulta contém um conceito específico (SEO, ferramentas,
+  // marketing ou crescimento), a sugestão precisa preservar ao menos um
+  // desses conceitos; compartilhar apenas "youtube" não é suficiente.
+  const specificGroups = ["seo", "tools", "marketing", "growth"];
+  const seedSpecificGroups = specificGroups.filter(group =>
+    CONTEXT_TERMS[group].some(term => seedTokens.includes(term))
   );
-  // Regra conservadora: exige conceito compartilhado; não exige dois grupos,
-  // pois isso eliminava sugestões válidas de consultas longas.
-  return overlap >= (seedTokens.length >= 4 ? 2 : 1) || (groupMatch && overlap >= 1);
+  if (seedSpecificGroups.length) {
+    const candidateHasSpecificGroup = seedSpecificGroups.some(group =>
+      CONTEXT_TERMS[group].some(term => candidateTokens.has(term))
+    );
+    if (!candidateHasSpecificGroup) return false;
+  }
+
+  return directMatches >= 1 || semanticMatches >= 1;
 }
 
 async function adsFetch(path, token, body) {

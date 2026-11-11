@@ -1,78 +1,15 @@
 // TubeX — Google Ads Keyword Planner bridge.
 // Uses the signed-in user's short-lived OAuth access token; never stores it.
-// As of Sep  9, 2026, new Google Ads API onboarding/access is managed by
-// the Google Cloud project. Developer-token header is intentionally omitted.
-const API_VERSION = "v25";
+// Google Ads API access is managed by the Google Cloud project.
+// Since the September 9, 2026 migration, developer-token headers are optional and ignored.
+
+const API_VERSION = "v26";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
 const BRAZIL_GEO = "geoTargetConstants/2076";
 const PORTUGUESE_LANGUAGE = "languageConstants/1014";
 
 function cleanKeyword(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80);
-}
-
-// Context groups prevent broad Google Ads ideas from drifting to an unrelated
-// meaning (for example "ferramentas de SEO para YouTube" -> power drills).
-const CONTEXT_GROUPS = [
-  { id: "youtube", terms: ["youtube", "youtuber", "youtubers", "canal", "canais", "shorts", "video", "videos", "vídeo", "vídeos"] },
-  { id: "seo", terms: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra-chave", "palavras-chave", "busca", "pesquisa", "pesquisas"] },
-  { id: "tool", terms: ["ferramenta", "ferramentas", "software", "programa", "aplicativo", "app", "plataforma", "extensao", "extensão"] },
-  { id: "marketing", terms: ["marketing", "digital", "trafego", "tráfego", "conteudo", "conteúdo", "criador", "criadores"] }
-];
-const STOP_WORDS = new Set([
-  "a", "as", "o", "os", "um", "uma", "de", "do", "da", "dos", "das",
-  "para", "por", "no", "na", "nos", "nas", "com", "e", "em", "como"
-]);
-function foldText(value) {
-  return String(value || "").toLocaleLowerCase("pt-BR")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-}
-function keywordTokens(value) {
-  return foldText(value).split(" ").filter(token => token && !STOP_WORDS.has(token));
-}
-function contextProfile(keyword) {
-  const folded = foldText(keyword);
-  const tokens = new Set(keywordTokens(keyword));
-  const groups = new Set();
-  for (const group of CONTEXT_GROUPS) {
-    if (group.terms.some(term => {
-      const normalized = foldText(term);
-      return normalized.includes(" ")
-        ? folded.includes(normalized)
-        : tokens.has(normalized);
-    })) groups.add(group.id);
-  }
-  return { tokens, groups };
-}
-function isContextuallyRelevant(seedKeyword, candidateKeyword) {
-  const seed = contextProfile(seedKeyword);
-  const candidate = contextProfile(candidateKeyword);
-  const candidateTokens = keywordTokens(candidateKeyword);
-  if (!candidateTokens.length) return false;
-
-  // For multi-word searches, require at least two matching concepts when
-  // the seed contains recognizable semantic groups. This keeps the intent.
-  if (seed.groups.size >= 2) {
-    let matchedGroups = 0;
-    for (const group of seed.groups) {
-      const definition = CONTEXT_GROUPS.find(item => item.id === group);
-      if (definition && definition.terms.some(term => {
-        const normalized = foldText(term);
-        return normalized.includes(" ")
-          ? foldText(candidateKeyword).includes(normalized)
-          : candidate.tokens.has(normalized);
-      })) matchedGroups++;
-    }
-    return matchedGroups >= 2;
-  }
-
-  // Generic or single-concept searches: require meaningful token overlap.
-  const meaningfulSeedTokens = [...seed.tokens].filter(token => token.length > 2);
-  if (!meaningfulSeedTokens.length) return true;
-  const overlap = meaningfulSeedTokens.filter(token => candidate.tokens.has(token)).length;
-  const required = meaningfulSeedTokens.length >= 3 ? 2 : 1;
-  return overlap >= required;
 }
 function numberOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
@@ -92,13 +29,15 @@ function periodEstimates(monthly) {
   };
 }
 function normalizeMetrics(result) {
-  const metrics = result?.keywordMetrics || result?.keywordIdeaMetrics || {};
-  const monthly = numberOrNull(metrics.avgMonthlySearches);
-  const history = Array.isArray(metrics.monthlySearchVolumes)
-    ? metrics.monthlySearchVolumes.map(item => ({
+  const metrics = result?.keywordMetrics || result?.keywordIdeaMetrics ||
+    result?.keyword_metrics || result?.keyword_idea_metrics || {};
+  const monthly = numberOrNull(metrics.avgMonthlySearches ?? metrics.avg_monthly_searches);
+  const rawHistory = metrics.monthlySearchVolumes ?? metrics.monthly_search_volumes;
+  const history = Array.isArray(rawHistory)
+    ? rawHistory.map(item => ({
         year: Number(item.year),
         month: String(item.month || ""),
-        searches: numberOrNull(item.monthlySearches)
+        searches: numberOrNull(item.monthlySearches ?? item.monthly_searches)
       })).filter(item => item.searches !== null)
     : [];
   return {
@@ -107,14 +46,69 @@ function normalizeMetrics(result) {
     periods: periodEstimates(monthly),
     monthlyHistory: history,
     competition: metrics.competition || "UNSPECIFIED",
-    competitionIndex: numberOrNull(metrics.competitionIndex),
-    lowTopOfPageBidMicros: numberOrNull(metrics.lowTopOfPageBidMicros),
-    highTopOfPageBidMicros: numberOrNull(metrics.highTopOfPageBidMicros),
+    competitionIndex: numberOrNull(metrics.competitionIndex ?? metrics.competition_index),
+    lowTopOfPageBidMicros: numberOrNull(metrics.lowTopOfPageBidMicros ?? metrics.low_top_of_page_bid_micros),
+    highTopOfPageBidMicros: numberOrNull(metrics.highTopOfPageBidMicros ?? metrics.high_top_of_page_bid_micros),
     source: "google_ads_keyword_planner",
     metricType: "average_monthly_searches"
   };
 }
+function normalizeKeywordKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+function resultMatchesKeyword(item, requestedKey) {
+  if (normalizeKeywordKey(item?.text || item?.keyword) === requestedKey) return true;
+  const variants = item?.closeVariants ?? item?.close_variants;
+  return Array.isArray(variants) && variants.some(value => normalizeKeywordKey(value) === requestedKey);
+}
+
+// Expande a semente para frases compostas sem perder a consulta original.
+function buildKeywordSeeds(keyword) {
+  const words = normalizeKeywordKey(keyword).split(" ").filter(Boolean);
+  const seeds = [keyword];
+  const stop = new Set(["a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "para", "por", "com", "sem", "um", "uma"]);
+  for (const size of [3, 2]) {
+    for (let i = 0; i <= words.length - size; i++) {
+      const phrase = words.slice(i, i + size).join(" ");
+      if (phrase.length >= 4 && !seeds.some(s => normalizeKeywordKey(s) === phrase)) seeds.push(phrase);
+    }
+  }
+  for (const word of words.filter(w => !stop.has(w) && w.length >= 3)) {
+    if (!seeds.some(s => normalizeKeywordKey(s) === word)) seeds.push(word);
+  }
+  return seeds.slice(0, 10);
+}
+
+const CONTEXT_TERMS = {
+  youtube: ["youtube", "youtuber", "youtubers", "canal", "canais", "shorts", "video", "videos"],
+  seo: ["seo", "otimizacao", "otimizar", "ranqueamento", "posicionamento", "palavra chave", "palavras chave"],
+  tools: ["ferramenta", "ferramentas", "software", "programa", "aplicativo", "app", "plataforma", "extensao"],
+  marketing: ["marketing", "digital", "trafego", "conteudo", "criador", "criadores"]
+};
+function contextualCandidate(seed, candidate) {
+  const seedKey = normalizeKeywordKey(seed);
+  const candidateKey = normalizeKeywordKey(candidate);
+  if (!candidateKey || candidateKey === seedKey) return false;
+  const seedTokens = seedKey.split(" ").filter(w => w.length > 2);
+  const candidateTokens = new Set(candidateKey.split(" "));
+  const overlap = seedTokens.filter(w => candidateTokens.has(w)).length;
+  const groupMatch = Object.values(CONTEXT_TERMS).some(terms =>
+    terms.some(term => seedKey.includes(term) && candidateKey.includes(term))
+  );
+  // Regra conservadora: exige conceito compartilhado; não exige dois grupos,
+  // pois isso eliminava sugestões válidas de consultas longas.
+  return overlap >= (seedTokens.length >= 4 ? 2 : 1) || (groupMatch && overlap >= 1);
+}
+
 async function adsFetch(path, token, body) {
+  // OAuth access token + Google Cloud project's approved Google Ads API access.
+  // Do not require GOOGLE_ADS_DEVELOPER_TOKEN: it was sunset on 2026-09-09.
   const response = await fetch(`https://googleads.googleapis.com/${API_VERSION}/${path}`, {
     method: body ? "POST" : "GET",
     headers: {
@@ -154,12 +148,11 @@ async function historicalMetrics(customerId, token, keywords) {
 }
 async function keywordIdeas(customerId, token, keyword) {
   return adsFetch(`customers/${customerId}:generateKeywordIdeas`, token, {
-    keywordSeed: { keywords: [keyword] },
+    keywordSeed: { keywords: buildKeywordSeeds(keyword) },
     geoTargetConstants: [BRAZIL_GEO],
     language: PORTUGUESE_LANGUAGE,
     keywordPlanNetwork: "GOOGLE_SEARCH",
-    includeAdultKeywords: false,
-    pageSize: 30
+    includeAdultKeywords: false
   });
 }
 export default async function handler(req, res) {
@@ -199,53 +192,116 @@ export default async function handler(req, res) {
       });
     }
 
+    const requestedKey = normalizeKeywordKey(keyword);
     let lastError = null;
+    const accountDiagnostics = [];
+    let best = null;
+
+    // Uma conta Google pode ter acesso direto a mais de uma conta Ads.
+    // Não encerramos no primeiro HTTP 200 vazio: isso escondia resultados
+    // disponíveis em outra conta vinculada ao mesmo usuário.
     for (const customerId of customerIds.slice(0, 5)) {
       try {
         const [historyResponse, ideasResponse] = await Promise.all([
           historicalMetrics(customerId, token, [keyword]),
           keywordIdeas(customerId, token, keyword)
         ]);
-        const normalizedRequestedKeyword = foldText(keyword);
-        const primaryRaw = (historyResponse.results || []).find(item =>
-          foldText(item.text || item.keyword || "") === normalizedRequestedKeyword
+        const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
+        const ideaResults = Array.isArray(ideasResponse.results) ? ideasResponse.results : [];
+
+        const primaryHistoricalRaw = historyResults.find(item =>
+          resultMatchesKeyword(item, requestedKey)
         ) || null;
-        const primary = primaryRaw ? normalizeMetrics(primaryRaw) : {
-          keyword, monthlySearches: null,
-          periods: periodEstimates(null), monthlyHistory: [],
-          source: "google_ads_keyword_planner",
-          metricType: "average_monthly_searches"
-        };
-        const seen = new Set([keyword.toLocaleLowerCase("pt-BR")]);
-        const relatedKeywords = (ideasResponse.results || [])
+        const primaryIdeaRaw = ideaResults.find(item =>
+          resultMatchesKeyword(item, requestedKey)
+        ) || null;
+        const primaryRaw = primaryHistoricalRaw || primaryIdeaRaw;
+        const primary = primaryRaw
+          ? { ...normalizeMetrics(primaryRaw), keyword }
+          : {
+              keyword,
+              monthlySearches: null,
+              periods: periodEstimates(null),
+              monthlyHistory: [],
+              source: "google_ads_keyword_planner",
+              metricType: "average_monthly_searches"
+            };
+
+        const seen = new Set([requestedKey]);
+        const relatedKeywords = ideaResults
           .map(normalizeMetrics)
-          .filter(item => item.keyword && !seen.has(foldText(item.keyword)))
-          .filter(item => isContextuallyRelevant(keyword, item.keyword))
-          .filter(item => { const key = foldText(item.keyword); if (seen.has(key)) return false; seen.add(key); return true; })
+          .filter(item => item.keyword && !seen.has(normalizeKeywordKey(item.keyword)))
+          .filter(item => contextualCandidate(keyword, item.keyword))
+          .filter(item => {
+            const key = normalizeKeywordKey(item.keyword);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
           .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
-          .slice(0, 25);
-        return res.status(200).json({
-          success: true,
-          provider: "google_ads_keyword_planner",
+          .slice(0, 50);
+
+        const diagnostics = {
+          historicalResultsCount: historyResults.length,
+          ideaResultsCount: ideaResults.length,
+          exactTermFoundInHistoricalMetrics: Boolean(primaryHistoricalRaw),
+          exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw)
+        };
+        accountDiagnostics.push({ customerId, ...diagnostics });
+
+        const candidate = {
           customerId,
-          keyword,
           primary,
           relatedKeywords,
-          relatedKeywordsFiltering: "contextual_semantic_groups_v1",
-          primaryExactMatchOnly: true,
-          geo: "BR",
-          language: "pt",
-          monthlySearchesSource: "Google Ads API average monthly searches",
-          periodEstimateNote: "7/30/60/90 dias são projeções proporcionais calculadas a partir da média mensal do Google Ads; não são contagens diárias observadas.",
-          checkedAt: new Date().toISOString()
-        });
+          diagnostics,
+          resultCount: historyResults.length + ideaResults.length
+        };
+        if (!best || candidate.resultCount > best.resultCount) best = candidate;
+
+        // Continua avaliando as contas diretamente acessíveis para escolher
+        // a resposta mais completa, em vez de depender da ordem do Google.
       } catch (error) {
         lastError = error;
-        // Try another accessible Ads account only for account-specific errors.
+        accountDiagnostics.push({
+          customerId,
+          error: String(error?.message || "Falha na consulta").slice(0, 180),
+          status: Number(error?.status) || null,
+          adsCode: error?.adsCode || null
+        });
+        // Erros de conta/permissão podem variar por customer ID; tenta a próxima.
         if (![400, 403, 404].includes(Number(error.status))) break;
       }
     }
-    throw lastError || new Error("Nenhuma conta Google Ads autorizada pôde ser consultada.");
+
+    if (best && best.resultCount > 0) {
+      return res.status(200).json({
+        success: true,
+        provider: "google_ads_keyword_planner",
+        customerId: best.customerId,
+        keyword,
+        primary: best.primary,
+        primaryDiagnostics: best.diagnostics,
+        relatedKeywords: best.relatedKeywords,
+        geo: "BR",
+        language: "pt",
+        monthlySearchesSource: "Google Ads API average monthly searches",
+        periodEstimateNote: "7/30/60/90 dias são projeções proporcionais calculadas a partir da média mensal do Google Ads; não são contagens diárias observadas.",
+        checkedAt: new Date().toISOString()
+      });
+    }
+
+    if (lastError) throw lastError;
+
+    // Não sinaliza falsamente "Conta conectada" quando a API respondeu
+    // com sucesso HTTP, mas não retornou nenhum dado utilizável.
+    return res.status(200).json({
+      success: false,
+      error: "google_ads_no_keyword_data",
+      message: "O Google Ads aceitou a consulta, mas não retornou métricas nem ideias para esta palavra-chave. Tente uma variação mais ampla ou confira se a conta tem acesso ao Planejador de Palavras-chave.",
+      keyword,
+      accountDiagnostics,
+      help: "A consulta foi feita com a conta Google autorizada, no Brasil e em português."
+    });
   } catch (error) {
     const message = String(error?.message || "Falha na consulta Google Ads").slice(0, 260);
     const status = Number(error?.status) || 502;
@@ -258,7 +314,7 @@ export default async function handler(req, res) {
     return res.status(status >= 400 && status < 600 ? status : 502).json({
       success: false, error: code, message,
       adsCode: error?.adsCode || null,
-      help: "Verifique se a Google Ads API está habilitada e se o projeto OAuth do TubeX possui acesso Explorer à API."
+      help: "Verifique se a Google Ads API está habilitada e se o projeto Google Cloud do OAuth possui acesso Básico ou superior."
     });
   }
 }

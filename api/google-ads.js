@@ -252,8 +252,14 @@ export default async function handler(req, res) {
     // disponíveis em outra conta vinculada ao mesmo usuário.
     for (const customerId of customerIds.slice(0, 5)) {
       try {
+        // Consulta a frase completa e também subfrases contextuais no histórico.
+        // O Google Ads pode não devolver a métrica da frase composta em algumas
+        // contas, embora retorne métricas para suas variações de cauda longa.
+        // A métrica principal continua sendo EXCLUSIVAMENTE a correspondência
+        // exata da frase digitada; as demais servem apenas para preencher ideias.
+        const historicalSeeds = buildKeywordSeeds(keyword).slice(0, 10);
         const [historyResponse, ideasResponse] = await Promise.all([
-          historicalMetrics(customerId, token, [keyword]),
+          historicalMetrics(customerId, token, historicalSeeds),
           keywordIdeas(customerId, token, keyword)
         ]);
         const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
@@ -277,9 +283,21 @@ export default async function handler(req, res) {
               metricType: "average_monthly_searches"
             };
 
+        const historicalByKeyword = new Map(
+          historyResults
+            .map(normalizeMetrics)
+            .filter(item => item.keyword)
+            .map(item => [normalizeKeywordKey(item.keyword), item])
+        );
         const seen = new Set([requestedKey]);
         const relatedKeywords = ideaResults
           .map(normalizeMetrics)
+          .map(item => {
+            const historical = historicalByKeyword.get(normalizeKeywordKey(item.keyword));
+            return historical && historical.monthlySearches !== null
+              ? { ...item, ...historical, keyword: item.keyword }
+              : item;
+          })
           .filter(item => item.keyword && !seen.has(normalizeKeywordKey(item.keyword)))
           .filter(item => contextualCandidate(keyword, item.keyword))
           .filter(item => {
@@ -300,7 +318,8 @@ export default async function handler(req, res) {
           historicalResultsCount: historyResults.length,
           ideaResultsCount: ideaResults.length,
           exactTermFoundInHistoricalMetrics: Boolean(primaryHistoricalRaw),
-          exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw)
+          exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw),
+          historicalSeedsUsed: historicalSeeds
         };
         accountDiagnostics.push({ customerId, ...diagnostics });
 

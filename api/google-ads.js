@@ -1,9 +1,8 @@
 // TubeX — Google Ads Keyword Planner bridge.
 // Uses the signed-in user's short-lived OAuth access token; never stores it.
-// Google Ads API access is managed by the Google Cloud project.
-// Since the September 9, 2026 migration, developer-token headers are optional and ignored.
-
-const API_VERSION = "v26";
+// As of Sep  9, 2026, new Google Ads API onboarding/access is managed by
+// the Google Cloud project. Developer-token header is intentionally omitted.
+const API_VERSION = "v25";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
 const BRAZIL_GEO = "geoTargetConstants/2076";
 const PORTUGUESE_LANGUAGE = "languageConstants/1014";
@@ -52,8 +51,6 @@ function normalizeMetrics(result) {
   };
 }
 async function adsFetch(path, token, body) {
-  // OAuth access token + Google Cloud project's approved Google Ads API access.
-  // Do not require GOOGLE_ADS_DEVELOPER_TOKEN: it was sunset on 2026-09-09.
   const response = await fetch(`https://googleads.googleapis.com/${API_VERSION}/${path}`, {
     method: body ? "POST" : "GET",
     headers: {
@@ -97,7 +94,8 @@ async function keywordIdeas(customerId, token, keyword) {
     geoTargetConstants: [BRAZIL_GEO],
     language: PORTUGUESE_LANGUAGE,
     keywordPlanNetwork: "GOOGLE_SEARCH",
-    includeAdultKeywords: false
+    includeAdultKeywords: false,
+    pageSize: 30
   });
 }
 export default async function handler(req, res) {
@@ -144,34 +142,20 @@ export default async function handler(req, res) {
           historicalMetrics(customerId, token, [keyword]),
           keywordIdeas(customerId, token, keyword)
         ]);
-        const normalizeKeywordKey = value => String(value || "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLocaleLowerCase("pt-BR")
-          .replace(/[^a-z0-9]+/g, " ")
-          .trim()
-          .replace(/\s+/g, " ");
-        const requestedKey = normalizeKeywordKey(keyword);
-        const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
-        const ideaResults = Array.isArray(ideasResponse.results) ? ideasResponse.results : [];
-        const primaryHistoricalRaw = historyResults.find(item =>
-          normalizeKeywordKey(item.text || item.keyword) === requestedKey
-        ) || null;
-        const primaryIdeaRaw = ideaResults.find(item =>
-          normalizeKeywordKey(item.text || item.keyword) === requestedKey
-        ) || null;
-        const primaryRaw = primaryHistoricalRaw || primaryIdeaRaw;
+        const primaryRaw = (historyResponse.results || []).find(item =>
+          String(item.text || "").toLocaleLowerCase("pt-BR") === keyword.toLocaleLowerCase("pt-BR")
+        ) || historyResponse.results?.[0] || null;
         const primary = primaryRaw ? normalizeMetrics(primaryRaw) : {
           keyword, monthlySearches: null,
           periods: periodEstimates(null), monthlyHistory: [],
           source: "google_ads_keyword_planner",
           metricType: "average_monthly_searches"
         };
-        const seen = new Set([requestedKey]);
-        const relatedKeywords = ideaResults
+        const seen = new Set([keyword.toLocaleLowerCase("pt-BR")]);
+        const relatedKeywords = (ideasResponse.results || [])
           .map(normalizeMetrics)
-          .filter(item => item.keyword && !seen.has(normalizeKeywordKey(item.keyword)))
-          .filter(item => { const key = normalizeKeywordKey(item.keyword); if (seen.has(key)) return false; seen.add(key); return true; })
+          .filter(item => item.keyword && !seen.has(item.keyword.toLocaleLowerCase("pt-BR")))
+          .filter(item => { const key = item.keyword.toLocaleLowerCase("pt-BR"); if (seen.has(key)) return false; seen.add(key); return true; })
           .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
           .slice(0, 25);
         return res.status(200).json({
@@ -180,12 +164,6 @@ export default async function handler(req, res) {
           customerId,
           keyword,
           primary,
-          primaryDiagnostics: {
-            historicalResultsCount: historyResults.length,
-            ideaResultsCount: ideaResults.length,
-            exactTermFoundInHistoricalMetrics: Boolean(primaryHistoricalRaw),
-            exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw)
-          },
           relatedKeywords,
           geo: "BR",
           language: "pt",
@@ -212,7 +190,7 @@ export default async function handler(req, res) {
     return res.status(status >= 400 && status < 600 ? status : 502).json({
       success: false, error: code, message,
       adsCode: error?.adsCode || null,
-      help: "Verifique se a Google Ads API está habilitada e se o projeto Google Cloud do OAuth possui acesso Básico ou superior."
+      help: "Verifique se a Google Ads API está habilitada e se o projeto OAuth do TubeX possui acesso Explorer à API."
     });
   }
 }

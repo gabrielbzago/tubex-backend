@@ -392,7 +392,10 @@ if(
     const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
     const cacheKey = keyword ? `seo_v6_estimate_related_${cachePlan}_${keyword.toLowerCase()}` : null;
 
-    if (cacheKey) {
+    // O cache SEO só pode atender ao modo SEO padrão.
+    // Modos isolados (tags, keyword_insights etc.) nunca devem receber
+    // acidentalmente um payload de outro modo para a mesma palavra-chave.
+    if (cacheKey && mode === "seo") {
       const cached = global.tubexSeoCache[cacheKey];
 
       if (cached && cached.expires > Date.now()) {
@@ -410,6 +413,135 @@ if(
       .split(",")[0]
       .trim();
 
+
+    // =========================================================
+    // 📊 KEYWORD INSIGHTS — uploads recentes e total estimado
+    // Fonte: YouTube Data API oficial, usando a mesma YOUTUBE_API_KEY
+    // do backend. Não depende de OAuth da extensão.
+    // =========================================================
+    if (mode === "keyword_insights") {
+      const query = String(body?.keyword || "").trim().slice(0, 180);
+      const normalizeInsight = value => String(value || "")
+        .toLocaleLowerCase("pt-BR")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+        .replace(/\s+/g, " ").trim();
+
+      const stop = new Set([
+        "a","o","as","os","um","uma","uns","umas","de","da","do","das","dos",
+        "em","no","na","nos","nas","para","por","com","sem","e","ou","que",
+        "se","como","mais","menos","sobre","entre","video","videos","youtube",
+        "canal","oficial"
+      ]);
+      const anchors = normalizeInsight(query).split(" ").filter(w => w.length > 2 && !stop.has(w));
+      if (!anchors.length) {
+        return res.status(200).json({
+          success: false, mode: "keyword_insights", error: "query_too_generic",
+          message: "Pesquisa muito ampla. Informe um assunto ou nicho mais específico.",
+          totalResults: 0, recentVideos: []
+        });
+      }
+
+      global.tubexKeywordInsightsCache = global.tubexKeywordInsightsCache || {};
+      const insightCacheKey = "v1_" + normalizeInsight(query);
+      const cachedInsight = global.tubexKeywordInsightsCache[insightCacheKey];
+      if (cachedInsight && cachedInsight.expires > Date.now()) {
+        return res.status(200).json({ ...cachedInsight.data, cached: true });
+      }
+
+      if (!activeKey) {
+        return res.status(200).json({
+          success: false, mode: "keyword_insights", error: "youtube_api_unavailable",
+          message: "A chave da YouTube Data API não está configurada.",
+          totalResults: 0, recentVideos: []
+        });
+      }
+
+      // Variações semânticas restritas ao mesmo assunto. O totalResults
+      // permanece o estimado da consulta original; não somamos estimativas
+      // de consultas diferentes, pois haveria duplicidade.
+      const synonymMap = {
+        capa: ["capas","thumbnail","thumbnails","thumb","miniatura","miniaturas"],
+        capas: ["capa","thumbnail","thumbnails","thumb","miniatura","miniaturas"],
+        thumbnail: ["thumbnails","thumb","capa","capas","miniatura"],
+        thumbnails: ["thumbnail","thumb","capa","capas","miniatura"],
+        montar: ["criar","fazer","produzir"],
+        criar: ["montar","fazer","produzir"],
+        fazer: ["criar","montar","produzir"],
+        coleiro: ["coleirinho","papa","capim"],
+        coleirinho: ["coleiro","papa","capim"],
+        papa: ["coleiro","coleirinho"],
+        capim: ["coleiro","coleirinho"]
+      };
+      const relatedAnchors = new Set(anchors);
+      anchors.forEach(word => (synonymMap[word] || []).forEach(term => relatedAnchors.add(term)));
+
+      const publishedAfter = new Date(Date.now() - 30 * 86400000).toISOString();
+      const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+      searchUrl.searchParams.set("part", "snippet");
+      searchUrl.searchParams.set("type", "video");
+      searchUrl.searchParams.set("order", "date");
+      searchUrl.searchParams.set("maxResults", "50");
+      searchUrl.searchParams.set("q", query);
+      searchUrl.searchParams.set("publishedAfter", publishedAfter);
+      searchUrl.searchParams.set("relevanceLanguage", "pt");
+      searchUrl.searchParams.set("regionCode", "BR");
+      searchUrl.searchParams.set("key", activeKey);
+
+      const insightResponse = await fetch(searchUrl.toString());
+      const insightPayload = await insightResponse.json().catch(() => ({}));
+      if (!insightResponse.ok || insightPayload?.error) {
+        const apiMessage = insightPayload?.error?.message || `youtube_insights_http_${insightResponse.status}`;
+        console.warn("[TubeX] keyword_insights API:", apiMessage);
+        return res.status(200).json({
+          success: false, mode: "keyword_insights", error: "youtube_api_error",
+          message: apiMessage, totalResults: 0, recentVideos: []
+        });
+      }
+
+      const recentVideos = (Array.isArray(insightPayload.items) ? insightPayload.items : [])
+        .map(item => {
+          const snippet = item?.snippet || {};
+          const videoId = String(item?.id?.videoId || "");
+          const title = String(snippet.title || "");
+          const description = String(snippet.description || "");
+          const normalizedText = normalizeInsight(`${title} ${description}`);
+          const words = normalizedText.split(" ").filter(Boolean);
+          const matches = [...relatedAnchors].filter(term =>
+            words.some(word => word === term ||
+              (term.length >= 5 && word.length >= 5 && (word.startsWith(term) || term.startsWith(word))))
+          );
+          const relevance = Math.round(Math.min(1, matches.length / Math.max(1, anchors.length)) * 100);
+          return {
+            videoId,
+            title,
+            channelTitle: String(snippet.channelTitle || ""),
+            publishedAt: String(snippet.publishedAt || ""),
+            thumbnail: String(snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""),
+            relevance
+          };
+        })
+        .filter(video => video.videoId && video.relevance > 0)
+        .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
+
+      const insightData = {
+        success: true,
+        mode: "keyword_insights",
+        keyword: query,
+        totalResults: Number(insightPayload?.pageInfo?.totalResults || 0),
+        totalResultsIsEstimate: true,
+        sampleSize: Array.isArray(insightPayload.items) ? insightPayload.items.length : 0,
+        relevantSampleCount: recentVideos.length,
+        recentVideos,
+        periodDays: 30,
+        source: "youtube_data_api_search"
+      };
+      global.tubexKeywordInsightsCache[insightCacheKey] = {
+        data: insightData,
+        expires: Date.now() + 10 * 60 * 1000
+      };
+      return res.status(200).json(insightData);
+    }
 
     // =========================================================
     // 🏷️ TAG SUGGESTIONS MODE — isolated from the SEO pipeline
@@ -3699,6 +3831,8 @@ const responseData = {
     success: true,
 
     items,
+    totalResults,
+    recentItemsCount: recentItems.length,
 
     volume: finalVolume,
 

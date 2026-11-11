@@ -1,6 +1,7 @@
 // TubeX — Google Ads Keyword Planner bridge.
 // Uses the signed-in user's short-lived OAuth access token; never stores it.
-// Google Ads requires BOTH the user's OAuth token and the app's developer token.
+// Google Ads API access is managed by the Google Cloud project.
+// Since the September 9, 2026 migration, developer-token headers are optional and ignored.
 
 const API_VERSION = "v26";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
@@ -51,18 +52,12 @@ function normalizeMetrics(result) {
   };
 }
 async function adsFetch(path, token, body) {
-  const developerToken = String(process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "").trim();
-  if (!developerToken) {
-    const error = new Error("Falta configurar GOOGLE_ADS_DEVELOPER_TOKEN no Vercel.");
-    error.status = 500;
-    error.adsCode = "DEVELOPER_TOKEN_MISSING";
-    throw error;
-  }
+  // OAuth access token + Google Cloud project's approved Google Ads API access.
+  // Do not require GOOGLE_ADS_DEVELOPER_TOKEN: it was sunset on 2026-09-09.
   const response = await fetch(`https://googleads.googleapis.com/${API_VERSION}/${path}`, {
     method: body ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${token}`,
-      "developer-token": developerToken,
       "Content-Type": "application/json"
     },
     ...(body ? { body: JSON.stringify(body) } : {})
@@ -118,13 +113,6 @@ export default async function handler(req, res) {
   const keyword = cleanKeyword(body.keyword);
   const token = String(body.accessToken || "").trim();
   if (!keyword) return res.status(400).json({ success: false, error: "keyword_required" });
-  if (!process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
-    return res.status(500).json({
-      success: false,
-      error: "google_ads_developer_token_missing",
-      message: "O backend TubeX ainda não tem GOOGLE_ADS_DEVELOPER_TOKEN configurado no Vercel."
-    });
-  }
   if (!token) return res.status(401).json({ success: false, error: "google_ads_oauth_required", message: "Autorize o acesso ao Google Ads pela sua conta Google conectada." });
 
   try {
@@ -156,20 +144,34 @@ export default async function handler(req, res) {
           historicalMetrics(customerId, token, [keyword]),
           keywordIdeas(customerId, token, keyword)
         ]);
-        const primaryRaw = (historyResponse.results || []).find(item =>
-          String(item.text || "").toLocaleLowerCase("pt-BR") === keyword.toLocaleLowerCase("pt-BR")
-        ) || historyResponse.results?.[0] || null;
+        const normalizeKeywordKey = value => String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLocaleLowerCase("pt-BR")
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim()
+          .replace(/\s+/g, " ");
+        const requestedKey = normalizeKeywordKey(keyword);
+        const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
+        const ideaResults = Array.isArray(ideasResponse.results) ? ideasResponse.results : [];
+        const primaryHistoricalRaw = historyResults.find(item =>
+          normalizeKeywordKey(item.text || item.keyword) === requestedKey
+        ) || null;
+        const primaryIdeaRaw = ideaResults.find(item =>
+          normalizeKeywordKey(item.text || item.keyword) === requestedKey
+        ) || null;
+        const primaryRaw = primaryHistoricalRaw || primaryIdeaRaw;
         const primary = primaryRaw ? normalizeMetrics(primaryRaw) : {
           keyword, monthlySearches: null,
           periods: periodEstimates(null), monthlyHistory: [],
           source: "google_ads_keyword_planner",
           metricType: "average_monthly_searches"
         };
-        const seen = new Set([keyword.toLocaleLowerCase("pt-BR")]);
-        const relatedKeywords = (ideasResponse.results || [])
+        const seen = new Set([requestedKey]);
+        const relatedKeywords = ideaResults
           .map(normalizeMetrics)
-          .filter(item => item.keyword && !seen.has(item.keyword.toLocaleLowerCase("pt-BR")))
-          .filter(item => { const key = item.keyword.toLocaleLowerCase("pt-BR"); if (seen.has(key)) return false; seen.add(key); return true; })
+          .filter(item => item.keyword && !seen.has(normalizeKeywordKey(item.keyword)))
+          .filter(item => { const key = normalizeKeywordKey(item.keyword); if (seen.has(key)) return false; seen.add(key); return true; })
           .sort((a, b) => (b.monthlySearches || 0) - (a.monthlySearches || 0))
           .slice(0, 25);
         return res.status(200).json({
@@ -178,6 +180,12 @@ export default async function handler(req, res) {
           customerId,
           keyword,
           primary,
+          primaryDiagnostics: {
+            historicalResultsCount: historyResults.length,
+            ideaResultsCount: ideaResults.length,
+            exactTermFoundInHistoricalMetrics: Boolean(primaryHistoricalRaw),
+            exactTermFoundInKeywordIdeas: Boolean(primaryIdeaRaw)
+          },
           relatedKeywords,
           geo: "BR",
           language: "pt",
@@ -204,7 +212,7 @@ export default async function handler(req, res) {
     return res.status(status >= 400 && status < 600 ? status : 502).json({
       success: false, error: code, message,
       adsCode: error?.adsCode || null,
-      help: "Verifique se a Google Ads API está habilitada e se o projeto OAuth do TubeX possui acesso Explorer à API."
+      help: "Verifique se a Google Ads API está habilitada e se o projeto Google Cloud do OAuth possui acesso Básico ou superior."
     });
   }
 }

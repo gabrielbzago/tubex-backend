@@ -49,6 +49,10 @@ function trendsTime(range, exactRange = false) {
       return "today 7-d";
     }
 
+    if (range === "60d" || range === "90d") {
+      return "today 3-m";
+    }
+
     if (range === "12m") {
       return "today 12-m";
     }
@@ -474,7 +478,7 @@ async function fetchGoogleTrend(
 ) {
   // Use Google's normal relative selector first.
   const attempts =
-    range === "30d" || range === "7d"
+    range === "30d" || range === "7d" || range === "60d" || range === "90d"
       ? 3
       : 2;
 
@@ -506,7 +510,7 @@ async function fetchGoogleTrend(
 
       if(attempt < attempts){
         const waitMs =
-          range === "30d"
+          range === "30d" || range === "60d" || range === "90d"
             ? (attempt === 1 ? 1200 : 2500)
             : range === "7d"
               ? (attempt === 1 ? 900 : 1800)

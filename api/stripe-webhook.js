@@ -218,7 +218,7 @@ async function findUsersByCustomerId(customerId) {
   const { data, error } = await supabase
     .from("users")
     .select(
-      "id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at"
+      "id,email,name,plan,status,subscription_status,stripe_customer_id,stripe_subscription_id,updated_at"
     )
     .eq("stripe_customer_id", customerId)
     .limit(20);
@@ -234,7 +234,7 @@ async function findUsersByEmail(email) {
   const { data, error } = await supabase
     .from("users")
     .select(
-      "id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at"
+      "id,email,name,plan,status,subscription_status,stripe_customer_id,stripe_subscription_id,updated_at"
     )
     .ilike("email", normalized)
     .limit(20);
@@ -349,6 +349,7 @@ async function saveUserState({
       updated_at: now,
       plan,
       status,
+      subscription_status: plan,
       stripe_customer_id:
         canonicalCustomerId || existingUser.stripe_customer_id || null,
       stripe_subscription_id: subscriptionId
@@ -383,6 +384,7 @@ async function saveUserState({
       email: updateData.email || existingUser.email,
       plan,
       status,
+      subscriptionStatus: plan,
       subscriptionId,
       customerId: canonicalCustomerId
     });
@@ -395,6 +397,7 @@ async function saveUserState({
     name: normalizedName,
     plan,
     status,
+    subscription_status: plan,
     stripe_customer_id: canonicalCustomerId,
     stripe_subscription_id: subscriptionId,
     created_at: now,
@@ -473,11 +476,12 @@ async function reconcileCustomer(
     }))
   );
 
-  const canonicalEntry = [...allSubscriptions]
-    .filter(({ subscription }) => subscriptionIsUsable(subscription))
-    .sort((a, b) => compareSubscriptions(a.subscription, b.subscription))[0];
-
-  const canonical = canonicalEntry?.subscription || null;
+  const canonical = chooseCanonicalSubscription(
+    allSubscriptions.map(({ subscription }) => subscription)
+  );
+  const canonicalEntry = canonical
+    ? allSubscriptions.find(({ subscription }) => subscription.id === canonical.id)
+    : null;
   const canonicalCustomerId =
     canonicalEntry?.sourceCustomerId || customerId;
 
@@ -644,7 +648,7 @@ async function listUsersForHealthCheck() {
 
     const { data, error } = await supabase
       .from("users")
-      .select("id,email,name,plan,status,stripe_customer_id,stripe_subscription_id,updated_at")
+      .select("id,email,name,plan,status,subscription_status,stripe_customer_id,stripe_subscription_id,updated_at")
       .not("stripe_customer_id", "is", null)
       .range(from, to);
 
@@ -675,11 +679,16 @@ async function runSubscriptionHealthCheck() {
       String(user.plan || "free").toLowerCase() !== "free" &&
       !user.stripe_subscription_id;
 
+    const inconsistentSubscriptionTier =
+      String(user.subscription_status || "free").toLowerCase() !==
+      String(user.plan || "free").toLowerCase();
+
     return (
       !updated ||
       updated <= cutoff ||
       inconsistentCanceledPaid ||
-      paidWithoutSubscription
+      paidWithoutSubscription ||
+      inconsistentSubscriptionTier
     );
   });
 
@@ -696,6 +705,7 @@ async function runSubscriptionHealthCheck() {
           const before = {
             plan: user.plan || "free",
             status: user.status || "canceled",
+            subscriptionStatus: user.subscription_status || "free",
             subscriptionId: user.stripe_subscription_id || null,
             customerId: user.stripe_customer_id || null
           };
@@ -712,7 +722,8 @@ async function runSubscriptionHealthCheck() {
             result.subscriptionId !== before.subscriptionId ||
             result.customerId !== before.customerId ||
             result.plan !== before.plan ||
-            result.status !== before.status;
+            result.status !== before.status ||
+            result.plan !== before.subscriptionStatus;
 
           if (didChange) changed += 1;
 

@@ -171,17 +171,6 @@ const accessToken =
       const target = body?.target === "channel" ? "channel" : "video";
       const requestedDays = Number(body?.days);
       const days = [7, 28, 30].includes(requestedDays) ? requestedDays : 28;
-      const requestedChannelId = String(body?.channelId || "").trim();
-      const selectedChannelId = /^UC[A-Za-z0-9_-]{20,}$/.test(requestedChannelId) ? requestedChannelId : "";
-      if (!selectedChannelId) {
-        return res.status(200).json({
-          success: false,
-          error: "active_channel_id_required",
-          engagedViews: null,
-          target
-        });
-      }
-      const analyticsChannelId = `channel==${selectedChannelId}`;
 
       if (!token) {
         return res.status(200).json({
@@ -208,7 +197,7 @@ const accessToken =
 
       const queryAnalytics = async ({ startDate, endDate, dimensions = "", filters = "" }) => {
         const url = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
-        url.searchParams.set("ids", analyticsChannelId);
+        url.searchParams.set("ids", "channel==MINE");
         url.searchParams.set("startDate", startDate);
         url.searchParams.set("endDate", endDate);
         url.searchParams.set("metrics", "views,engagedViews");
@@ -238,10 +227,7 @@ const accessToken =
       };
 
       let videoId = String(body?.videoId || "").trim();
-      const isAnalyticsDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
-      const requestedStartDate = String(body?.startDate || "").trim();
-      const requestedEndDate = String(body?.endDate || "").trim();
-      let startDate = isAnalyticsDate(requestedStartDate) ? requestedStartDate : target === "channel" ? dateAtStartOfDay(days) : dateAtStartOfDay(30);
+      let startDate = target === "channel" ? dateAtStartOfDay(days) : dateAtStartOfDay(30);
 
       // For video metrics we try to preserve lifetime semantics by resolving
       // the video's publication date. If it cannot be resolved, 30 days is
@@ -266,7 +252,7 @@ const accessToken =
             const videoResponse = await fetch(videoUrl.toString());
             const videoJson = await videoResponse.json().catch(() => ({}));
             const publishedAt = videoJson?.items?.[0]?.snippet?.publishedAt;
-            if (publishedAt && !isAnalyticsDate(requestedStartDate)) startDate = new Date(publishedAt).toISOString().slice(0, 10);
+            if (publishedAt) startDate = new Date(publishedAt).toISOString().slice(0, 10);
           } catch (e) {
             console.warn("[TubeX] engagedViews publication lookup failed:", e?.message || e);
           }
@@ -275,9 +261,7 @@ const accessToken =
 
       // Analytics can lag recent dates. Use yesterday first and two days ago
       // as a fallback without changing any existing SEO behavior.
-      const endDates = isAnalyticsDate(requestedEndDate)
-        ? [requestedEndDate, (() => { const d = new Date(`${requestedEndDate}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })()]
-        : [dateAtStartOfDay(1), dateAtStartOfDay(2)];
+      const endDates = [dateAtStartOfDay(1), dateAtStartOfDay(2)];
       let lastError = null;
 
       for (const endDate of endDates) {
@@ -307,11 +291,6 @@ const accessToken =
             : rows;
 
           if (scopedRows.length && engagedIndex >= 0 && viewsIndex >= 0) {
-            const dayIndex = headers.indexOf("day");
-            const returnedDays = dayIndex >= 0
-              ? scopedRows.map(row => String(row?.[dayIndex] || "")).filter(value => isAnalyticsDate(value)).sort()
-              : [];
-            const actualEndDate = returnedDays.length ? returnedDays[returnedDays.length - 1] : endDate;
             const engagedViews = scopedRows.reduce(
               (sum, row) => sum + Number(row[engagedIndex] || 0), 0
             );
@@ -338,7 +317,7 @@ const accessToken =
                 videoId: target === "video" ? videoId : undefined,
                 days: target === "channel" ? days : undefined,
                 startDate,
-                endDate: actualEndDate,
+                endDate,
                 source: "youtube-analytics-api",
                 scopeVerified: target === "video"
               });

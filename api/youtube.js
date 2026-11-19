@@ -173,7 +173,15 @@ const accessToken =
       const days = [7, 28, 30].includes(requestedDays) ? requestedDays : 28;
       const requestedChannelId = String(body?.channelId || "").trim();
       const selectedChannelId = /^UC[A-Za-z0-9_-]{20,}$/.test(requestedChannelId) ? requestedChannelId : "";
-      const analyticsChannelId = selectedChannelId ? `channel==${selectedChannelId}` : "channel==MINE";
+      if (!selectedChannelId) {
+        return res.status(200).json({
+          success: false,
+          error: "active_channel_id_required",
+          engagedViews: null,
+          target
+        });
+      }
+      const analyticsChannelId = `channel==${selectedChannelId}`;
 
       if (!token) {
         return res.status(200).json({

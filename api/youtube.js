@@ -171,6 +171,9 @@ const accessToken =
       const target = body?.target === "channel" ? "channel" : "video";
       const requestedDays = Number(body?.days);
       const days = [7, 28, 30].includes(requestedDays) ? requestedDays : 28;
+      const requestedChannelId = String(body?.channelId || "").trim();
+      const selectedChannelId = /^UC[A-Za-z0-9_-]{20,}$/.test(requestedChannelId) ? requestedChannelId : "";
+      const analyticsChannelId = selectedChannelId ? `channel==${selectedChannelId}` : "channel==MINE";
 
       if (!token) {
         return res.status(200).json({
@@ -197,7 +200,7 @@ const accessToken =
 
       const queryAnalytics = async ({ startDate, endDate, dimensions = "", filters = "" }) => {
         const url = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
-        url.searchParams.set("ids", "channel==MINE");
+        url.searchParams.set("ids", analyticsChannelId);
         url.searchParams.set("startDate", startDate);
         url.searchParams.set("endDate", endDate);
         url.searchParams.set("metrics", "views,engagedViews");

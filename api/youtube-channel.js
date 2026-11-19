@@ -1,3 +1,239 @@
+import { createClient } from "@supabase/supabase-js";
+
+let supabaseClient = null;
+
+function getSupabase() {
+  const url = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim();
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+  if (!url || !serviceKey) {
+    throw new Error("supabase_environment_missing");
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createClient(url, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+  }
+  return supabaseClient;
+}
+
+export function saoPauloDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function shiftDate(dateString, offsetDays) {
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function dailyDeltaRows(rows, days) {
+  const byDate = new Map(
+    (Array.isArray(rows) ? rows : []).map(row => [
+      String(row.snapshot_date),
+      {
+        date: String(row.snapshot_date),
+        totalViews: Number(row.total_views || 0),
+        subscribers: Number(row.subscriber_count || 0),
+        videoCount: Number(row.video_count || 0)
+      }
+    ])
+  );
+
+  const today = saoPauloDate();
+  const startDate = shiftDate(today, -(days - 1));
+  const previousDate = shiftDate(startDate, -1);
+  const result = [];
+
+  for (let i = 0; i < days; i++) {
+    const date = shiftDate(startDate, i);
+    const current = byDate.get(date);
+    if (!current) continue;
+
+    const previous = byDate.get(shiftDate(date, -1));
+    const consecutive = Boolean(previous);
+    const delta = consecutive
+      ? Math.max(0, current.totalViews - previous.totalViews)
+      : null;
+
+    result.push({
+      date,
+      views: delta,
+      totalViews: current.totalViews,
+      subscribers: current.subscribers,
+      videoCount: current.videoCount,
+      complete: consecutive,
+      source: "public_channel_counter_delta"
+    });
+  }
+
+  return result;
+}
+
+export async function recordChannelSnapshot({
+  channelId,
+  title = "",
+  customUrl = "",
+  thumbnailUrl = "",
+  totalViews,
+  subscribers = 0,
+  videoCount = 0
+}) {
+  const id = String(channelId || "").trim();
+  const views = Number(totalViews);
+
+  if (!/^UC[A-Za-z0-9_-]{20,}$/.test(id)) {
+    throw new Error("invalid_channel_id");
+  }
+  if (!Number.isFinite(views) || views < 0) {
+    throw new Error("invalid_total_views");
+  }
+
+  const supabase = getSupabase();
+  const now = new Date().toISOString();
+  const snapshotDate = saoPauloDate();
+
+  const tracked = await supabase
+    .from("tubex_tracked_channels")
+    .upsert({
+      channel_id: id,
+      channel_title: String(title || "").slice(0, 200),
+      custom_url: String(customUrl || "").slice(0, 200),
+      thumbnail_url: String(thumbnailUrl || "").slice(0, 1000),
+      last_seen_at: now,
+      last_snapshot_at: now
+    }, { onConflict: "channel_id" });
+
+  if (tracked.error) throw tracked.error;
+
+  const snapshot = await supabase
+    .from("tubex_channel_view_snapshots")
+    .upsert({
+      channel_id: id,
+      snapshot_date: snapshotDate,
+      total_views: Math.floor(views),
+      subscriber_count: Math.max(0, Math.floor(Number(subscribers) || 0)),
+      video_count: Math.max(0, Math.floor(Number(videoCount) || 0)),
+      captured_at: now
+    }, { onConflict: "channel_id,snapshot_date" });
+
+  if (snapshot.error) throw snapshot.error;
+
+  return { channelId: id, snapshotDate };
+}
+
+export async function getChannelHistory(channelId, days = 28) {
+  const id = String(channelId || "").trim();
+  if (!/^UC[A-Za-z0-9_-]{20,}$/.test(id)) return [];
+
+  const safeDays = Math.max(1, Math.min(90, Number(days) || 28));
+  const today = saoPauloDate();
+  const startDate = shiftDate(today, -(safeDays - 1));
+  const queryStart = shiftDate(startDate, -1);
+
+  const { data, error } = await getSupabase()
+    .from("tubex_channel_view_snapshots")
+    .select("snapshot_date,total_views,subscriber_count,video_count")
+    .eq("channel_id", id)
+    .gte("snapshot_date", queryStart)
+    .lte("snapshot_date", today)
+    .order("snapshot_date", { ascending: true })
+    .limit(100);
+
+  if (error) throw error;
+  return dailyDeltaRows(data || [], safeDays);
+}
+
+export async function getTrackedChannels(limit = 500) {
+  const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 500));
+  const { data, error } = await getSupabase()
+    .from("tubex_tracked_channels")
+    .select("channel_id,channel_title,custom_url,thumbnail_url,last_snapshot_at")
+    .order("last_snapshot_at", { ascending: true, nullsFirst: true })
+    .limit(safeLimit);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function recordCronChannelSnapshot(channel) {
+  const id = String(channel?.id || "").trim();
+  const stats = channel?.statistics || {};
+  const snippet = channel?.snippet || {};
+
+  return recordChannelSnapshot({
+    channelId: id,
+    title: snippet.title || "",
+    customUrl: snippet.customUrl || "",
+    thumbnailUrl:
+      snippet.thumbnails?.high?.url ||
+      snippet.thumbnails?.medium?.url ||
+      snippet.thumbnails?.default?.url ||
+      "",
+    totalViews: Number(stats.viewCount || 0),
+    subscribers: Number(stats.subscriberCount || 0),
+    videoCount: Number(stats.videoCount || 0)
+  });
+}
+
+
+
+async function attachPublicHistory(responseData, channelId) {
+  try {
+    const channel = responseData?.data?.channel;
+    const stats = channel?.statistics || {};
+    const totalViews = Number(stats.viewCount ?? responseData?.data?.metrics?.totalChannelViews ?? 0);
+    const subscribers = Number(stats.subscriberCount ?? responseData?.data?.metrics?.subscribers ?? 0);
+    const videoCount = Number(stats.videoCount ?? responseData?.data?.metrics?.totalVideos ?? 0);
+
+    if (channelId && Number.isFinite(totalViews) && totalViews >= 0) {
+      await recordChannelSnapshot({
+        channelId,
+        title: channel?.snippet?.title || channel?.snippet?.localized?.title || "",
+        customUrl: channel?.snippet?.customUrl || "",
+        thumbnailUrl:
+          channel?.snippet?.thumbnails?.high?.url ||
+          channel?.snippet?.thumbnails?.medium?.url ||
+          channel?.snippet?.thumbnails?.default?.url ||
+          "",
+        totalViews,
+        subscribers,
+        videoCount
+      });
+    }
+
+    const history = channelId ? await getChannelHistory(channelId, 28) : [];
+    return {
+      ...responseData,
+      data: {
+        ...(responseData?.data || {}),
+        channelHistory: history,
+        channelHistorySource: "tubex_supabase_public_snapshots",
+        channelHistoryDays: 28
+      }
+    };
+  } catch (error) {
+    console.warn("[TubeX][ChannelHistory] enrichment failed:", error?.message || error);
+    return {
+      ...responseData,
+      data: {
+        ...(responseData?.data || {}),
+        channelHistory: [],
+        channelHistorySource: "unavailable",
+        channelHistoryDays: 28
+      }
+    };
+  }
+}
+
 export default async function handler(req, res) {
 
   const origin = req.headers.origin || "*";
@@ -225,7 +461,8 @@ const cached = global.tubexChannelCache[cacheKey];
 if(cached){
   if(cached.expires > Date.now()){
     console.log("⚡ CACHE HIT CHANNEL:", channelId);
-    return res.status(200).json(cached.data);
+    const cachedWithHistory = await attachPublicHistory(cached.data, channelId);
+    return res.status(200).json(cachedWithHistory);
   }
   console.log("♻️ STALE CHANNEL CACHE AVAILABLE:", channelId);
 }
@@ -495,7 +732,8 @@ if (!Array.isArray(videos) || videos.length === 0) {
     }
   };
 
-  return res.status(200).json(finalData);
+  const finalDataWithHistory = await attachPublicHistory(finalData, channelId);
+  return res.status(200).json(finalDataWithHistory);
 }
 
 
@@ -582,15 +820,18 @@ const finalData = {
 };
 
 
+// 📈 Registra snapshot público e devolve o histórico persistido do canal.
+const finalDataWithHistory = await attachPublicHistory(finalData, channelId);
+
 // 💾 SALVA CACHE
 global.tubexChannelCache[cacheKey] = {
-  data: finalData,
+  data: finalDataWithHistory,
   expires: Date.now() + CHANNEL_CACHE_TTL,
   staleUntil: Date.now() + CHANNEL_STALE_TTL
 
 };
 
-return res.status(200).json(finalData);
+return res.status(200).json(finalDataWithHistory);
 
   } catch (e) {
 

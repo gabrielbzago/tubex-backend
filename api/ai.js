@@ -104,6 +104,14 @@ try {
 // ======================================================
 let prompt = body?.prompt;
 const context = body?.context || {};
+const editorContextInput = body?.editorContext && typeof body.editorContext === "object" ? body.editorContext : {};
+const editorContext = {
+  description: String(editorContextInput.description || "").slice(0, 1800),
+  tags: Array.isArray(editorContextInput.tags)
+    ? [...new Set(editorContextInput.tags.map(tag => String(tag || "").trim()).filter(Boolean))].slice(0, 25)
+    : []
+};
+const titleFocus = String(body?.titleFocus || "seo").trim().toLowerCase();
 
 const userId = body?.userId || "guest";
 const channelId = body?.channelId || "no_channel";
@@ -125,6 +133,7 @@ const requiresPrompt = [
   "tituloImpactante",
   "tituloEmocional",
   "descricao",
+  "descricao_editor",
   "ideas",
   "seo_workspace",
   "viral_content",
@@ -268,189 +277,67 @@ if (
 const painelIA = tipo.endsWith("_panel");
 const quantidade = painelIA ? 1 : 4;
 
+const recommendationMode = ["recommendation","recomendation","recomendacao","recomendação","suggested","browse"].includes(titleFocus);
+const focusInstruction = recommendationMode
+  ? "FOCO: RECOMENDAÇÕES. Otimize para Início e Vídeos sugeridos: leitura imediata, assunto claro, curiosidade específica e motivo legítimo para clicar. Não force palavras-chave no começo."
+  : "FOCO: SEO / PESQUISA. Identifique a intenção e a frase-chave principal do título. Preserve-a naturalmente, de preferência no começo quando soar fluido, e torne explícito o benefício ou a resposta que a busca procura. Evite repetição de palavras-chave.";
+const editorContextText = [
+  editorContext.description ? `Descrição existente (fonte auxiliar): ${editorContext.description}` : "",
+  editorContext.tags.length ? `Tags atuais (pistas do assunto): ${editorContext.tags.join(", ")}` : ""
+].filter(Boolean).join("\n");
+
 finalPrompt = `
-
-Você é um dos maiores especialistas do mundo em crescimento de canais no YouTube.
-
-Sua missão NÃO é apenas criar títulos.
-
-Sua missão é criar títulos capazes de gerar o maior CTR possível sem sacrificar o SEO.
-
-Pense como um criador que vive exclusivamente de milhões de visualizações.
-
-Seu trabalho é competir contra os melhores títulos do YouTube.
-
-Tema:
-"${prompt}"
-
---------------------------------------------------
-
-OBJETIVO
-
-Gerar títulos que façam o usuário sentir necessidade imediata de clicar.
-
-Os títulos devem parecer escritos por grandes criadores, nunca por uma IA.
-
-Nunca escreva títulos comuns.
-
-Nunca escreva títulos genéricos.
-
-Nunca escreva títulos parecidos entre si.
-
-Nunca reutilize a mesma estrutura.
-
---------------------------------------------------
-
-REGRAS
-
-• Crie EXATAMENTE ${quantidade} título${quantidade > 1 ? "s" : ""}.
-
-• Cada título deve utilizar um gatilho psicológico diferente.
-
-• Cada título deve utilizar uma estrutura completamente diferente.
-
-Varie entre formatos como:
-
-- Pergunta
-- Erro
-- Descoberta
-- Comparação
-- Tutorial
-- Alerta
-- Mito
-- Verdade inesperada
-- Opinião forte
-- Mudança recente
-- Lista
-- Caso real
-- Antes e Depois
-- Resultado inesperado
-
-Nunca repita a mesma abertura.
-
-Exemplos de aberturas:
-
-Como...
-Por que...
-O erro...
-Você está...
-Nunca...
-Antes de...
-O YouTube...
-Este simples...
-Pare de...
-A maioria...
-Quase ninguém...
-Todo criador...
-
---------------------------------------------------
-
-GATILHOS PSICOLÓGICOS
-
-Utilize apenas um gatilho principal por título.
-
-Exemplos:
-
-- curiosidade
-- surpresa
-- choque
-- medo de perder
-- descoberta
-- benefício
-- autoridade
-- erro
-- comparação
-- urgência
-- conflito
-- prova
-- transformação
-- oportunidade
-
-Nunca repita o mesmo gatilho.
-
---------------------------------------------------
-
-SEO
-
-Sempre que possível:
-
-• coloque a palavra-chave principal naturalmente no início
-
-• mantenha entre 45 e 68 caracteres
-
-• preserve legibilidade
-
-• escreva como uma pessoa real
-
-• evite clickbait enganoso
-
-• maximize CTR sem prejudicar SEO
-
---------------------------------------------------
-
-ESTILO
-
-Os títulos devem parecer publicados por canais como:
-
-- MrBeast
-- Film Booth
-- Think Media
-- VidIQ
-- TubeBuddy
-
-Mas nunca copie títulos existentes.
-
-Inspire-se apenas no nível de qualidade.
-
---------------------------------------------------
-
-PENSE COMO O USUÁRIO
-
-Antes de responder imagine:
-
-"Existem mais de 20 vídeos iguais na busca."
-
-"Qual destes títulos faria alguém clicar imediatamente?"
-
-Se um título não vencer essa disputa mental, descarte-o.
-
---------------------------------------------------
-
-PROCESSO INTERNO
-
-Antes de responder:
-
-1. Crie mentalmente 40 títulos.
-
-2. Elimine imediatamente os 30 mais fracos.
-
-3. Dê uma nota de CTR para os 10 restantes.
-
-4. Escolha apenas os ${quantidade} melhores.
-
-5. Ordene do melhor para o pior.
-
-Nunca revele esse processo.
-
---------------------------------------------------
-
-FORMATO
-
-${painelIA
-    ? "Retorne apenas UM título."
-    : "Retorne apenas os 4 títulos.\n\nUm por linha."
-}
-
-Sem números.
-
-Sem aspas.
-
-Sem markdown.
-
-Sem explicações.
-
+Você é estrategista editorial de YouTube e editor de títulos. Crie títulos melhores a partir do vídeo real, não apenas reformule superficialmente o texto.
+
+${focusInstruction}
+
+TÍTULO ORIGINAL:
+${prompt}
+
+CONTEXTO DISPONÍVEL:
+${editorContextText || "Nenhuma descrição ou tag adicional disponível."}
+
+COMO RACIOCINAR
+- Extraia o tema central, a intenção do espectador e a promessa que o título original já faz.
+- Use descrição e tags somente para esclarecer o assunto; se contradisserem o título, não acrescente a informação duvidosa.
+- Preserve entidades, espécie, local, resultado e outros fatos específicos que realmente estejam nos dados.
+- Encontre um ângulo editorial mais concreto: resposta, consequência, erro, descoberta, comparação ou pergunta relevante. Não invente prova, resultado, urgência, segredo ou experiência pessoal.
+
+ENTREGA
+- Crie exatamente ${quantidade} alternativas realmente distintas, ordenadas da mais forte para a mais fraca.
+- Cada alternativa deve manter o assunto reconhecível e acrescentar clareza, especificidade ou uma razão real para assistir; não use sinônimos do título original como se fossem ideias novas.
+- Limite cada título a 70 caracteres. Escreva no mesmo idioma do título original, com linguagem natural.
+- Evite fórmulas vazias, exagero, clickbait enganoso, frases genéricas como “você não vai acreditar” e estruturas repetidas.
+- Retorne somente ${quantidade} títulos, um por linha, sem numeração, aspas, markdown ou comentários.
 `;
     }
+
+  else if (tipo === "descricao_editor") {
+
+finalPrompt = `
+Você é editor de conteúdo para YouTube. Escreva uma descrição curta, útil, natural e específica para este vídeo.
+
+TÍTULO DO VÍDEO:
+${prompt}
+
+DESCRIÇÃO ATUAL (use apenas os fatos que ajudem a explicar o vídeo; não copie trechos genéricos):
+${editorContext.description || "Não fornecida."}
+
+TAGS EXISTENTES (pistas secundárias, não uma lista para repetir):
+${editorContext.tags.join(", ") || "Não fornecidas."}
+
+REGRAS
+- Comece com uma frase clara que explique o assunto e responda à intenção sugerida pelo título.
+- Use os dados disponíveis para dar contexto concreto. Não invente cenas, resultados, pessoas, locais, dicas ou conclusões que não estejam no título ou na descrição atual.
+- Escreva entre 450 e 900 caracteres, em 2 ou 3 parágrafos curtos, no idioma do título.
+- Integre naturalmente a frase-chave principal e no máximo duas variações realmente pertinentes. Não repita o título ou a mesma ideia em frases diferentes.
+- Evite introduções vazias (“neste vídeo você vai descobrir”), listas artificiais, promessas exageradas, explicações sobre SEO e CTAs repetitivos.
+- Termine com no máximo um convite breve para comentar ou acompanhar o canal, somente se couber com naturalidade. Use no máximo duas hashtags específicas; não crie hashtags genéricas.
+
+Retorne apenas a descrição pronta para colar no YouTube, sem rótulo, aspas ou explicação.
+`;
+
+  }
 
   else if (tipo === "descricao") {
 
@@ -3684,9 +3571,21 @@ const insightFingerprint = insightCachePayload
   ? insightCachePayload.split("").reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261).toString(36)
   : "";
 
+const editorCachePayload = JSON.stringify({titleFocus, editorContext});
+const editorCacheFingerprint = editorCachePayload
+  .split("")
+  .reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261)
+  .toString(36);
+
 const cacheKey =
 
-tipo === "title_score"
+tipo === "tituloSEO" || tipo === "tituloSEO_panel"
+? ["title_editor_v8", userId, normalizedKeyword, titleFocus, editorCacheFingerprint].join("|")
+
+: tipo === "descricao_editor"
+? ["description_editor_v1", userId, normalizedKeyword, editorCacheFingerprint].join("|")
+
+: tipo === "title_score"
 ? ["title_score_v2", userId, normalizedKeyword].join("|")
 
 : tipo === "tubex_insight"
@@ -3761,6 +3660,7 @@ video_analysis:12,
   tituloImpactante: 0,
   tituloEmocional: 0,
   tituloSEO_panel: 0,
+  descricao_editor: 0,
   tituloImpactante_panel: 0,
   tituloEmocional_panel: 0,
 
@@ -3874,6 +3774,7 @@ if (tipo === "seo_workspace")
     temp = 0.45;
 if (tipo === "ideas") temp = 0.8;
 if (tipo === "descricao") temp = 0.5;
+if (tipo === "descricao_editor") temp = 0.62;
 if (tipo === "strategy") temp = 0.55;
 if (tipo === "niche") temp = 0.3;
 if (tipo==="thumbnail_prompt") temp=0.9;

@@ -97,6 +97,12 @@ export default async function handler(req, res) {
 
     tipo = String(tipo || "").toLowerCase().trim();
     prompt = String(prompt || "").trim();
+    const titleFocus = String(body?.titleFocus || body?.focus || "seo").trim().toLowerCase();
+    const editorContextInput = body?.editorContext && typeof body.editorContext === "object" ? body.editorContext : {};
+    const editorDescription = String(editorContextInput.description || "").slice(0, 1800);
+    const editorTags = Array.isArray(editorContextInput.tags)
+      ? [...new Set(editorContextInput.tags.map(tag => String(tag || "").trim()).filter(Boolean))].slice(0, 25)
+      : [];
 
     if (!prompt) {
       return res.status(400).json({
@@ -123,58 +129,46 @@ export default async function handler(req, res) {
     let finalPrompt = "";
 
     if (tipo === "titulo" || tipo === "tituloseo") {
-
+      const recommendationMode = ["recommendation","recomendation","recomendacao","recomendação","suggested","browse"].includes(titleFocus);
       finalPrompt = `
-Crie 4 títulos curtos e altamente clicáveis para YouTube.
-Máx 70 caracteres.
+Você é estrategista editorial de YouTube. Gere quatro títulos realmente diferentes a partir do conteúdo informado, sem fazer simples trocas de sinônimos.
 
-Base:
-"${prompt}"
+FOCO: ${recommendationMode
+  ? "RECOMENDAÇÕES — Início e Vídeos sugeridos: clareza imediata, curiosidade específica e motivo legítimo para clicar. Não force palavras-chave no começo."
+  : "SEO / PESQUISA — reconheça a intenção e a frase-chave principal, preserve-a naturalmente e deixe claro que resposta ou benefício o vídeo oferece."}
+
+TÍTULO ORIGINAL:
+${prompt}
+
+DESCRIÇÃO ATUAL (contexto auxiliar; não copie frases genéricas):
+${editorDescription || "Não fornecida."}
+
+TAGS (pistas do assunto, não repetir como lista):
+${editorTags.join(", ") || "Não fornecidas."}
+
+Use descrição e tags apenas se forem consistentes com o título. Mantenha fatos e entidades recebidos; não invente resultados, promessas, acontecimentos ou experiência pessoal. Crie quatro ângulos específicos, naturais e distintos, no mesmo idioma do título, com no máximo 70 caracteres cada. Evite clickbait enganoso, frases vazias e aberturas repetidas.
+
+Retorne somente os quatro títulos, um por linha, sem numeração, aspas, markdown ou explicação.
 `;
 
-    } else if (tipo === "descricao") {
+    } else if (tipo === "descricao" || tipo === "descricao_editor") {
 
 finalPrompt = `
 
-Você é um especialista em SEO para YouTube e Google.
+Você é editor de conteúdo para YouTube. Escreva uma descrição curta, útil, natural e específica para este vídeo.
 
-Sua missão é criar uma descrição profissional capaz de aumentar as chances de ranqueamento e incentivar mais cliques e tempo de exibição.
+TÍTULO:
+${prompt}
 
-Tema do vídeo:
+DESCRIÇÃO ATUAL (use somente fatos úteis; não copie trechos genéricos):
+${editorDescription || "Não fornecida."}
 
-"${prompt}"
+TAGS (pistas secundárias):
+${editorTags.join(", ") || "Não fornecidas."}
 
-REGRAS:
+Escreva de 450 a 900 caracteres em 2 ou 3 parágrafos curtos, no idioma do título. Abra explicando claramente o assunto e a intenção atendida. Preserve apenas detalhes presentes no título ou na descrição atual; não invente cenas, resultados, pessoas, lugares ou conclusões. Integre naturalmente a frase-chave principal e no máximo duas variações pertinentes. Evite repetir o título, a mesma ideia, introduções vazias, listas artificiais, promessas exageradas e CTAs repetitivos. Termine com no máximo um convite curto, se couber, e use até duas hashtags específicas.
 
-• Escreva entre 1800 e 2800 caracteres.
-
-• Comece exatamente com o título do vídeo.
-
-• Os primeiros 200 caracteres devem explicar claramente o assunto e despertar interesse.
-
-• Utilize naturalmente a palavra-chave principal ao longo do texto.
-
-• Inclua variações semânticas e palavras-chave relacionadas sem repetir excessivamente.
-
-• Organize o conteúdo em parágrafos curtos e fáceis de ler.
-
-• Explique o tema de forma clara, útil e aprofundada.
-
-• Responda dúvidas comuns que o público teria ao pesquisar esse assunto.
-
-• Destaque os principais benefícios que o espectador terá ao assistir ao vídeo.
-
-• Escreva em linguagem natural, sem parecer texto gerado por IA.
-
-• Nunca utilize keyword stuffing.
-
-• Não invente informações que não estejam relacionadas ao tema.
-
-• Finalize com um CTA curto incentivando inscrição, comentário e compartilhamento.
-
-• Inclua no máximo 2 hashtags realmente relevantes.
-
-Retorne apenas a descrição, sem títulos, explicações, markdown ou aspas.
+Retorne somente a descrição pronta para colar, sem rótulo, aspas ou explicação.
 
 `;
 
@@ -192,7 +186,9 @@ Retorne apenas a descrição, sem títulos, explicações, markdown ou aspas.
     // ======================================================
     // ⚡ CACHE
     // ======================================================
-    const cacheKey = `${tipo}_${prompt.slice(0,80)}`;
+    const contextKey = JSON.stringify({ titleFocus, editorDescription, editorTags });
+    const contextHash = contextKey.split("").reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261).toString(36);
+    const cacheKey = `${tipo}_${prompt.slice(0,80)}_${contextHash}`;
 
     global.__tubexCache = global.__tubexCache || {};
 

@@ -2020,233 +2020,62 @@ console.log("================================");
 console.log("Entrou no bloco Analytics?", !!accessToken);
 
 if (accessToken) {
+  const startDate = String(snippet.publishedAt || "").slice(0, 10);
+  const end = new Date();
+  end.setUTCDate(end.getUTCDate() - 3); // Wait for Analytics processing to settle.
+  const endDate = end.toISOString().slice(0, 10);
+  const reports = [
+    ["views", "estimatedMinutesWatched", "averageViewDuration", "averageViewPercentage"],
+    ["impressions", "impressionClickThroughRate"],
+    ["likes", "comments", "subscribersGained", "subscribersLost", "shares", "videosAddedToPlaylists"]
+  ];
+  const collected = { videoId: video.id };
+  const number = value => value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
 
-    console.log(">>> CHAMANDO YOUTUBE ANALYTICS API");
-
+  for (const metrics of reports) {
     try {
-
-        const startDate =
-            snippet.publishedAt.slice(0, 10);
-
-        const yesterday = new Date();
-
-yesterday.setDate(
-    yesterday.getDate() - 1
-);
-
-const endDate =
-    yesterday
-        .toISOString()
-        .slice(0, 10);
-
-        const analyticsUrl =
-
-            "https://youtubeanalytics.googleapis.com/v2/reports"
-
-            +
-
-            "?ids=channel==MINE"
-
-            +
-
-            `&startDate=${startDate}`
-
-            +
-
-            `&endDate=${endDate}`
-
-            +
-
-            "&dimensions=video"
-
-            +
-
-            `&filters=video==${video.id}`
-
-            +
-
-            "&metrics=" +
-
-            [
-
-                "views",
-
-                "estimatedMinutesWatched",
-
-                "averageViewDuration",
-
-                "averageViewPercentage",
-
-                "impressions",
-
-                "impressionClickThroughRate",
-
-                "likes",
-
-                "comments",
-
-                "subscribersGained",
-
-                "subscribersLost",
-
-                "shares",
-
-                "playlistAdds"
-
-            ].join(",");
-
-        let analyticsJson = {};
-
-        let row = null;
-
-        // ======================================
-        // PRIMEIRA TENTATIVA
-        // ======================================
-
-        for (let attempt = 1; attempt <= 2; attempt++) {
-
-            const analyticsRes = await fetch(
-
-                analyticsUrl,
-
-                {
-
-                    headers: {
-
-                        Authorization:
-
-                            `Bearer ${accessToken}`
-
-                    }
-
-                }
-
-            );
-
-            console.log(
-                "📡 Analytics Status:",
-                analyticsRes.status
-            );
-
-            const analyticsText =
-                await analyticsRes.text();
-
-            console.log(
-                "📡 Analytics Body:",
-                analyticsText
-            );
-
-            try {
-
-                analyticsJson =
-                    JSON.parse(analyticsText);
-
-            }
-
-            catch (e) {
-
-                analyticsJson = {};
-
-            }
-
-            console.log(
-                "📊 Analytics JSON:",
-                analyticsJson
-            );
-
-            row =
-                analyticsJson?.rows?.[0];
-
-            if (row) {
-
-                break;
-
-            }
-
-            console.warn(
-
-                `⚠ Analytics vazia. Tentativa ${attempt}/2`
-
-            );
-
-            if (attempt < 2) {
-
-                await new Promise(
-
-                    resolve =>
-
-                        setTimeout(
-
-                            resolve,
-
-                            2500
-
-                        )
-
-                );
-
-            }
-
-        }
-
-        // ======================================
-        // SEM DADOS
-        // ======================================
-
-if (!row) {
-
-    console.warn(
-        "⚠ Analytics ainda não disponível para este vídeo."
-    );
-
-}
-else {
-
-    const headers = (analyticsJson?.columnHeaders || []).map(header => String(header?.name || ""));
-    const metricValue = name => {
-        const column = headers.indexOf(name);
-        const value = column >= 0 ? row[column] : null;
-        const number = value == null || value === "" ? null : Number(value);
-        return Number.isFinite(number) ? number : null;
-    };
-    const rawCtr = metricValue("impressionClickThroughRate");
-    analytics = {
-        videoId: video.id,
-        views: metricValue("views"),
-        estimatedMinutesWatched: metricValue("estimatedMinutesWatched"),
-        averageViewDuration: metricValue("averageViewDuration"),
-        averageViewPercentage: metricValue("averageViewPercentage"),
-        impressions: metricValue("impressions"),
-        ctr: rawCtr == null ? null : rawCtr * 100,
-        likes: metricValue("likes"),
-        comments: metricValue("comments"),
-        subscribersGained: metricValue("subscribersGained"),
-        subscribersLost: metricValue("subscribersLost"),
-        shares: metricValue("shares"),
-        playlistAdds: metricValue("playlistAdds")
-    };
-
-    console.log(
-        "✅ Analytics carregada:",
-        analytics
-    );
-
-}
-
-       }
-
-    catch (e) {
-
-        console.error(
-
-            "❌ Analytics API:",
-
-            e
-
-        );
-
+      const reportUrl = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
+      reportUrl.searchParams.set("ids", "channel==MINE");
+      reportUrl.searchParams.set("startDate", startDate);
+      reportUrl.searchParams.set("endDate", endDate);
+      reportUrl.searchParams.set("dimensions", "video");
+      reportUrl.searchParams.set("filters", `video==${video.id}`);
+      reportUrl.searchParams.set("metrics", metrics.join(","));
+      const response = await fetch(reportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error?.message || `youtube_analytics_http_${response.status}`);
+      const headers = (payload?.columnHeaders || []).map(header => String(header?.name || ""));
+      const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+      const videoColumn = headers.indexOf("video");
+      const row = rows.find(candidate => videoColumn < 0 || String(candidate?.[videoColumn] || "") === String(video.id));
+      if (!row) continue;
+      for (const metric of metrics) {
+        const column = headers.indexOf(metric);
+        if (column >= 0) collected[metric] = number(row[column]);
+      }
+    } catch (error) {
+      // One unavailable metric group must not erase data from other groups.
+      console.warn(`[TubeX video AI] Analytics metric group unavailable (${metrics.join(",")}):`, error?.message || error);
     }
-
+  }
+  const rawCtr = number(collected.impressionClickThroughRate);
+  analytics = {
+    videoId: video.id,
+    views: collected.views ?? null,
+    estimatedMinutesWatched: collected.estimatedMinutesWatched ?? null,
+    averageViewDuration: collected.averageViewDuration ?? null,
+    averageViewPercentage: collected.averageViewPercentage ?? null,
+    impressions: collected.impressions ?? null,
+    ctr: rawCtr == null ? null : rawCtr * 100,
+    likes: collected.likes ?? null,
+    comments: collected.comments ?? null,
+    subscribersGained: collected.subscribersGained ?? null,
+    subscribersLost: collected.subscribersLost ?? null,
+    shares: collected.shares ?? null,
+    playlistAdds: collected.videosAddedToPlaylists ?? null,
+    startDate,
+    endDate
+  };
 }
 
   // Optional additive analytics metric. It is deliberately isolated from

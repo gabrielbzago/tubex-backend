@@ -2165,7 +2165,7 @@ else if (tipo === "video_analysis") {
 
 finalPrompt = `
 
-Você possui profundo conhecimento da documentação oficial do YouTube, comportamento do algoritmo de recomendações, SEO para vídeos, psicologia do clique, retenção de audiência e crescimento de canais.
+Você é especialista em YouTube Analytics, SEO para vídeos, apresentação de conteúdo, retenção de audiência e recomendações práticas para criadores.
 
 Sua missão é entregar uma consultoria superior à maioria dos especialistas humanos.
 
@@ -2275,399 +2275,24 @@ ${youtube.channel?.totalVideos ?? 0}
 COMO ANALISAR
 ========================================================
 
-Analise sempre o conjunto completo dos dados.
-
-Nunca tome decisões utilizando apenas uma métrica.
-
-Considere sempre:
-
-• CTR
-
-• Impressões
-
-• Retenção
-
-• Tempo médio assistido
-
-• Idade do vídeo
-
-• Qualidade do título
-
-• SEO
-
-• Potencial do tema
-
-• Capacidade de recomendação
-
-Explique sempre como essas métricas trabalham juntas.
-
-Se algum elemento estiver bom, diga claramente que NÃO deve ser alterado.
+Baseie cada conclusão em um dado realmente recebido. Cite o número, o período e a fonte quando disponíveis.
+NÃO infira que título, thumbnail, descrição, concorrência, algoritmo ou público causou um resultado sem um sinal mensurável que sustente isso.
+Não trate um campo ausente ou zero usado como fallback como evidência de desempenho ruim. Dados ausentes devem ser descritos como indisponíveis, nunca como zero.
+Não gere pontuação, chance viral, previsão de crescimento ou impacto estimado sem benchmark e método mensurável recebidos nos dados.
+Considere CTR, impressões, retenção, duração média, views e idade do vídeo em conjunto; explique quando faltarem dados para uma conclusão.
+Separe claramente observação, hipótese e recomendação. Use frases curtas e linguagem direta para o criador.
+Compare com a média do canal somente se ela tiver sido fornecida. Não invente benchmarks ou comparações com concorrentes.
 
 ========================================================
-REGRAS DO ALGORITMO
+LIMITES DAS CONCLUSÕES
 ========================================================
 
-CTR abaixo de 4%
-
-→ Forte indício de problema na geração de cliques.
-
-Analise profundamente:
-
-• título
-
-• thumbnail
-
-• promessa
-
-Explique exatamente por que a CTR limita o alcance.
-
-Nunca escreva apenas:
-
-"Troque a thumbnail."
-
-Explique exatamente o que alterar.
-
---------------------------------------------------------
-
-CTR entre 4% e 6%
-
-Considere aceitável.
-
-Não culpe automaticamente a thumbnail.
-
-Analise primeiro:
-
-• retenção
-
-• entrega da promessa
-
-• satisfação
-
---------------------------------------------------------
-
-CTR acima de 6%
-
-Considere boa.
-
-Evite recomendar mudanças na thumbnail.
-
-Procure gargalos em retenção, tema ou estrutura do vídeo.
-
---------------------------------------------------------
-
-Retenção acima de 50%
-
-Excelente.
-
-Não recomende alterar o roteiro.
-
---------------------------------------------------------
-
-Retenção entre 35% e 50%
-
-Boa.
-
-Sugira apenas melhorias pontuais.
-
---------------------------------------------------------
-
-Retenção abaixo de 35%
-
-Considere este o principal gargalo APENAS quando nenhuma outra métrica indicar um problema mais crítico.
-
-Sempre compare CTR, retenção, idade do vídeo e impressões antes de decidir qual é o verdadeiro gargalo.
-
---------------------------------------------------------
-
-Vídeo publicado há menos de 48 horas
-
-Explique que o algoritmo ainda está coletando sinais.
-
-Evite alterações profundas.
-
---------------------------------------------------------
-
-Vídeo publicado entre 2 e 30 dias
-
-Momento ideal para otimizações.
-
---------------------------------------------------------
-
-Vídeo publicado há mais de 30 dias
-
-Permita recomendações mais profundas.
-
-Explique que mudanças relevantes podem reativar a distribuição.
-
-========================================================
-ANÁLISE DO TÍTULO
-========================================================
-
-Analise profundamente:
-
-• curiosidade
-
-• promessa
-
-• clareza
-
-• emoção
-
-• benefício
-
-• competitividade
-
-• originalidade
-
-Explique os pontos fortes.
-
-Explique os pontos fracos.
-
-Caso recomende alteração:
-
-Explique exatamente por quê.
-
-Depois gere exatamente 3 novos títulos.
-
-Nunca faça pequenas variações.
-
-Cada título deve utilizar um gatilho psicológico diferente e possuir potencial real de aumentar a CTR.
-
-========================================================
-ANÁLISE DA THUMBNAIL
-========================================================
-
-Primeiro decida se realmente existe necessidade de alterar a thumbnail.
-
-Nunca recomende alteração apenas porque a CTR está baixa.
-
-Considere também:
-
-• idade do vídeo;
-
-• retenção;
-
-• título;
-
-• quantidade de impressões;
-
-• potencial do tema.
-
-Caso considere a thumbnail boa, explique por que ela deve permanecer.
-
-Caso recomende alteração, explique detalhadamente:
-
-• quais elementos remover;
-
-• quais elementos adicionar;
-
-• emoção que a imagem deve transmitir;
-
-• cores predominantes;
-
-• quantidade ideal de texto;
-
-• posição do texto;
-
-• contraste;
-
-• gatilho psicológico utilizado.
-
-Nunca escreva apenas:
-
-"Melhore a thumbnail."
-
-Explique exatamente como ela deve ser construída.
-
-========================================================
-ANÁLISE DA DESCRIÇÃO
-========================================================
-
-Analise:
-
-• SEO
-
-• intenção de pesquisa
-
-• entidades
-
-• palavras-chave
-
-• estrutura
-
-• primeiros 200 caracteres
-
-• potencial para indexação
-
-Explique pontos fortes e pontos fracos.
-
-Caso necessário gere uma nova descrição otimizada.
-
-========================================================
-TIPO DO VÍDEO
-========================================================
-
-Classifique o vídeo em apenas um tipo:
-
-• Pesquisa
-
-• Recomendação
-
-• Híbrido
-
-Explique detalhadamente por que chegou nessa conclusão.
-
-Explique também qual estratégia possui maior potencial para esse vídeo.
-
-========================================================
-PLANO DE AÇÃO
-========================================================
-
-Crie exatamente 3 ações.
-
-Ordene da maior para a menor capacidade de melhorar o desempenho.
-
-Cada ação deve conter obrigatoriamente:
-
-• Problema encontrado.
-
-• Explicação técnica.
-
-• O que alterar.
-
-• Um exemplo completo.
-
-• Por que isso funciona.
-
-• Impacto esperado.
-
-Cada ação deve ser suficientemente detalhada para que o usuário consiga aplicá-la imediatamente.
-
-Utilize entre 60 e 150 palavras quando necessário.
-
-Priorize qualidade em vez de quantidade.
-
-São proibidas respostas como:
-
-"Troque o título."
-
-"Melhore a thumbnail."
-
-"Melhore SEO."
-
-Sempre explique exatamente:
-
-• o que alterar;
-
-• por que alterar;
-
-• como alterar;
-
-• por que isso tende a funcionar.
-
-========================================================
-SCORES
-========================================================
-
-Calcule obrigatoriamente:
-
-optimizationScore
-
-Representa o nível de otimização geral do vídeo.
-
-Considere:
-
-• CTR
-
-• retenção
-
-• título
-
-• thumbnail
-
-• descrição
-
-• SEO
-
-• idade do vídeo
-
-• potencial de recomendação
-
-Valor entre 0 e 100.
-
-Explique resumidamente o motivo do score.
-
---------------------------------------------------------
-
-viralChance
-
-Estime a probabilidade deste vídeo receber mais distribuição.
-
-Considere:
-
-• CTR
-
-• retenção
-
-• potencial do tema
-
-• competitividade
-
-• idade
-
-• qualidade geral
-
-Valor entre 0 e 100.
-
-Explique resumidamente o motivo.
-
-========================================================
-REGRAS IMPORTANTES
-========================================================
-
-Este recurso pertence ao Plano Expert do TubeX.
-
-A resposta deve parecer uma consultoria profissional.
-
-Nunca escreva respostas curtas.
-
-Nunca escreva respostas genéricas.
-
-Cada explicação deve ser específica para ESTE vídeo.
-
-Sempre explique:
-
-• por que encontrou o problema;
-
-• como isso afeta o algoritmo;
-
-• qual consequência esse problema gera;
-
-• por que sua recomendação resolve esse problema;
-
-• qual resultado pode ser esperado.
-
-Se algum elemento estiver bom, diga claramente que ele NÃO deve ser alterado.
-
-Agora retorne SOMENTE o JSON abaixo exatamente na estrutura solicitada.
-
-========================================================
-IMPORTANTE
-========================================================
-
-Nunca entregue respostas superficiais.
-
-Cada explicação deve ser suficiente para que um criador de conteúdo consiga aplicar imediatamente sua recomendação.
-
-Sempre utilize exemplos específicos deste vídeo.
-
-Escreva como um consultor profissional de YouTube e não como um assistente de IA.
-
-Quando sugerir trocar um título, escreva o título completo.
-
-Quando sugerir alterar uma thumbnail, descreva exatamente como ela deve ser construída.
-
-Quando sugerir mudanças no vídeo, explique exatamente por que essas mudanças aumentam a probabilidade de recomendação pelo algoritmo.
+Não afirme conhecer regras internas do algoritmo nem diga que ele bloqueou ou puniu o vídeo.
+CTR abaixo de um número fixo não prova problema: considere origem de tráfego, volume de impressões, idade e histórico do canal.
+Não prometa visualizações, CTR futuro, multiplicadores de crescimento ou qualquer resultado garantido.
+Em expectedImpact.text, descreva apenas um efeito possível e condicionado a teste; não inclua previsão numérica sem evidência fornecida.
+Se título, thumbnail ou retenção não puderem ser avaliados com os dados recebidos, identifique isso como hipótese e proponha um teste mensurável.
+Recomende mudanças específicas para este vídeo, mas preserve elementos que os dados mostram como positivos.
 
 RETORNE SOMENTE JSON
 
@@ -3596,19 +3221,25 @@ tipo === "tituloSEO" || tipo === "tituloSEO_panel"
 
 ? [
 
-    "video",
+    "video_analysis_v2",
 
-    youtube.videoId ||
+    String(youtube.videoId || youtube.id || "unknown-video"),
 
-    youtube.id,
+    String(youtube.channelId || "unknown-channel"),
 
-    youtube.views,
+    youtube.title || "",
 
-    youtube.impressions,
+    youtube.views ?? "na",
 
-    youtube.ctr,
+    youtube.impressions ?? "na",
 
-    youtube.averageViewPercentage
+    youtube.ctr ?? "na",
+
+    youtube.averageViewPercentage ?? "na",
+
+    youtube.averageViewDuration ?? "na",
+
+    youtube.estimatedMinutesWatched ?? "na"
 
 ].join("|")
 
@@ -4364,21 +3995,49 @@ if (tipo === "video_analysis") {
     try {
 
         const parsed = JSON.parse(text);
+        const metric = value => value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+        const impressions = metric(youtube.impressions);
+        const ctr = metric(youtube.ctr);
+        const retention = metric(youtube.averageViewPercentage);
+        const averageDuration = metric(youtube.averageViewDuration);
+        const minutesWatched = metric(youtube.estimatedMinutesWatched);
+        const views = metric(youtube.views);
+        const available = [];
+        if (views != null) available.push(`${views.toLocaleString("pt-BR")} visualizações públicas acumuladas`);
+        if (impressions != null) available.push(`${impressions.toLocaleString("pt-BR")} impressões`);
+        if (ctr != null) available.push(`CTR ${ctr.toLocaleString("pt-BR", {maximumFractionDigits: 2})}%`);
+        if (retention != null) available.push(`retenção média ${retention.toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`);
+        if (averageDuration != null) available.push(`duração média ${Math.round(averageDuration)} s`);
+        if (minutesWatched != null) available.push(`${minutesWatched.toLocaleString("pt-BR", {maximumFractionDigits: 1})} minutos assistidos`);
+        const metricsSufficient = impressions != null && impressions > 0 && ctr != null &&
+          (retention != null || averageDuration != null);
+
+        parsed.diagnostic = available.length
+          ? `Métricas confirmadas deste vídeo: ${available.join("; ")}.`
+          : "O YouTube Analytics não retornou métricas privadas para este vídeo nesta consulta.";
+        parsed.bottleneck = metricsSufficient
+          ? "Nenhum gargalo pode ser confirmado sem comparar estas métricas com uma referência válida do canal ou uma meta definida."
+          : "Dados insuficientes para apontar um gargalo: faltam impressões, CTR ou retenção/duração média deste vídeo.";
+        parsed.nextAction = metricsSufficient
+          ? "Compare CTR e retenção deste vídeo com vídeos do mesmo canal e duração semelhante antes de alterar título ou miniatura."
+          : "Aguarde o processamento do Analytics ou reconecte a conta e execute a análise novamente. Não altere título ou miniatura com base em métricas ausentes.";
+        parsed.opportunity = "Nenhuma oportunidade específica foi confirmada; é necessário comparar os dados do vídeo com uma referência válida do canal.";
+        parsed.prediction = "Não estimada: não há comparação validada que sustente uma previsão.";
+        parsed.expectedImpact = { text: "Não estimado: o impacto de uma alteração exige teste e comparação com dados deste canal." };
+        parsed.priority = metricsSufficient ? "Comparar com a referência do canal" : "Aguardar métricas completas do Analytics";
+        parsed.comparison = available.length ? `Dados observados: ${available.join("; ")}.` : "Sem métricas retornadas para comparação.";
+        parsed.actionPlan = [parsed.nextAction];
+        parsed.optimizationScore = { score: null, reason: "Não calculado: o TubeX não possui uma referência validada para pontuar estes dados." };
+        parsed.viralChance = { score: null, reason: "Não estimada: sem base comparativa validada." };
 
         global.__tubexCache.set(cacheKey, {
-
-            text: parsed,
-
-            timestamp: Date.now()
-
+          text: parsed,
+          timestamp: Date.now()
         });
 
         return res.status(200).json({
-
-            success: true,
-
-            ...parsed
-
+          success: true,
+          ...parsed
         });
 
     }

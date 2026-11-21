@@ -4020,28 +4020,39 @@ if (tipo === "video_analysis") {
         const analyticsDiagnostics = Array.isArray(youtube.analyticsDiagnostics) ? youtube.analyticsDiagnostics : [];
         const analyticsErrors = analyticsDiagnostics.filter(item => item?.code === "analytics_report_error");
         const emptyReports = analyticsDiagnostics.filter(item => item?.code === "analytics_empty_report");
-        const analyticsFailureText = analyticsErrors.length
-          ? analyticsErrors.map(item => `${item.group || "Analytics"}${item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}: ${String(item.message || item.code).slice(0, 180)}`).join("; ")
-          : analyticsDiagnostics.some(item => item?.code === "analytics_token_missing")
-            ? "Nenhum token OAuth foi enviado à consulta do YouTube Analytics."
-            : emptyReports.length
-              ? `O Google aceitou a consulta, mas retornou relatório sem linhas para: ${emptyReports.map(item => item.group).join("; ")}.`
-              : "O backend não recebeu diagnóstico da consulta do Analytics.";
-
+        const processingWindow = analyticsDiagnostics.find(item => item?.code === "analytics_processing_window_not_reached");
+        const reachUnavailable = analyticsDiagnostics.some(item => item?.code === "thumbnail_reach_requires_reporting_api");
+        const analyticsFailureMessages = [];
+        if (analyticsErrors.length) {
+          const statuses = [...new Set(analyticsErrors.map(item => Number(item.httpStatus)).filter(Boolean))];
+          if (statuses.includes(401) || statuses.includes(403)) analyticsFailureMessages.push("O Google negou acesso às métricas privadas. Reconecte a conta com acesso ao canal.");
+          else analyticsFailureMessages.push("O Google Analytics não concluiu uma ou mais consultas privadas.");
+        }
+        if (analyticsDiagnostics.some(item => item?.code === "analytics_token_missing")) analyticsFailureMessages.push("A extensão não enviou autorização do YouTube Analytics.");
+        if (processingWindow) analyticsFailureMessages.push(`O Analytics ainda está processando este vídeo; os dados estão disponíveis até ${processingWindow.availableThrough || "a data indicada pelo YouTube"}.`);
+        else if (emptyReports.length) analyticsFailureMessages.push("O YouTube aceitou a consulta, mas ainda não retornou dados consolidados para este vídeo.");
+        if (reachUnavailable) analyticsFailureMessages.push("CTR e impressões de miniatura não são fornecidos por esta consulta direta; precisam do relatório de alcance do YouTube.");
+        const analyticsFailureText = analyticsFailureMessages.join(" ") || "Consulta privada concluída.";
         parsed.diagnostic = available.length
           ? `Métricas confirmadas deste vídeo: ${available.join("; ")}.` + (analyticsDiagnostics.length ? ` Status Analytics: ${analyticsFailureText}` : "")
           : `O YouTube Analytics não retornou métricas privadas para este vídeo. ${analyticsFailureText}`;
         parsed.bottleneck = metricsSufficient
           ? "Nenhum gargalo pode ser confirmado sem comparar estas métricas com uma referência válida do canal ou uma meta definida."
-          : "Dados insuficientes para apontar um gargalo: faltam impressões, CTR ou retenção/duração média deste vídeo.";
+          : retention != null || averageDuration != null
+            ? "Há dados de retenção para este vídeo, mas faltam impressões/CTR para confirmar um gargalo de atração."
+            : "Dados insuficientes: o YouTube ainda não retornou retenção nem impressões/CTR para este vídeo.";
         const authFailure = analyticsErrors.some(item => item.httpStatus === 401 || item.httpStatus === 403) || analyticsDiagnostics.some(item => item?.code === "analytics_token_missing");
         parsed.nextAction = metricsSufficient
           ? "Compare CTR e retenção deste vídeo com vídeos do mesmo canal e duração semelhante antes de alterar título ou miniatura."
           : authFailure
-            ? `Falha de autorização do Analytics (${analyticsFailureText}). Reconecte o Google com acesso ao YouTube Analytics e confirme o canal dono deste vídeo.`
-            : emptyReports.length
-              ? `O Google não retornou linhas para este vídeo (${analyticsFailureText}). Confirme que o canal selecionado é o proprietário e tente novamente após o processamento.`
-              : `Consulta do Analytics sem dados suficientes (${analyticsFailureText}). Não altere título ou miniatura usando métricas ausentes.`;
+            ? "Reconecte o Google com acesso ao YouTube Analytics e confirme que o canal selecionado é o proprietário deste vídeo."
+            : processingWindow
+              ? `Aguarde o processamento do Analytics até ${processingWindow.availableThrough || "a data indicada pelo YouTube"} e execute a análise novamente.`
+              : emptyReports.length
+                ? "Confirme que o canal selecionado é o proprietário deste vídeo e tente novamente após o processamento do Analytics."
+                : reachUnavailable
+                  ? "Não é possível diagnosticar CTR sem dados de impressões. Use o valor do YouTube Studio ou um relatório de alcance do YouTube; não altere título/miniatura por estimativa."
+                  : "Não altere título ou miniatura usando métricas que ainda não foram retornadas pelo YouTube.";
         parsed.opportunity = "Nenhuma oportunidade específica foi confirmada; é necessário comparar os dados do vídeo com uma referência válida do canal.";
         parsed.prediction = "Não estimada: não há comparação validada que sustente uma previsão.";
         parsed.expectedImpact = { text: "Não estimado: o impacto de uma alteração exige teste e comparação com dados deste canal." };

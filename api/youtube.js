@@ -1998,6 +1998,13 @@ const analyticsChannelScope = /^UC[A-Za-z0-9_-]{20,}$/.test(analyticsChannelId)
   : null;
 
 const analyticsDiagnostics = [];
+const analyticsStartDate = String(snippet.publishedAt || "").slice(0, 10);
+const analyticsEndDateObject = new Date();
+analyticsEndDateObject.setUTCDate(analyticsEndDateObject.getUTCDate() - 3);
+const analyticsEndDate = analyticsEndDateObject.toISOString().slice(0, 10);
+const analyticsDateRangeReady = !!analyticsStartDate && analyticsStartDate <= analyticsEndDate;
+analyticsDiagnostics.push({ code: "thumbnail_reach_requires_reporting_api" });
+if (!analyticsDateRangeReady) analyticsDiagnostics.push({ code: "analytics_processing_window_not_reached", availableThrough: analyticsEndDate });
 let analytics = {
 
     ctr: null,
@@ -2019,14 +2026,11 @@ if (accessToken && !analyticsChannelScope) analyticsDiagnostics.push({ code: "vi
 
 // Do not write OAuth credentials or token fragments to production logs.
 
-if (accessToken && analyticsChannelScope) {
-  const startDate = String(snippet.publishedAt || "").slice(0, 10);
-  const end = new Date();
-  end.setUTCDate(end.getUTCDate() - 3); // Wait for Analytics processing to settle.
-  const endDate = end.toISOString().slice(0, 10);
+if (accessToken && analyticsChannelScope && analyticsDateRangeReady) {
+  const startDate = analyticsStartDate;
+  const endDate = analyticsEndDate;
   const reports = [
     ["views", "estimatedMinutesWatched", "averageViewDuration", "averageViewPercentage"],
-    ["impressions", "impressionClickThroughRate"],
     ["likes", "comments", "subscribersGained", "subscribersLost", "shares", "videosAddedToPlaylists"]
   ];
   const collected = { videoId: video.id };
@@ -2062,7 +2066,7 @@ if (accessToken && analyticsChannelScope) {
       // One unavailable metric group must not erase data from other groups.
       const message = String(error?.message || error || "analytics_request_failed").slice(0, 180);
       const statusMatch = message.match(/(?:http|status)[_ ]?(\d{3})/i);
-      analyticsDiagnostics.push({ code: "analytics_report_error", group: metrics.join(","), httpStatus: Number(error?.status) || (statusMatch ? Number(statusMatch[1]) : null), message });
+      analyticsDiagnostics.push({ code: "analytics_report_error", group: metrics.join(","), httpStatus: Number(error?.status) || (statusMatch ? Number(statusMatch[1]) : null) });
       console.warn(`[TubeX video AI] Analytics metric group unavailable (${metrics.join(",")}):`, message);
     }
   }
@@ -2089,14 +2093,12 @@ if (accessToken && analyticsChannelScope) {
 
   // Optional additive analytics metric. It is deliberately isolated from
   // the existing VIDEO AI metrics so existing consumers keep the same shape.
-  if (accessToken && analyticsChannelScope) {
+  if (accessToken && analyticsChannelScope && analyticsDateRangeReady) {
     try {
       const evUrl = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
       evUrl.searchParams.set("ids", analyticsChannelScope);
-      evUrl.searchParams.set("startDate", snippet.publishedAt.slice(0, 10));
-      const evEnd = new Date();
-      evEnd.setDate(evEnd.getDate() - 1);
-      evUrl.searchParams.set("endDate", evEnd.toISOString().slice(0, 10));
+      evUrl.searchParams.set("startDate", analyticsStartDate);
+      evUrl.searchParams.set("endDate", analyticsEndDate);
       // The single-video filter scopes this report; no video dimension is needed.
       evUrl.searchParams.set("filters", `video==${video.id}`);
       evUrl.searchParams.set("metrics", "views,engagedViews");
@@ -2107,7 +2109,7 @@ if (accessToken && analyticsChannelScope) {
       const evJson = await evRes.json().catch(() => ({}));
       if (!evRes.ok) {
         const message = String(evJson?.error?.message || `youtube_analytics_http_${evRes.status}`).slice(0, 180);
-        analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews", httpStatus: evRes.status, message });
+        analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews", httpStatus: evRes.status });
         throw new Error(message);
       }
       const headers = Array.isArray(evJson?.columnHeaders)
@@ -2123,7 +2125,7 @@ if (accessToken && analyticsChannelScope) {
       else analyticsDiagnostics.push({ code: "analytics_report_ok", group: "views,engagedViews", httpStatus: evRes.status });
     } catch (error) {
       analytics.engagedViews = null;
-      if (!analyticsDiagnostics.some(item => item.group === "views,engagedViews" && item.code === "analytics_report_error")) analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews", message: String(error?.message || error || "analytics_request_failed").slice(0, 180) });
+      if (!analyticsDiagnostics.some(item => item.group === "views,engagedViews" && item.code === "analytics_report_error")) analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews" });
     }
   } else {
     analytics.engagedViews = null;

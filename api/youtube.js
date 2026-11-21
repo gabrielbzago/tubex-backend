@@ -764,6 +764,12 @@ async function tubexMcpAuthHandler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   const action = query(req, "oauth");
   try {
+    if (action === "openai-apps-challenge") {
+      const token = String(process.env.OPENAI_MCP_DOMAIN_VERIFICATION_TOKEN || "").trim();
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      if (!token) return res.status(503).send("Domain verification token is not configured");
+      return res.status(200).send(token);
+    }
     if (action === "protected-resource") return res.status(200).json(publicResourceMetadata());
     if (action === "metadata") return res.status(200).json(authorizationMetadata());
     if (action === "register") return await handleRegister(req, res);

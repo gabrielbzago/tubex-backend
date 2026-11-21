@@ -41,12 +41,16 @@ const YT_ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports";
 const TOOLS = [
   {
     name: "list_my_youtube_channels",
+    title: "Listar meus canais do YouTube",
     description: "Lista os canais do YouTube que a conta Google conectada pode administrar, com inscritos, views totais e quantidade de vídeos.",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     name: "get_my_channel_analytics",
+    title: "Consultar métricas do meu canal",
     description: "Consulta métricas oficiais do YouTube Analytics do canal conectado no período escolhido (7, 28 ou 90 dias).",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     inputSchema: {
       type: "object",
       properties: {
@@ -58,7 +62,9 @@ const TOOLS = [
   },
   {
     name: "get_public_youtube_channel",
+    title: "Consultar canal público do YouTube",
     description: "Busca os dados públicos de um canal do YouTube por @handle ou ID: inscritos, visualizações totais, vídeos recentes e informações do canal.",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
       properties: {
@@ -71,7 +77,9 @@ const TOOLS = [
   },
   {
     name: "search_public_youtube_videos",
+    title: "Pesquisar vídeos públicos do YouTube",
     description: "Pesquisa vídeos públicos no YouTube por palavra-chave e retorna título, canal, data e contagens públicas de views, likes e comentários.",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
       required: ["query"],
@@ -84,7 +92,9 @@ const TOOLS = [
   },
   {
     name: "compare_my_channel_with_public_channel",
+    title: "Comparar meu canal com outro canal",
     description: "Compara métricas do seu canal conectado com as métricas públicas de outro canal. Os dados privados vêm do YouTube Analytics; os dados do outro canal são públicos.",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
     inputSchema: {
       type: "object",
       required: ["competitor"],

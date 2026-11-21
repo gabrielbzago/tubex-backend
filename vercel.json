@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/.well-known/openai-apps-challenge",
+      "destination": "/api/api/youtube?oauth=openai-apps-challenge"
+    },
+    {
       "source": "/api/mcp",
       "destination": "/api/api/youtube?mcp=1"
     },

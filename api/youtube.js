@@ -530,6 +530,31 @@ function nameForLog(request) { return String(request?.params?.name || request?.m
 
 const FALLBACK_BASE = "https://tubex-backend.vercel.app";
 const MCP_AUTH_SCOPES = ["channel.read", "analytics.read", "public.youtube.read"];
+// ChatGPT may include standard OIDC scopes and, depending on the connector
+// registration flow, Google API scopes in the authorization request. The MCP
+// authorization server must translate those provider scopes to TubeX scopes
+// before validating/storing the grant.
+const OIDC_IDENTITY_SCOPES = new Set(["openid", "email", "profile"]);
+const GOOGLE_SCOPE_TO_MCP = {
+  "https://www.googleapis.com/auth/youtube.readonly": ["channel.read", "public.youtube.read"],
+  "https://www.googleapis.com/auth/yt-analytics.readonly": ["channel.read", "analytics.read"]
+};
+function normalizeMcpScopes(requested) {
+  const normalized = new Set();
+  for (const scope of requested) {
+    if (OIDC_IDENTITY_SCOPES.has(scope)) continue;
+    if (MCP_AUTH_SCOPES.includes(scope)) {
+      normalized.add(scope);
+      continue;
+    }
+    const mapped = GOOGLE_SCOPE_TO_MCP[scope];
+    if (!mapped) return null;
+    for (const mcpScope of mapped) normalized.add(mcpScope);
+  }
+  // Retain the prior behavior for clients that omit scopes or send only
+  // identity scopes: the initial account connection can authorize all tools.
+  return normalized.size ? [...normalized] : [...MCP_AUTH_SCOPES];
+}
 function googleScopesFor(mcpScopes) {
   const scopes = ["openid", "email"];
   if (mcpScopes.includes("channel.read") || mcpScopes.includes("analytics.read")) scopes.push("https://www.googleapis.com/auth/youtube.readonly");
@@ -653,7 +678,7 @@ function publicResourceMetadata() {
   return {
     resource: resource(),
     authorization_servers: [issuer()],
-    scopes_supported: MCP_AUTH_SCOPES,
+    scopes_supported: [...MCP_AUTH_SCOPES, ...OIDC_IDENTITY_SCOPES, ...Object.keys(GOOGLE_SCOPE_TO_MCP)],
     bearer_methods_supported: ["header"],
     resource_documentation: "https://www.tubex.app.br"
   };
@@ -671,7 +696,7 @@ function authorizationMetadata() {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
-    scopes_supported: MCP_AUTH_SCOPES,
+    scopes_supported: [...MCP_AUTH_SCOPES, ...OIDC_IDENTITY_SCOPES, ...Object.keys(GOOGLE_SCOPE_TO_MCP)],
     authorization_response_iss_parameter_supported: true
   };
 }
@@ -717,8 +742,8 @@ async function handleAuthorize(req, res) {
   const requestedResource = query(req, "resource");
   if (requestedResource && requestedResource !== resource()) return oauthError(res, 400, "invalid_target", "resource must identify the TubeX MCP server");
   const requestedScopes = query(req, "scope").split(/\s+/).filter(Boolean);
-  const scopes = requestedScopes.length ? [...new Set(requestedScopes)] : MCP_AUTH_SCOPES;
-  if (scopes.some(scope => !MCP_AUTH_SCOPES.includes(scope))) return oauthError(res, 400, "invalid_scope");
+  const scopes = normalizeMcpScopes(requestedScopes.length ? [...new Set(requestedScopes)] : MCP_AUTH_SCOPES);
+  if (!scopes) return oauthError(res, 400, "invalid_scope");
   const nonce = randomGoogleState();
   await dbAdd(TABLE.transactions, {
     id: nonce,

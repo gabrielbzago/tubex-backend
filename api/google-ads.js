@@ -196,6 +196,38 @@ async function historicalMetrics(customerId, token, keywords) {
     includeAdultKeywords: false
   });
 }
+const adsRequestQueue = globalThis.__tubexAdsKeywordRequestQueue ||
+  (globalThis.__tubexAdsKeywordRequestQueue = new Map());
+const adsLastRequestAt = globalThis.__tubexAdsKeywordLastRequestAt ||
+  (globalThis.__tubexAdsKeywordLastRequestAt = new Map());
+async function throttledAdsRequest(customerId, requestFn) {
+  const key=String(customerId);
+  const previous=adsRequestQueue.get(key)||Promise.resolve();
+  let release;
+  const turn=new Promise(resolve=>{release=resolve;});
+  adsRequestQueue.set(key,turn);
+  await previous;
+  try {
+    for(let attempt=0;attempt<2;attempt++){
+      const wait=Math.max(0,1100-(Date.now()-(adsLastRequestAt.get(key)||0)));
+      if(wait)await new Promise(resolve=>setTimeout(resolve,wait));
+      try {
+        const result=await requestFn();
+        adsLastRequestAt.set(key,Date.now());
+        return result;
+      } catch(error) {
+        adsLastRequestAt.set(key,Date.now());
+        const throttled=Number(error?.status)===429||/RESOURCE_EXHAUSTED|rate.?limit/i.test(String(error?.adsCode||error?.message||''));
+        if(!throttled||attempt===1)throw error;
+        await new Promise(resolve=>setTimeout(resolve,1200));
+      }
+    }
+  } finally {
+    release();
+    if(adsRequestQueue.get(key)===turn)adsRequestQueue.delete(key);
+  }
+}
+
 async function keywordIdeas(customerId, token, keyword) {
   return adsFetch(`customers/${customerId}:generateKeywordIdeas`, token, {
     keywordSeed: { keywords: buildKeywordSeeds(keyword) },
@@ -258,10 +290,16 @@ export default async function handler(req, res) {
         // A métrica principal continua sendo EXCLUSIVAMENTE a correspondência
         // exata da frase digitada; as demais servem apenas para preencher ideias.
         const historicalSeeds = buildKeywordSeeds(keyword).slice(0, 10);
-        const [historyResponse, ideasResponse] = await Promise.all([
-          historicalMetrics(customerId, token, historicalSeeds),
-          keywordIdeas(customerId, token, keyword)
-        ]);
+        // KeywordPlanIdeaService is limited to 1 request/second per customer ID.
+        // Serialize both calls and retry one transient RESOURCE_EXHAUSTED response.
+        const historyResponse = await throttledAdsRequest(
+          customerId,
+          () => historicalMetrics(customerId, token, historicalSeeds)
+        );
+        const ideasResponse = await throttledAdsRequest(
+          customerId,
+          () => keywordIdeas(customerId, token, keyword)
+        );
         const historyResults = Array.isArray(historyResponse.results) ? historyResponse.results : [];
         const ideaResults = Array.isArray(ideasResponse.results) ? ideasResponse.results : [];
 

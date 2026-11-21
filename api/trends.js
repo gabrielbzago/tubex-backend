@@ -16,6 +16,8 @@ const CACHE_VERSION = "v7";
 const cache =
   globalThis.__tubexGoogleTrendsCacheV2 ||
   (globalThis.__tubexGoogleTrendsCacheV2 = new Map());
+const rateLimitState = globalThis.__tubexGoogleTrendsRateLimit ||
+  (globalThis.__tubexGoogleTrendsRateLimit = { until: 0 });
 
 function stripXssi(text) {
   return String(text || "")
@@ -138,14 +140,13 @@ async function requestJson(url, options = {}) {
     await response.text();
 
   if (!response.ok) {
-    const detail = text
-      .replace(/^\\s+|\\s+$/g, "")
-      .slice(0, 300);
-
-    throw new Error(
-      `Google Trends HTTP ${response.status}` +
-      (detail ? `: ${detail}` : "")
+    const error = new Error(
+      response.status === 429
+        ? "Google Trends limitou temporariamente as consultas. Aguarde cerca de 1 minuto."
+        : `Google Trends HTTP ${response.status}`
     );
+    error.status = response.status;
+    throw error;
   }
 
   let json;
@@ -327,9 +328,13 @@ async function requestJsonText(
     await response.text();
 
   if (!response.ok) {
-    throw new Error(
-      `Google Trends warmup HTTP ${response.status}`
+    const error = new Error(
+      response.status === 429
+        ? "Google Trends limitou temporariamente as consultas. Aguarde cerca de 1 minuto."
+        : `Google Trends warmup HTTP ${response.status}`
     );
+    error.status = response.status;
+    throw error;
   }
 
   return {
@@ -502,6 +507,11 @@ async function fetchGoogleTrend(
         error?.message || error
       );
 
+      if(Number(error?.status)===429||/HTTP 429|too many requests|rate.?limit/i.test(String(error?.message||''))){
+        lastError=Object.assign(error,{status:429});
+        break;
+      }
+
       if(attempt < attempts){
         const waitMs =
           range === "30d"
@@ -516,6 +526,8 @@ async function fetchGoogleTrend(
       }
     }
   }
+
+  if(Number(lastError?.status)===429){throw lastError;}
 
   // Important: 7d and 30d now get the same real-data fallback
   // previously reserved for 12m. No zeros and no synthetic values.
@@ -652,6 +664,11 @@ export default async function handler(req, res) {
       });
     }
 
+    if(rateLimitState.until>Date.now()){
+      res.setHeader("Retry-After","60");
+      return res.status(429).json({success:false,error:"trends_rate_limited",rateLimited:true,message:"Google Trends limitou consultas temporariamente. Aguarde cerca de 1 minuto."});
+    }
+
     const trend =
       await fetchGoogleTrend(
         keyword,
@@ -705,6 +722,13 @@ export default async function handler(req, res) {
     const message =
       error?.message ||
       "google_trends_failed";
+    const rateLimited=Number(error?.status)===429||/HTTP 429|too many requests|rate.?limit/i.test(String(message));
+    if(rateLimited){
+      rateLimitState.until=Date.now()+60_000;
+      res.setHeader("Retry-After","60");
+      const data={success:false,error:"trends_rate_limited",rateLimited:true,message:"Google Trends limitou consultas temporariamente. Aguarde cerca de 1 minuto."};
+      return res.status(429).json(data);
+    }
 
     const status =
       message.includes("dados suficientes") ||

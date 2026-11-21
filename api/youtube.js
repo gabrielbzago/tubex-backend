@@ -44,7 +44,28 @@ const TOOLS = [
     title: "Listar meus canais do YouTube",
     description: "Lista os canais do YouTube que a conta Google conectada pode administrar, com inscritos, views totais e quantidade de vídeos.",
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    outputSchema: {
+      type: "object",
+      properties: {
+        channels: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              channelId: { type: "string" }, title: { type: "string" }, handle: { type: "string" },
+              description: { type: "string" }, publishedAt: { type: "string" }, country: { type: "string" },
+              subscribers: { type: "number" }, totalViews: { type: "number" }, videoCount: { type: "number" },
+              hiddenSubscriberCount: { type: "boolean" }
+            },
+            required: ["channelId", "title", "subscribers", "totalViews", "videoCount"],
+            additionalProperties: true
+          }
+        }
+      },
+      required: ["channels"],
+      additionalProperties: false
+    }
   },
   {
     name: "get_my_channel_analytics",
@@ -58,7 +79,8 @@ const TOOLS = [
         days: { type: "integer", enum: [7, 28, 90], description: "Período em dias, padrão 28." }
       },
       additionalProperties: false
-    }
+    },
+    outputSchema: { type: "object", additionalProperties: true }
   },
   {
     name: "get_public_youtube_channel",
@@ -73,7 +95,8 @@ const TOOLS = [
         recentVideos: { type: "integer", minimum: 0, maximum: 10, description: "Quantidade de vídeos recentes (padrão 5)." }
       },
       additionalProperties: false
-    }
+    },
+    outputSchema: { type: "object", additionalProperties: true }
   },
   {
     name: "search_public_youtube_videos",
@@ -88,7 +111,8 @@ const TOOLS = [
         maxResults: { type: "integer", minimum: 1, maximum: 10, description: "Quantidade de vídeos (padrão 5)." }
       },
       additionalProperties: false
-    }
+    },
+    outputSchema: { type: "object", additionalProperties: true }
   },
   {
     name: "compare_my_channel_with_public_channel",
@@ -104,7 +128,8 @@ const TOOLS = [
         days: { type: "integer", enum: [7, 28, 90], description: "Período das métricas privadas do seu canal, padrão 28." }
       },
       additionalProperties: false
-    }
+    },
+    outputSchema: { type: "object", additionalProperties: true }
   }
 ];
 
@@ -334,7 +359,7 @@ async function executeTool(name, input, grant) {
   if (requiredScopes.some(scope => !scopes.includes(scope))) throw new Error("required_scope_not_granted");
   const googleToken = requiredScopes.includes("channel.read") ? await googleAccessToken(grant) : null;
   if (name === "list_my_youtube_channels") {
-    return (await listOwnedChannels(googleToken)).map(({ uploadsPlaylistId, ...channel }) => channel);
+    return { channels: (await listOwnedChannels(googleToken)).map(({ uploadsPlaylistId, ...channel }) => channel) };
   }
   if (name === "get_my_channel_analytics") {
     const days = [7, 28, 90].includes(Number(input.days)) ? Number(input.days) : 28;

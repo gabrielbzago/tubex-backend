@@ -34,11 +34,39 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEq
 const MCP_VERSION = "2025-06-18";
 const SERVICE_URL = "https://tubex-backend.vercel.app";
 const RESOURCE_URL = `${SERVICE_URL}/api/mcp`;
+const TUBEX_APP_URI = "ui://tubex/sidebar.html";
+const TUBEX_SIDEBAR_HTML = String.raw`<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TubeX</title>
+<style>
+:root{color-scheme:light dark;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--background,#101010);color:var(--foreground,#f4f4f4)}.wrap{max-width:980px;margin:0 auto}.top{display:flex;align-items:center;gap:14px;margin-bottom:22px}.mark{width:46px;height:46px;flex:none}.top h1{font-size:24px;margin:0}.top p{margin:2px 0 0;color:#aaa}.hero,.panel,.card{border:1px solid #383838;border-radius:16px;background:#171717}.hero{padding:22px;margin-bottom:18px}.hero h2{font-size:21px;margin:0 0 6px}.hero p{color:#bbb;margin:0 0 18px}.actions{display:flex;flex-wrap:wrap;gap:10px}button{font:inherit;cursor:pointer;border:1px solid #555;border-radius:999px;padding:10px 16px;background:#282828;color:#f5f5f5}button.primary{background:#f2c300;color:#151515;border-color:#f2c300;font-weight:700}button:hover{filter:brightness(1.12)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:12px}.card,.panel{padding:16px}.card h3{margin:0 0 8px;font-size:17px}.stats{display:flex;gap:14px;flex-wrap:wrap;color:#ccc;font-size:13px;margin:8px 0 14px}.muted{color:#aaa}.section{margin:22px 0 10px;font-size:18px}.forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.form{display:flex;gap:8px;margin-top:12px}input{min-width:0;flex:1;border-radius:10px;border:1px solid #555;padding:10px 12px;background:#111;color:#fff;font:inherit}.status{margin:16px 0;color:#ddd;white-space:pre-wrap}.error{color:#ff8c82}.empty{color:#aaa;padding:12px 0}.result{overflow-wrap:anywhere;color:#ddd}.badge{display:inline-block;border-radius:999px;padding:2px 9px;background:#333;color:#eee;font-size:12px}@media(prefers-color-scheme:light){body{--background:#fff;--foreground:#161616}.hero,.panel,.card{background:#fafafa;border-color:#ddd}button{background:#eee;color:#111;border-color:#ccc}input{background:#fff;color:#111;border-color:#bbb}.stats,.result{color:#444}.muted,.empty{color:#666}.status{color:#333}}
+</style></head><body><main class="wrap">
+<header class="top"><svg class="mark" viewBox="0 0 64 64" role="img" aria-label="TubeX"><path fill="#f2c300" d="M32 2 60 17v30L32 62 4 47V17z"/><path fill="#d4a900" d="M32 2v30L4 17z"/><path fill="#b58f00" d="M32 32v30L4 47V17z"/><path fill="#171717" d="M14 21h19v5h-7v20h-6V26h-6zm20 0h7l4 7 4-7h7l-7 11 7 14h-7l-4-8-4 8h-7l7-14z"/></svg><div><h1>TubeX</h1><p>Métricas e pesquisa no YouTube</p></div></header>
+<section class="hero"><h2>Seu YouTube, com contexto</h2><p>Consulte seus canais autorizados, veja métricas oficiais e pesquise canais e vídeos públicos.</p><div class="actions"><button class="primary" id="loadChannels">Conectar Google e listar canais</button><button id="analyzeFirst">Analisar meu canal</button></div></section>
+<div id="status" class="status" aria-live="polite"></div><section id="channelsSection" hidden><h2 class="section">Seus canais</h2><div id="channels" class="grid"></div></section>
+<section class="forms"><article class="panel"><h2 class="section">Pesquisar vídeos</h2><p class="muted">Encontre vídeos públicos por tema.</p><form id="videoForm" class="form"><input id="videoQuery" minlength="2" maxlength="120" placeholder="Ex.: crescimento no YouTube" required><button class="primary">Buscar</button></form></article><article class="panel"><h2 class="section">Analisar canal público</h2><p class="muted">Pesquise por @handle ou ID do canal.</p><form id="channelForm" class="form"><input id="channelQuery" placeholder="@canal ou ID" required><button class="primary">Consultar</button></form></article></section>
+<section id="resultsSection" hidden><h2 class="section" id="resultsTitle">Resultados</h2><div id="results" class="grid"></div></section><p class="muted"><span class="badge">Somente leitura</span> Métricas privadas exigem autorização Google. Os dados de outros canais são públicos.</p>
+</main><script>
+const $=id=>document.getElementById(id);const statusEl=$("status");function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}function fmt(n){const v=Number(n);return Number.isFinite(v)?new Intl.NumberFormat("pt-BR").format(v):"—"}function setStatus(text,error){statusEl.textContent=text||"";statusEl.className="status"+(error?" error":"")}function unwrap(r){if(r&&r.structuredContent)return r.structuredContent;if(r&&r.result&&r.result.structuredContent)return r.result.structuredContent;const list=(r&&r.content)||(r&&r.result&&r.result.content)||[];const t=list.find(x=>x.type==="text")?.text;if(t){try{return JSON.parse(t)}catch{return {message:t}}}return r||{}}
+async function callTool(name,args){if(!window.openai||typeof window.openai.callTool!=="function")throw new Error("Abra o TubeX pela conexão MCP no ChatGPT para usar as ferramentas.");const r=await window.openai.callTool(name,args||{});if(r&&r.isError)throw new Error((r.content||[]).map(x=>x.text||"").join("\n")||"A ferramenta retornou um erro.");return unwrap(r)}
+function showChannels(channels){$("channels").innerHTML="";$("channelsSection").hidden=false;if(!channels.length){$("channels").innerHTML='<p class="empty">Nenhum canal foi retornado pela conta autorizada.</p>';return}for(const c of channels){const el=document.createElement("article");el.className="card";el.innerHTML='<h3>'+esc(c.title||"Canal do YouTube")+'</h3><div class="muted">'+esc(c.handle||c.channelId||"")+'</div><div class="stats"><span>'+fmt(c.subscribers)+' inscritos</span><span>'+fmt(c.totalViews)+' visualizações</span><span>'+fmt(c.videoCount)+' vídeos</span></div><button class="primary" data-channel="'+esc(c.channelId)+'">Ver métricas</button>';el.querySelector("button").addEventListener("click",()=>loadAnalytics(c.channelId));$("channels").appendChild(el)}}
+async function loadChannels(){try{setStatus("Consultando os canais da conta Google…");const d=await callTool("list_my_youtube_channels",{});showChannels(Array.isArray(d.channels)?d.channels:[]);setStatus("")}catch(e){setStatus(e.message,true)}}async function loadAnalytics(channelId){try{setStatus("Carregando métricas oficiais…");const d=await callTool("get_my_channel_analytics",{channelId:channelId,days:28});$("resultsTitle").textContent="Métricas dos últimos 28 dias";$("results").innerHTML='<article class="card"><h3>'+esc(d.channel?.title||"Canal")+'</h3><div class="stats">'+Object.entries(d.metrics||{}).map(([k,v])=>'<span>'+esc(k)+': <b>'+fmt(v)+'</b></span>').join("")+'</div><p class="muted">Fonte: YouTube Analytics</p></article>';$("resultsSection").hidden=false;setStatus("")}catch(e){setStatus(e.message,true)}}
+async function submitVideos(e){e.preventDefault();try{setStatus("Pesquisando vídeos públicos…");const d=await callTool("search_public_youtube_videos",{query:$("videoQuery").value.trim(),maxResults:5});const items=d.videos||[];$("resultsTitle").textContent="Vídeos encontrados";$("results").innerHTML=items.length?items.map(v=>'<article class="card"><h3>'+esc(v.title)+'</h3><p class="muted">'+esc(v.channelTitle)+' · '+fmt(v.views)+' visualizações</p><p class="result">'+esc(v.publishedAt||"")+'</p></article>').join(""):'<p class="empty">Nenhum vídeo encontrado.</p>';$("resultsSection").hidden=false;setStatus("")}catch(e){setStatus(e.message,true)}}
+async function submitChannel(e){e.preventDefault();try{setStatus("Consultando dados públicos do canal…");const d=await callTool("get_public_youtube_channel",{handle:$("channelQuery").value.trim(),recentVideos:5});const c=d.channel||{};$("resultsTitle").textContent="Canal público";$("results").innerHTML='<article class="card"><h3>'+esc(c.title)+'</h3><p class="muted">'+esc(c.handle||c.channelId||"")+'</p><div class="stats"><span>'+fmt(c.subscribers)+' inscritos</span><span>'+fmt(c.totalViews)+' views totais</span><span>'+fmt(c.videoCount)+' vídeos</span></div><p class="result">'+esc(c.description||"")+'</p></article>'+(d.recentVideos||[]).map(v=>'<article class="card"><h3>'+esc(v.title)+'</h3><div class="muted">'+fmt(v.views)+' views</div></article>').join("");$("resultsSection").hidden=false;setStatus("")}catch(e){setStatus(e.message,true)}}
+$("loadChannels").addEventListener("click",loadChannels);$("analyzeFirst").addEventListener("click",async()=>{if($("channelsSection").hidden){await loadChannels();return}const b=document.querySelector("[data-channel]");if(b)await loadAnalytics(b.dataset.channel);else setStatus("Nenhum canal disponível para analisar.",true)});$("videoForm").addEventListener("submit",submitVideos);$("channelForm").addEventListener("submit",submitChannel);
+</script></body></html>`;
 const AUTH_METADATA_URL = `${SERVICE_URL}/.well-known/oauth-authorization-server`;
 const YT_API = "https://www.googleapis.com/youtube/v3";
 const YT_ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports";
 
 const TOOLS = [
+  {
+    name: "open_tubex_dashboard",
+    title: "Abrir TubeX",
+    description: "Abre o painel TubeX na barra lateral do ChatGPT para listar canais, consultar métricas e pesquisar conteúdo público do YouTube.",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    outputSchema: { type: "object", properties: { ready: { type: "boolean" } }, required: ["ready"], additionalProperties: false }
+  },
   {
     name: "list_my_youtube_channels",
     title: "Listar meus canais do YouTube",
@@ -134,6 +162,7 @@ const TOOLS = [
 ];
 
 const TOOL_REQUIRED_SCOPES = {
+  open_tubex_dashboard: [],
   list_my_youtube_channels: ["channel.read"],
   get_my_channel_analytics: ["channel.read", "analytics.read"],
   get_public_youtube_channel: [],
@@ -144,7 +173,11 @@ for (const tool of TOOLS) {
   const scopes = TOOL_REQUIRED_SCOPES[tool.name] || [];
   tool._meta = {
     ...(tool._meta || {}),
-    securitySchemes: scopes.length ? [{ type: "oauth2", scopes }] : [{ type: "noauth" }]
+    securitySchemes: scopes.length ? [{ type: "oauth2", scopes }] : [{ type: "noauth" }],
+    ...(tool.name === "open_tubex_dashboard" ? {
+      ui: { resourceUri: TUBEX_APP_URI },
+      "openai/ui": { entrypoints: [{ type: "global" }] }
+    } : {})
   };
 }
 
@@ -358,6 +391,7 @@ async function executeTool(name, input, grant) {
   const requiredScopes = TOOL_REQUIRED_SCOPES[name] || [];
   if (requiredScopes.some(scope => !scopes.includes(scope))) throw new Error("required_scope_not_granted");
   const googleToken = requiredScopes.includes("channel.read") ? await googleAccessToken(grant) : null;
+  if (name === "open_tubex_dashboard") return { ready: true };
   if (name === "list_my_youtube_channels") {
     return { channels: (await listOwnedChannels(googleToken)).map(({ uploadsPlaylistId, ...channel }) => channel) };
   }
@@ -421,12 +455,42 @@ async function tubexMcpHandler(req, res) {
     if (request.method === "initialize") {
       return res.status(200).json(jsonRpc(request.id, {
         protocolVersion: MCP_VERSION,
-        capabilities: { tools: {} },
-        serverInfo: { name: "TubeX MCP", version: "1.0.0" },
+        capabilities: {
+          tools: {},
+          resources: {},
+          extensions: { "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] } }
+        },
+        serverInfo: { name: "TubeX MCP", version: "1.0.8" },
         instructions: "Use os dados públicos da YouTube Data API e, para o canal autorizado, métricas privadas da YouTube Analytics API. Sempre diferencie métricas de terceiros (públicas e acumuladas) das métricas privadas do canal conectado."
       }));
     }
     if (request.method === "ping") return res.status(200).json(jsonRpc(request.id, {}));
+    if (request.method === "resources/list") {
+      return res.status(200).json(jsonRpc(request.id, {
+        resources: [{
+          uri: TUBEX_APP_URI,
+          name: "Painel TubeX",
+          title: "Painel TubeX",
+          description: "Painel lateral para canais, métricas e pesquisa pública do YouTube.",
+          mimeType: "text/html;profile=mcp-app"
+        }]
+      }));
+    }
+    if (request.method === "resources/read") {
+      const uri = String(request.params?.uri || "");
+      if (uri !== TUBEX_APP_URI) return res.status(200).json(rpcError(request.id, -32602, "Resource not found"));
+      return res.status(200).json(jsonRpc(request.id, {
+        contents: [{
+          uri: TUBEX_APP_URI,
+          mimeType: "text/html;profile=mcp-app",
+          text: TUBEX_SIDEBAR_HTML,
+          _meta: {
+            ui: { csp: { resourceDomains: [], connectDomains: [] } },
+            "openai/ui": { preferredDisplayMode: "fullscreen", availableDisplayModes: ["fullscreen"] }
+          }
+        }]
+      }));
+    }
     if (request.method === "tools/list") {
       return res.status(200).json(jsonRpc(request.id, { tools: TOOLS }));
     }

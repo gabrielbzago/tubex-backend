@@ -2185,6 +2185,7 @@ Cada resposta deve parecer uma consultoria de alto nível.
 DADOS DO VÍDEO
 ========================================================
 
+Diagnóstico da consulta do Analytics: ${JSON.stringify(youtube.analyticsDiagnostics || [])}
 Título:
 ${youtube.title || "Não informado"}
 
@@ -3221,7 +3222,7 @@ tipo === "tituloSEO" || tipo === "tituloSEO_panel"
 
 ? [
 
-    "video_analysis_v3",
+    "video_analysis_v4",
 
     String(youtube.videoId || youtube.id || "unknown-video"),
 
@@ -3239,7 +3240,9 @@ tipo === "tituloSEO" || tipo === "tituloSEO_panel"
 
     youtube.averageViewDuration ?? "na",
 
-    youtube.estimatedMinutesWatched ?? "na"
+    youtube.estimatedMinutesWatched ?? "na",
+
+    JSON.stringify(youtube.analyticsDiagnostics || [])
 
 ].join("|")
 
@@ -4014,15 +4017,31 @@ if (tipo === "video_analysis") {
         const metricsSufficient = impressions != null && impressions > 0 && ctr != null &&
           (retention != null || averageDuration != null);
 
+        const analyticsDiagnostics = Array.isArray(youtube.analyticsDiagnostics) ? youtube.analyticsDiagnostics : [];
+        const analyticsErrors = analyticsDiagnostics.filter(item => item?.code === "analytics_report_error");
+        const emptyReports = analyticsDiagnostics.filter(item => item?.code === "analytics_empty_report");
+        const analyticsFailureText = analyticsErrors.length
+          ? analyticsErrors.map(item => `${item.group || "Analytics"}${item.httpStatus ? ` (HTTP ${item.httpStatus})` : ""}: ${String(item.message || item.code).slice(0, 180)}`).join("; ")
+          : analyticsDiagnostics.some(item => item?.code === "analytics_token_missing")
+            ? "Nenhum token OAuth foi enviado à consulta do YouTube Analytics."
+            : emptyReports.length
+              ? `O Google aceitou a consulta, mas retornou relatório sem linhas para: ${emptyReports.map(item => item.group).join("; ")}.`
+              : "O backend não recebeu diagnóstico da consulta do Analytics.";
+
         parsed.diagnostic = available.length
-          ? `Métricas confirmadas deste vídeo: ${available.join("; ")}.`
-          : "O YouTube Analytics não retornou métricas privadas para este vídeo nesta consulta.";
+          ? `Métricas confirmadas deste vídeo: ${available.join("; ")}.` + (analyticsDiagnostics.length ? ` Status Analytics: ${analyticsFailureText}` : "")
+          : `O YouTube Analytics não retornou métricas privadas para este vídeo. ${analyticsFailureText}`;
         parsed.bottleneck = metricsSufficient
           ? "Nenhum gargalo pode ser confirmado sem comparar estas métricas com uma referência válida do canal ou uma meta definida."
           : "Dados insuficientes para apontar um gargalo: faltam impressões, CTR ou retenção/duração média deste vídeo.";
+        const authFailure = analyticsErrors.some(item => item.httpStatus === 401 || item.httpStatus === 403) || analyticsDiagnostics.some(item => item?.code === "analytics_token_missing");
         parsed.nextAction = metricsSufficient
           ? "Compare CTR e retenção deste vídeo com vídeos do mesmo canal e duração semelhante antes de alterar título ou miniatura."
-          : "Aguarde o processamento do Analytics ou reconecte a conta e execute a análise novamente. Não altere título ou miniatura com base em métricas ausentes.";
+          : authFailure
+            ? `Falha de autorização do Analytics (${analyticsFailureText}). Reconecte o Google com acesso ao YouTube Analytics e confirme o canal dono deste vídeo.`
+            : emptyReports.length
+              ? `O Google não retornou linhas para este vídeo (${analyticsFailureText}). Confirme que o canal selecionado é o proprietário e tente novamente após o processamento.`
+              : `Consulta do Analytics sem dados suficientes (${analyticsFailureText}). Não altere título ou miniatura usando métricas ausentes.`;
         parsed.opportunity = "Nenhuma oportunidade específica foi confirmada; é necessário comparar os dados do vídeo com uma referência válida do canal.";
         parsed.prediction = "Não estimada: não há comparação validada que sustente uma previsão.";
         parsed.expectedImpact = { text: "Não estimado: o impacto de uma alteração exige teste e comparação com dados deste canal." };

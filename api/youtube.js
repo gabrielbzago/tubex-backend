@@ -1992,6 +1992,12 @@ console.log("================================");
 // YOUTUBE ANALYTICS
 // ======================================
 
+const analyticsChannelId = String(snippet.channelId || "").trim();
+const analyticsChannelScope = /^UC[A-Za-z0-9_-]{20,}$/.test(analyticsChannelId)
+  ? `channel==${analyticsChannelId}`
+  : null;
+
+const analyticsDiagnostics = [];
 let analytics = {
 
     ctr: null,
@@ -2008,18 +2014,12 @@ let analytics = {
 
 };
 
-console.log("================================");
-console.log("ACCESS TOKEN:", !!accessToken);
-console.log(
-    accessToken
-        ? accessToken.substring(0, 20) + "..."
-        : "TOKEN NULO"
-);
-console.log("================================");
+if (!accessToken) analyticsDiagnostics.push({ code: "analytics_token_missing" });
+if (accessToken && !analyticsChannelScope) analyticsDiagnostics.push({ code: "video_channel_id_missing" });
 
-console.log("Entrou no bloco Analytics?", !!accessToken);
+// Do not write OAuth credentials or token fragments to production logs.
 
-if (accessToken) {
+if (accessToken && analyticsChannelScope) {
   const startDate = String(snippet.publishedAt || "").slice(0, 10);
   const end = new Date();
   end.setUTCDate(end.getUTCDate() - 3); // Wait for Analytics processing to settle.
@@ -2035,27 +2035,35 @@ if (accessToken) {
   for (const metrics of reports) {
     try {
       const reportUrl = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
-      reportUrl.searchParams.set("ids", "channel==MINE");
+      reportUrl.searchParams.set("ids", analyticsChannelScope);
       reportUrl.searchParams.set("startDate", startDate);
       reportUrl.searchParams.set("endDate", endDate);
-      reportUrl.searchParams.set("dimensions", "video");
+      // A single-video basic report uses the video filter without a video dimension.
       reportUrl.searchParams.set("filters", `video==${video.id}`);
       reportUrl.searchParams.set("metrics", metrics.join(","));
       const response = await fetch(reportUrl.toString(), { headers: { Authorization: `Bearer ${accessToken}` } });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error?.message || `youtube_analytics_http_${response.status}`);
+      if (!response.ok) { const error = new Error(payload?.error?.message || `youtube_analytics_http_${response.status}`); error.status = response.status; throw error; }
       const headers = (payload?.columnHeaders || []).map(header => String(header?.name || ""));
       const rows = Array.isArray(payload?.rows) ? payload.rows : [];
       const videoColumn = headers.indexOf("video");
       const row = rows.find(candidate => videoColumn < 0 || String(candidate?.[videoColumn] || "") === String(video.id));
-      if (!row) continue;
+      const groupName = metrics.join(",");
+      if (!row) {
+        analyticsDiagnostics.push({ code: "analytics_empty_report", group: groupName, httpStatus: response.status });
+        continue;
+      }
+      analyticsDiagnostics.push({ code: "analytics_report_ok", group: groupName, httpStatus: response.status });
       for (const metric of metrics) {
         const column = headers.indexOf(metric);
         if (column >= 0) collected[metric] = number(row[column]);
       }
     } catch (error) {
       // One unavailable metric group must not erase data from other groups.
-      console.warn(`[TubeX video AI] Analytics metric group unavailable (${metrics.join(",")}):`, error?.message || error);
+      const message = String(error?.message || error || "analytics_request_failed").slice(0, 180);
+      const statusMatch = message.match(/(?:http|status)[_ ]?(\d{3})/i);
+      analyticsDiagnostics.push({ code: "analytics_report_error", group: metrics.join(","), httpStatus: Number(error?.status) || (statusMatch ? Number(statusMatch[1]) : null), message });
+      console.warn(`[TubeX video AI] Analytics metric group unavailable (${metrics.join(",")}):`, message);
     }
   }
   const rawCtr = number(collected.impressionClickThroughRate);
@@ -2074,21 +2082,22 @@ if (accessToken) {
     shares: collected.shares ?? null,
     playlistAdds: collected.videosAddedToPlaylists ?? null,
     startDate,
-    endDate
+    endDate,
+    analyticsDiagnostics
   };
 }
 
   // Optional additive analytics metric. It is deliberately isolated from
   // the existing VIDEO AI metrics so existing consumers keep the same shape.
-  if (accessToken) {
+  if (accessToken && analyticsChannelScope) {
     try {
       const evUrl = new URL("https://youtubeanalytics.googleapis.com/v2/reports");
-      evUrl.searchParams.set("ids", "channel==MINE");
+      evUrl.searchParams.set("ids", analyticsChannelScope);
       evUrl.searchParams.set("startDate", snippet.publishedAt.slice(0, 10));
       const evEnd = new Date();
       evEnd.setDate(evEnd.getDate() - 1);
       evUrl.searchParams.set("endDate", evEnd.toISOString().slice(0, 10));
-      evUrl.searchParams.set("dimensions", "video");
+      // The single-video filter scopes this report; no video dimension is needed.
       evUrl.searchParams.set("filters", `video==${video.id}`);
       evUrl.searchParams.set("metrics", "views,engagedViews");
 
@@ -2096,20 +2105,29 @@ if (accessToken) {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       const evJson = await evRes.json().catch(() => ({}));
+      if (!evRes.ok) {
+        const message = String(evJson?.error?.message || `youtube_analytics_http_${evRes.status}`).slice(0, 180);
+        analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews", httpStatus: evRes.status, message });
+        throw new Error(message);
+      }
       const headers = Array.isArray(evJson?.columnHeaders)
         ? evJson.columnHeaders.map(x => String(x?.name || ""))
         : [];
-      const row = Array.isArray(evJson?.rows) ? evJson.rows[0] : null;
+      const videoIndex = headers.indexOf("video");
+      const rows = Array.isArray(evJson?.rows) ? evJson.rows : [];
+      const row = rows.find(candidate => videoIndex < 0 || String(candidate?.[videoIndex] || "") === String(video.id));
       const engagedIndex = headers.indexOf("engagedViews");
-
-      analytics.engagedViews = row && engagedIndex >= 0
-        ? Number(row[engagedIndex] || 0)
-        : null;
-    } catch {
+      const rawEngaged = row && engagedIndex >= 0 && row[engagedIndex] != null ? Number(row[engagedIndex]) : NaN;
+      analytics.engagedViews = Number.isFinite(rawEngaged) && rawEngaged >= 0 ? rawEngaged : null;
+      if (!row) analyticsDiagnostics.push({ code: "analytics_empty_report", group: "views,engagedViews", httpStatus: evRes.status });
+      else analyticsDiagnostics.push({ code: "analytics_report_ok", group: "views,engagedViews", httpStatus: evRes.status });
+    } catch (error) {
       analytics.engagedViews = null;
+      if (!analyticsDiagnostics.some(item => item.group === "views,engagedViews" && item.code === "analytics_report_error")) analyticsDiagnostics.push({ code: "analytics_report_error", group: "views,engagedViews", message: String(error?.message || error || "analytics_request_failed").slice(0, 180) });
     }
   } else {
     analytics.engagedViews = null;
+    if (!analyticsChannelScope) console.warn("[TubeX video AI] Analytics skipped: video owner channel ID is unavailable.");
   }
 
   // ======================================
@@ -2421,6 +2439,8 @@ analytics.estimatedMinutesWatched,
 engagedViews:
 
 analytics.engagedViews ?? null,
+
+      analyticsDiagnostics: analytics.analyticsDiagnostics || analyticsDiagnostics,
 
       seo: {
 

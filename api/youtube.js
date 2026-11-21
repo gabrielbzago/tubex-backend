@@ -35,7 +35,6 @@ const MCP_VERSION = "2025-06-18";
 const SERVICE_URL = "https://tubex-backend.vercel.app";
 const RESOURCE_URL = `${SERVICE_URL}/api/mcp`;
 const AUTH_METADATA_URL = `${SERVICE_URL}/.well-known/oauth-authorization-server`;
-const OAUTH_SCOPES = "openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly";
 const YT_API = "https://www.googleapis.com/youtube/v3";
 const YT_ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports";
 
@@ -363,7 +362,9 @@ async function tubexMcpHandler(req, res) {
   }
   const token = bearer(req);
   if (!token) {
-    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", scope="${OAUTH_SCOPES}"`);
+    // Advertise TubeX's MCP scopes to ChatGPT. The Google API scopes are
+    // requested later by our server during the Google consent redirect.
+    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", scope="${MCP_AUTH_SCOPES.join(" ")}"`);
     return res.status(401).json({ error: "authorization_required" });
   }
   let grant;

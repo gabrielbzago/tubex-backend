@@ -558,7 +558,7 @@ function publicResourceMetadata() {
   };
 }
 function authorizationMetadata() {
-  const base = `${baseUrl()}/api/api/youtube`;
+  const base = `${baseUrl()}/api/youtube`;
   return {
     issuer: issuer(),
     authorization_endpoint: `${base}?oauth=authorize`,

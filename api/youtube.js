@@ -28,7 +28,765 @@ async function tubexFetchKeywordVolume(keyword) {
   };
 }
 
+import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+
+
+const MCP_VERSION = "2025-06-18";
+const SERVICE_URL = "https://tubex-backend.vercel.app";
+const RESOURCE_URL = `${SERVICE_URL}/api/mcp`;
+const AUTH_METADATA_URL = `${SERVICE_URL}/.well-known/oauth-authorization-server`;
+const OAUTH_SCOPES = "openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly";
+const YT_API = "https://www.googleapis.com/youtube/v3";
+const YT_ANALYTICS = "https://youtubeanalytics.googleapis.com/v2/reports";
+
+const TOOLS = [
+  {
+    name: "list_my_youtube_channels",
+    description: "Lista os canais do YouTube que a conta Google conectada pode administrar, com inscritos, views totais e quantidade de vídeos.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "get_my_channel_analytics",
+    description: "Consulta métricas oficiais do YouTube Analytics do canal conectado no período escolhido (7, 28 ou 90 dias).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        channelId: { type: "string", description: "ID de um dos canais listados por list_my_youtube_channels; opcional se a conta tiver um único canal." },
+        days: { type: "integer", enum: [7, 28, 90], description: "Período em dias, padrão 28." }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "get_public_youtube_channel",
+    description: "Busca os dados públicos de um canal do YouTube por @handle ou ID: inscritos, visualizações totais, vídeos recentes e informações do canal.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: { type: "string", description: "@handle do canal." },
+        channelId: { type: "string", description: "ID do canal." },
+        recentVideos: { type: "integer", minimum: 0, maximum: 10, description: "Quantidade de vídeos recentes (padrão 5)." }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "search_public_youtube_videos",
+    description: "Pesquisa vídeos públicos no YouTube por palavra-chave e retorna título, canal, data e contagens públicas de views, likes e comentários.",
+    inputSchema: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string", minLength: 2, maxLength: 120 },
+        maxResults: { type: "integer", minimum: 1, maximum: 10, description: "Quantidade de vídeos (padrão 5)." }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    name: "compare_my_channel_with_public_channel",
+    description: "Compara métricas do seu canal conectado com as métricas públicas de outro canal. Os dados privados vêm do YouTube Analytics; os dados do outro canal são públicos.",
+    inputSchema: {
+      type: "object",
+      required: ["competitor"],
+      properties: {
+        channelId: { type: "string", description: "ID de um canal seu; opcional se houver somente um canal." },
+        competitor: { type: "string", description: "@handle ou ID do canal público para comparar." },
+        days: { type: "integer", enum: [7, 28, 90], description: "Período das métricas privadas do seu canal, padrão 28." }
+      },
+      additionalProperties: false
+    }
+  }
+];
+
+function jsonRpc(id, result) { return { jsonrpc: "2.0", id, result }; }
+function rpcError(id, code, message, data) {
+  return { jsonrpc: "2.0", id, error: { code, message, ...(data ? { data } : {}) } };
+}
+function bodyOf(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch {} }
+  return {};
+}
+function bearer(req) {
+  const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || "";
+}
+function hash(value) { return createHash("sha256").update(String(value)).digest("hex"); }
+
+function requireEnv(name) {
+  const value = String(process.env[name] || "").trim();
+  if (!value) throw new Error(`server_config_missing:${name}`);
+  return value;
+}
+function supabaseHeaders(prefer = "") {
+  const key = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) };
+}
+function supabaseUrl(table, query = "") {
+  const base = requireEnv("SUPABASE_URL").replace(/\/$/, "");
+  return `${base}/rest/v1/${table}${query ? `?${query}` : ""}`;
+}
+async function dbSelect(table, query) {
+  const response = await fetch(supabaseUrl(table, query), { headers: supabaseHeaders() });
+  if (!response.ok) throw new Error(`mcp_storage_read_failed:${response.status}`);
+  return response.json();
+}
+async function dbInsert(table, row) {
+  const response = await fetch(supabaseUrl(table), { method: "POST", headers: supabaseHeaders("return=minimal"), body: JSON.stringify(row) });
+  if (!response.ok) throw new Error(`mcp_storage_write_failed:${response.status}`);
+}
+async function dbDelete(table, query) {
+  const response = await fetch(supabaseUrl(table, query), { method: "DELETE", headers: supabaseHeaders("return=minimal") });
+  if (!response.ok) throw new Error(`mcp_storage_delete_failed:${response.status}`);
+}
+async function dbUpdate(table, query, row) {
+  const response = await fetch(supabaseUrl(table, query), { method: "PATCH", headers: supabaseHeaders("return=minimal"), body: JSON.stringify(row) });
+  if (!response.ok) throw new Error(`mcp_storage_update_failed:${response.status}`);
+}
+
+async function findAccessToken(token) {
+  const digest = hash(token);
+  const rows = await dbSelect("mcp_access_tokens", `token_hash=eq.${digest}&resource=eq.${encodeURIComponent(RESOURCE_URL)}&select=grant_id,expires_at`);
+  const row = rows[0];
+  if (!row || Date.parse(row.expires_at) <= Date.now()) return null;
+  const grants = await dbSelect("mcp_oauth_grants", `id=eq.${encodeURIComponent(row.grant_id)}&revoked_at=is.null&select=id,email,encrypted_google_refresh_token,scopes`);
+  return grants[0] || null;
+}
+
+async function decryptRefreshToken(ciphertext) {
+  const { createDecipheriv, createHash: makeHash } = await import("node:crypto");
+  const key = makeHash("sha256").update(requireEnv("MCP_TOKEN_ENCRYPTION_KEY")).digest();
+  const [ivPart, tagPart, dataPart] = String(ciphertext || "").split(".");
+  if (!ivPart || !tagPart || !dataPart) throw new Error("mcp_refresh_token_invalid");
+  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivPart, "base64url"));
+  decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(dataPart, "base64url")), decipher.final()]).toString("utf8");
+}
+
+async function googleAccessToken(grant) {
+  const refreshToken = await decryptRefreshToken(grant.encrypted_google_refresh_token);
+  const form = new URLSearchParams({
+    client_id: requireEnv("GOOGLE_MCP_CLIENT_ID"),
+    client_secret: requireEnv("GOOGLE_MCP_CLIENT_SECRET"),
+    refresh_token: refreshToken,
+    grant_type: "refresh_token"
+  });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) throw new Error("google_reauthorization_required");
+  return data.access_token;
+}
+
+async function googleJson(url, token) {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = data?.error?.errors?.[0]?.reason || data?.error?.status || `http_${response.status}`;
+    throw new Error(`youtube_api_error:${error}`);
+  }
+  return data;
+}
+function dateDaysAgo(days) {
+  const date = new Date(Date.now() - days * 86400000);
+  return date.toISOString().slice(0, 10);
+}
+function publicApiKey() { return String(process.env.YOUTUBE_API_KEY || "").split(",")[0].trim(); }
+function channelShape(channel) {
+  const s = channel?.statistics || {};
+  return {
+    channelId: channel?.id || "",
+    title: channel?.snippet?.title || "",
+    handle: channel?.snippet?.customUrl || "",
+    description: String(channel?.snippet?.description || "").slice(0, 1200),
+    publishedAt: channel?.snippet?.publishedAt || "",
+    country: channel?.snippet?.country || "",
+    subscribers: Number(s.subscriberCount || 0),
+    totalViews: Number(s.viewCount || 0),
+    videoCount: Number(s.videoCount || 0),
+    hiddenSubscriberCount: !!s.hiddenSubscriberCount
+  };
+}
+async function publicChannel(identifier) {
+  const apiKey = publicApiKey();
+  if (!apiKey) throw new Error("youtube_api_unavailable");
+  const value = String(identifier || "").trim();
+  if (!value) throw new Error("channel_identifier_required");
+  const params = new URLSearchParams({ part: "snippet,statistics,contentDetails", key: apiKey });
+  if (/^UC[\w-]{20,}$/.test(value)) params.set("id", value);
+  else params.set("forHandle", value.replace(/^@/, ""));
+  const data = await fetch(`${YT_API}/channels?${params}`).then(r => r.json());
+  if (data.error) throw new Error(`youtube_api_error:${data.error.errors?.[0]?.reason || data.error.code || "unknown"}`);
+  const channel = data.items?.[0];
+  if (!channel) throw new Error("public_channel_not_found");
+  return channel;
+}
+async function recentPublicVideos(channel, count) {
+  const limit = Math.max(0, Math.min(10, Number(count ?? 5) || 0));
+  if (!limit) return [];
+  const key = publicApiKey();
+  const playlistId = channel?.contentDetails?.relatedPlaylists?.uploads;
+  if (!playlistId) return [];
+  const params = new URLSearchParams({ part: "snippet,contentDetails", playlistId, maxResults: String(limit), key });
+  const playlist = await fetch(`${YT_API}/playlistItems?${params}`).then(r => r.json());
+  if (playlist.error) throw new Error("youtube_api_error:recent_videos_unavailable");
+  const ids = (playlist.items || []).map(item => item.contentDetails?.videoId).filter(Boolean);
+  if (!ids.length) return [];
+  const videoParams = new URLSearchParams({ part: "snippet,statistics,contentDetails", id: ids.join(","), key });
+  const videos = await fetch(`${YT_API}/videos?${videoParams}`).then(r => r.json());
+  if (videos.error) throw new Error("youtube_api_error:video_stats_unavailable");
+  return (videos.items || []).map(video => ({
+    videoId: video.id,
+    title: video.snippet?.title || "",
+    publishedAt: video.snippet?.publishedAt || "",
+    duration: video.contentDetails?.duration || "",
+    views: Number(video.statistics?.viewCount || 0),
+    likes: Number(video.statistics?.likeCount || 0),
+    comments: Number(video.statistics?.commentCount || 0)
+  }));
+}
+async function listOwnedChannels(token) {
+  const params = new URLSearchParams({ part: "snippet,statistics,contentDetails", mine: "true", maxResults: "50" });
+  const data = await googleJson(`${YT_API}/channels?${params}`, token);
+  return (data.items || []).map(channel => ({ ...channelShape(channel), uploadsPlaylistId: channel.contentDetails?.relatedPlaylists?.uploads || "" }));
+}
+async function myAnalytics(token, channelId, days) {
+  const owned = await listOwnedChannels(token);
+  const channels = channelId ? owned.filter(channel => channel.channelId === channelId) : owned;
+  if (!channels.length) throw new Error(channelId ? "channel_not_authorized_for_google_account" : "no_youtube_channel_found");
+  if (channels.length > 1 && !channelId) return { chooseChannel: true, channels: channels.map(({ uploadsPlaylistId, ...channel }) => channel) };
+  const channel = channels[0];
+  const end = dateDaysAgo(1);
+  const start = dateDaysAgo(days);
+  const params = new URLSearchParams({
+    ids: `channel==${channel.channelId}`,
+    startDate: start,
+    endDate: end,
+    metrics: "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,subscribersGained,subscribersLost"
+  });
+  const analytics = await googleJson(`${YT_ANALYTICS}?${params}`, token);
+  return {
+    channel: { ...channel, uploadsPlaylistId: undefined },
+    period: { startDate: start, endDate: end, days },
+    metrics: Object.fromEntries((analytics.columnHeaders || []).map((header, i) => [header.name, analytics.rows?.[0]?.[i] ?? null])),
+    rows: analytics.rows || [],
+    dataSource: "YouTube Analytics API"
+  };
+}
+async function searchPublicVideos(query, maxResults) {
+  const key = publicApiKey();
+  if (!key) throw new Error("youtube_api_unavailable");
+  const params = new URLSearchParams({ part: "snippet", type: "video", q: query, maxResults: String(Math.max(1, Math.min(10, Number(maxResults || 5)))) , key });
+  const data = await fetch(`${YT_API}/search?${params}`).then(r => r.json());
+  if (data.error) throw new Error(`youtube_api_error:${data.error.errors?.[0]?.reason || "search_failed"}`);
+  const ids = (data.items || []).map(item => item.id?.videoId).filter(Boolean);
+  const result = { items: data.items || [] };
+  if (!ids.length) return [];
+  const videoParams = new URLSearchParams({ part: "statistics,contentDetails", id: ids.join(","), key });
+  const statsData = await fetch(`${YT_API}/videos?${videoParams}`).then(r => r.json());
+  const stats = new Map((statsData.items || []).map(item => [item.id, item]));
+  return result.items.map(item => {
+    const v = stats.get(item.id?.videoId);
+    return {
+      videoId: item.id?.videoId || "",
+      title: item.snippet?.title || "",
+      channelId: item.snippet?.channelId || "",
+      channelTitle: item.snippet?.channelTitle || "",
+      publishedAt: item.snippet?.publishedAt || "",
+      description: String(item.snippet?.description || "").slice(0, 300),
+      views: Number(v?.statistics?.viewCount || 0),
+      likes: Number(v?.statistics?.likeCount || 0),
+      comments: Number(v?.statistics?.commentCount || 0),
+      duration: v?.contentDetails?.duration || ""
+    };
+  });
+}
+
+async function executeTool(name, input, grant) {
+  const scopes = Array.isArray(grant.scopes) ? grant.scopes : [];
+  const requiredScopes = {
+    list_my_youtube_channels: ["channel.read"],
+    get_my_channel_analytics: ["channel.read", "analytics.read"],
+    get_public_youtube_channel: ["public.youtube.read"],
+    search_public_youtube_videos: ["public.youtube.read"],
+    compare_my_channel_with_public_channel: ["channel.read", "analytics.read", "public.youtube.read"]
+  }[name] || [];
+  if (requiredScopes.some(scope => !scopes.includes(scope))) throw new Error("required_scope_not_granted");
+  const googleToken = await googleAccessToken(grant);
+  if (name === "list_my_youtube_channels") {
+    return (await listOwnedChannels(googleToken)).map(({ uploadsPlaylistId, ...channel }) => channel);
+  }
+  if (name === "get_my_channel_analytics") {
+    const days = [7, 28, 90].includes(Number(input.days)) ? Number(input.days) : 28;
+    return myAnalytics(googleToken, String(input.channelId || "").trim(), days);
+  }
+  if (name === "get_public_youtube_channel") {
+    const identifier = input.channelId || input.handle;
+    if (!identifier) throw new Error("handle_or_channelId_required");
+    const channel = await publicChannel(identifier);
+    const { uploadsPlaylistId, ...safeChannel } = { ...channelShape(channel), uploadsPlaylistId: channel.contentDetails?.relatedPlaylists?.uploads || "" };
+    return { channel: safeChannel, recentVideos: await recentPublicVideos(channel, input.recentVideos ?? 5), dataSource: "YouTube Data API (dados públicos)" };
+  }
+  if (name === "search_public_youtube_videos") {
+    const query = String(input.query || "").trim();
+    if (query.length < 2 || query.length > 120) throw new Error("query_length_invalid");
+    return { query, dataSource: "YouTube Data API (dados públicos)", videos: await searchPublicVideos(query, input.maxResults) };
+  }
+  if (name === "compare_my_channel_with_public_channel") {
+    const identifier = String(input.competitor || "").trim();
+    if (!identifier) throw new Error("competitor_required");
+    const days = [7, 28, 90].includes(Number(input.days)) ? Number(input.days) : 28;
+    const [own, competitor] = await Promise.all([
+      myAnalytics(googleToken, String(input.channelId || "").trim(), days),
+      publicChannel(identifier)
+    ]);
+    if (own.chooseChannel) return { chooseChannel: true, ownChannels: own.channels, publicChannel: channelShape(competitor) };
+    const { uploadsPlaylistId, ...ownChannel } = own.channel;
+    return {
+      period: own.period,
+      ownChannel: { ...ownChannel, analytics: own.metrics },
+      publicChannel: channelShape(competitor),
+      comparisonNote: "Métricas do próprio canal vêm do YouTube Analytics no período indicado. Métricas do outro canal são contadores públicos acumulados; a API pública não expõe o Analytics privado de terceiros."
+    };
+  }
+  throw new Error("tool_not_found");
+}
+
+async function tubexMcpHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Vary", "Authorization");
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "method_not_allowed" });
+  }
+  const token = bearer(req);
+  if (!token) {
+    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", scope="${OAUTH_SCOPES}"`);
+    return res.status(401).json({ error: "authorization_required" });
+  }
+  let grant;
+  try { grant = await findAccessToken(token); }
+  catch (error) {
+    console.error("[TubeX MCP] token store unavailable", error?.message || error);
+    return res.status(503).json({ error: "authorization_service_unavailable" });
+  }
+  if (!grant) {
+    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", error="invalid_token"`);
+    return res.status(401).json({ error: "invalid_or_expired_token" });
+  }
+
+  const request = bodyOf(req);
+  if (request.jsonrpc !== "2.0" || !request.method) return res.status(400).json(rpcError(request.id ?? null, -32600, "Invalid Request"));
+  if (request.method === "notifications/initialized") return res.status(202).end();
+  if (!Object.prototype.hasOwnProperty.call(request, "id")) return res.status(202).end();
+  try {
+    if (request.method === "initialize") {
+      return res.status(200).json(jsonRpc(request.id, {
+        protocolVersion: MCP_VERSION,
+        capabilities: { tools: {} },
+        serverInfo: { name: "TubeX MCP", version: "1.0.0" },
+        instructions: "Use os dados públicos da YouTube Data API e, para o canal autorizado, métricas privadas da YouTube Analytics API. Sempre diferencie métricas de terceiros (públicas e acumuladas) das métricas privadas do canal conectado."
+      }));
+    }
+    if (request.method === "ping") return res.status(200).json(jsonRpc(request.id, {}));
+    if (request.method === "tools/list") {
+      const scopes = Array.isArray(grant.scopes) ? grant.scopes : [];
+      const tools = TOOLS.filter(tool => {
+        const required = {
+          list_my_youtube_channels: ["channel.read"],
+          get_my_channel_analytics: ["channel.read", "analytics.read"],
+          get_public_youtube_channel: ["public.youtube.read"],
+          search_public_youtube_videos: ["public.youtube.read"],
+          compare_my_channel_with_public_channel: ["channel.read", "analytics.read", "public.youtube.read"]
+        }[tool.name] || [];
+        return required.every(scope => scopes.includes(scope));
+      });
+      return res.status(200).json(jsonRpc(request.id, { tools }));
+    }
+    if (request.method === "tools/call") {
+      const name = String(request.params?.name || "");
+      const input = request.params?.arguments && typeof request.params.arguments === "object" ? request.params.arguments : {};
+      if (!TOOLS.some(tool => tool.name === name)) return res.status(200).json(jsonRpc(request.id, {
+        content: [{ type: "text", text: `Ferramenta desconhecida: ${name}` }], isError: true
+      }));
+      const output = await executeTool(name, input, grant);
+      return res.status(200).json(jsonRpc(request.id, {
+        content: [{ type: "text", text: JSON.stringify(output) }], structuredContent: output
+      }));
+    }
+    return res.status(200).json(rpcError(request.id, -32601, "Method not found"));
+  } catch (error) {
+    const message = String(error?.message || "tool_execution_failed");
+    console.error("[TubeX MCP] tool error", nameForLog(request), message);
+    return res.status(200).json(jsonRpc(request.id, { content: [{ type: "text", text: message }], isError: true }));
+  }
+}
+
+function nameForLog(request) { return String(request?.params?.name || request?.method || "unknown").slice(0, 64); }
+
+
+const FALLBACK_BASE = "https://tubex-backend.vercel.app";
+const MCP_AUTH_SCOPES = ["channel.read", "analytics.read", "public.youtube.read"];
+function googleScopesFor(mcpScopes) {
+  const scopes = ["openid", "email"];
+  if (mcpScopes.includes("channel.read") || mcpScopes.includes("analytics.read")) scopes.push("https://www.googleapis.com/auth/youtube.readonly");
+  if (mcpScopes.includes("analytics.read")) scopes.push("https://www.googleapis.com/auth/yt-analytics.readonly");
+  return scopes;
+}
+const TABLE = {
+  clients: "mcp_oauth_clients",
+  transactions: "mcp_oauth_transactions",
+  grants: "mcp_oauth_grants",
+  access: "mcp_access_tokens",
+  refresh: "mcp_refresh_tokens"
+};
+
+function baseUrl() { return String(process.env.MCP_PUBLIC_BASE_URL || FALLBACK_BASE).replace(/\/$/, ""); }
+function issuer() { return String(process.env.MCP_ISSUER || baseUrl()).replace(/\/$/, ""); }
+function resource() { return String(process.env.MCP_RESOURCE_URL || `${baseUrl()}/api/mcp`).replace(/\/$/, ""); }
+function randomId(bytes = 32) { return randomBytes(bytes).toString("base64url"); }
+function sha256(value) { return createHash("sha256").update(String(value)).digest("hex"); }
+function secret(name) {
+  const value = String(process.env[name] || "").trim();
+  if (!value) throw new Error(`server_config_missing:${name}`);
+  return value;
+}
+function dbHeaders(prefer = "") {
+  const key = secret("SUPABASE_SERVICE_ROLE_KEY");
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) };
+}
+function dbUrl(table, query = "") { return `${secret("SUPABASE_URL").replace(/\/$/, "")}/rest/v1/${table}${query ? `?${query}` : ""}`; }
+async function dbGet(table, query) {
+  const response = await fetch(dbUrl(table, query), { headers: dbHeaders() });
+  if (!response.ok) throw new Error(`mcp_storage_read_failed:${response.status}`);
+  return response.json();
+}
+async function dbAdd(table, row) {
+  const response = await fetch(dbUrl(table), { method: "POST", headers: dbHeaders("return=minimal"), body: JSON.stringify(row) });
+  if (!response.ok) throw new Error(`mcp_storage_write_failed:${response.status}`);
+}
+async function dbRemove(table, query) {
+  const response = await fetch(dbUrl(table, query), { method: "DELETE", headers: dbHeaders("return=minimal") });
+  if (!response.ok) throw new Error(`mcp_storage_delete_failed:${response.status}`);
+}
+async function dbDeleteReturning(table, query) {
+  const response = await fetch(dbUrl(table, query), { method: "DELETE", headers: dbHeaders("return=representation") });
+  if (!response.ok) throw new Error(`mcp_storage_delete_failed:${response.status}`);
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+async function dbPatch(table, query, row) {
+  const response = await fetch(dbUrl(table, query), { method: "PATCH", headers: dbHeaders("return=minimal"), body: JSON.stringify(row) });
+  if (!response.ok) throw new Error(`mcp_storage_update_failed:${response.status}`);
+}
+function encryptGoogleRefreshToken(plain) {
+  const key = createHash("sha256").update(secret("MCP_TOKEN_ENCRYPTION_KEY")).digest();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([cipher.update(String(plain), "utf8"), cipher.final()]);
+  return `${iv.toString("base64url")}.${cipher.getAuthTag().toString("base64url")}.${data.toString("base64url")}`;
+}
+function decryptGoogleRefreshToken(payload) {
+  const key = createHash("sha256").update(secret("MCP_TOKEN_ENCRYPTION_KEY")).digest();
+  const [iv, tag, encrypted] = String(payload || "").split(".");
+  if (!iv || !tag || !encrypted) throw new Error("mcp_google_token_invalid");
+  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64url"));
+  decipher.setAuthTag(Buffer.from(tag, "base64url"));
+  return Buffer.concat([decipher.update(Buffer.from(encrypted, "base64url")), decipher.final()]).toString("utf8");
+}
+function query(req, key) { return String(req.query?.[key] || new URL(req.url, baseUrl()).searchParams.get(key) || ""); }
+function parseBody(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") {
+    try { return JSON.parse(req.body); } catch {}
+    return Object.fromEntries(new URLSearchParams(req.body));
+  }
+  return {};
+}
+function redirectError(res, client, redirectUri, state, code) {
+  const target = new URL(redirectUri);
+  target.searchParams.set("error", code);
+  target.searchParams.set("state", state || "");
+  target.searchParams.set("iss", issuer());
+  return res.redirect(302, target.toString());
+}
+function validHttpsRedirect(uri) {
+  try {
+    const url = new URL(uri);
+    return url.protocol === "https:" && !url.username && !url.password && !url.hash;
+  } catch { return false; }
+}
+function oauthSafeEqual(a, b) {
+  const x = Buffer.from(String(a)); const y = Buffer.from(String(b));
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+async function consumeTransaction(id, kind) {
+  if (!id || !/^[A-Za-z0-9_-]{30,100}$/.test(id)) return null;
+  const row = await dbDeleteReturning(TABLE.transactions, `id=eq.${encodeURIComponent(id)}&kind=eq.${encodeURIComponent(kind)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=id,kind,payload,expires_at`);
+  if (!row) return null;
+  return row.payload || null;
+}
+async function findClient(clientId) {
+  const rows = await dbGet(TABLE.clients, `client_id=eq.${encodeURIComponent(clientId)}&select=client_id,client_name,redirect_uris,token_endpoint_auth_method`);
+  if (rows[0]) return rows[0];
+  // ChatGPT uses a Client ID Metadata Document. Only fetch OpenAI's published
+  // metadata document, never arbitrary client_id URLs, to prevent SSRF.
+  if (!/^https:\/\/chatgpt\.com\/oauth\/(?:client\.json|[A-Za-z0-9_-]+\/client\.json)$/.test(clientId)) return null;
+  const response = await fetch(clientId, { redirect: "error", headers: { Accept: "application/json" } });
+  if (!response.ok) return null;
+  const metadata = await response.json();
+  if (metadata.client_id !== clientId || !Array.isArray(metadata.redirect_uris) || !metadata.redirect_uris.length) return null;
+  return {
+    client_id: clientId,
+    client_name: String(metadata.client_name || "ChatGPT").slice(0, 100),
+    redirect_uris: metadata.redirect_uris,
+    token_endpoint_auth_method: String(metadata.token_endpoint_auth_method || "none")
+  };
+}
+function asForm(req) { return parseBody(req); }
+function codeChallenge(verifier) { return createHash("sha256").update(String(verifier)).digest("base64url"); }
+function randomGoogleState() { return randomId(32); }
+function publicResourceMetadata() {
+  return {
+    resource: resource(),
+    authorization_servers: [issuer()],
+    scopes_supported: MCP_AUTH_SCOPES,
+    bearer_methods_supported: ["header"],
+    resource_documentation: "https://www.tubex.app.br"
+  };
+}
+function authorizationMetadata() {
+  const base = `${baseUrl()}/api/api/youtube`;
+  return {
+    issuer: issuer(),
+    authorization_endpoint: `${base}?oauth=authorize`,
+    token_endpoint: `${base}?oauth=token`,
+    registration_endpoint: `${base}?oauth=register`,
+    revocation_endpoint: `${base}?oauth=revoke`,
+    response_types_supported: ["code"],
+    response_modes_supported: ["query"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["none"],
+    scopes_supported: MCP_AUTH_SCOPES,
+    authorization_response_iss_parameter_supported: true
+  };
+}
+function oauthError(res, status, error, description = "") {
+  return res.status(status).json({ error, ...(description ? { error_description: description } : {}) });
+}
+
+async function handleRegister(req, res) {
+  if (req.method !== "POST") return oauthError(res, 405, "invalid_request", "POST required");
+  const body = parseBody(req);
+  const redirects = Array.isArray(body.redirect_uris) ? body.redirect_uris.map(String) : [];
+  if (!redirects.length || redirects.length > 10 || redirects.some(uri => !validHttpsRedirect(uri))) return oauthError(res, 400, "invalid_redirect_uri");
+  const clientId = randomId(24);
+  const clientName = String(body.client_name || body.software_id || "MCP client").slice(0, 100);
+  await dbAdd(TABLE.clients, {
+    client_id: clientId,
+    client_name: clientName,
+    redirect_uris: redirects,
+    token_endpoint_auth_method: "none",
+    created_at: new Date().toISOString()
+  });
+  return res.status(201).json({
+    client_id: clientId,
+    client_name: clientName,
+    redirect_uris: redirects,
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    scope: MCP_AUTH_SCOPES.join(" ")
+  });
+}
+
+async function handleAuthorize(req, res) {
+  if (req.method !== "GET") return oauthError(res, 405, "invalid_request");
+  const clientId = query(req, "client_id");
+  const client = await findClient(clientId);
+  if (!client || client.token_endpoint_auth_method && client.token_endpoint_auth_method !== "none") return oauthError(res, 400, "invalid_client");
+  const redirectUri = query(req, "redirect_uri");
+  if (!client.redirect_uris?.includes(redirectUri)) return oauthError(res, 400, "invalid_request", "redirect_uri is not registered");
+  const state = query(req, "state");
+  const challenge = query(req, "code_challenge");
+  if (query(req, "response_type") !== "code" || query(req, "code_challenge_method") !== "S256" || !challenge || !state) return oauthError(res, 400, "invalid_request", "Authorization code with PKCE S256 and state is required");
+  const requestedResource = query(req, "resource");
+  if (requestedResource && requestedResource !== resource()) return oauthError(res, 400, "invalid_target", "resource must identify the TubeX MCP server");
+  const requestedScopes = query(req, "scope").split(/\s+/).filter(Boolean);
+  const scopes = requestedScopes.length ? [...new Set(requestedScopes)] : MCP_AUTH_SCOPES;
+  if (scopes.some(scope => !MCP_AUTH_SCOPES.includes(scope))) return oauthError(res, 400, "invalid_scope");
+  const nonce = randomGoogleState();
+  await dbAdd(TABLE.transactions, {
+    id: nonce,
+    kind: "google_authorization",
+    payload: { client_id: clientId, redirect_uri: redirectUri, state, code_challenge: challenge, scopes, resource: resource() },
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  });
+  const callback = `${baseUrl()}/api/mcp-google-callback`;
+  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.search = new URLSearchParams({
+    client_id: secret("GOOGLE_MCP_CLIENT_ID"),
+    redirect_uri: callback,
+    response_type: "code",
+    scope: googleScopesFor(scopes).join(" "),
+    access_type: "offline",
+    prompt: "consent",
+    include_granted_scopes: "true",
+    state: nonce
+  }).toString();
+  return res.redirect(302, url.toString());
+}
+
+async function handleGoogleCallback(req, res) {
+  const googleState = query(req, "state");
+  const pending = await consumeTransaction(googleState, "google_authorization");
+  if (!pending) return res.status(400).send("A autorização expirou. Volte ao ChatGPT ou Claude e conecte novamente.");
+  const googleError = query(req, "error");
+  if (googleError) return redirectError(res, null, pending.redirect_uri, pending.state, "access_denied");
+  const googleCode = query(req, "code");
+  if (!googleCode) return redirectError(res, null, pending.redirect_uri, pending.state, "invalid_grant");
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code: googleCode,
+      client_id: secret("GOOGLE_MCP_CLIENT_ID"),
+      client_secret: secret("GOOGLE_MCP_CLIENT_SECRET"),
+      redirect_uri: `${baseUrl()}/api/mcp-google-callback`,
+      grant_type: "authorization_code"
+    })
+  });
+  const token = await tokenResponse.json().catch(() => ({}));
+  if (!tokenResponse.ok || !token.access_token) return redirectError(res, null, pending.redirect_uri, pending.state, "invalid_grant");
+  const userResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` } });
+  const user = await userResponse.json().catch(() => ({}));
+  if (!userResponse.ok || !user.email) return redirectError(res, null, pending.redirect_uri, pending.state, "access_denied");
+  if (!token.refresh_token) return redirectError(res, null, pending.redirect_uri, pending.state, "consent_required");
+
+  const code = randomId(32);
+  await dbAdd(TABLE.transactions, {
+    id: code,
+    kind: "authorization_code",
+    payload: {
+      client_id: pending.client_id,
+      redirect_uri: pending.redirect_uri,
+      code_challenge: pending.code_challenge,
+      scopes: pending.scopes,
+      resource: pending.resource,
+      email: String(user.email).toLowerCase(),
+      encrypted_google_refresh_token: encryptGoogleRefreshToken(token.refresh_token)
+    },
+    expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  });
+  const redirect = new URL(pending.redirect_uri);
+  redirect.searchParams.set("code", code);
+  redirect.searchParams.set("state", pending.state);
+  redirect.searchParams.set("iss", issuer());
+  return res.redirect(302, redirect.toString());
+}
+
+async function issueTokens(grantId, clientId, resourceUrl, scopes, res) {
+  const accessToken = randomId(32);
+  const refreshToken = randomId(48);
+  const accessExpires = new Date(Date.now() + 15 * 60 * 1000);
+  const refreshExpires = new Date(Date.now() + 30 * 86400000);
+  await Promise.all([
+    dbAdd(TABLE.access, { token_hash: sha256(accessToken), grant_id: grantId, resource: resourceUrl, expires_at: accessExpires.toISOString() }),
+    dbAdd(TABLE.refresh, { token_hash: sha256(refreshToken), grant_id: grantId, client_id: clientId, resource: resourceUrl, expires_at: refreshExpires.toISOString() })
+  ]);
+  return res.status(200).json({
+    access_token: accessToken,
+    token_type: "Bearer",
+    expires_in: 900,
+    refresh_token: refreshToken,
+    refresh_token_expires_in: 2592000,
+    scope: scopes.join(" ")
+  });
+}
+
+async function handleToken(req, res) {
+  if (req.method !== "POST") return oauthError(res, 405, "invalid_request");
+  const body = asForm(req);
+  if (body.grant_type === "authorization_code") {
+    const row = await consumeTransaction(String(body.code || ""), "authorization_code");
+    if (!row) return oauthError(res, 400, "invalid_grant");
+    const verifier = String(body.code_verifier || "");
+    if (body.client_id !== row.client_id || body.redirect_uri !== row.redirect_uri || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || !oauthSafeEqual(codeChallenge(verifier), row.code_challenge)) return oauthError(res, 400, "invalid_grant");
+    const grantId = randomId(24);
+    await dbAdd(TABLE.grants, {
+      id: grantId,
+      client_id: row.client_id,
+      email: row.email,
+      encrypted_google_refresh_token: row.encrypted_google_refresh_token,
+      scopes: row.scopes,
+      resource: row.resource,
+      created_at: new Date().toISOString(),
+      revoked_at: null
+    });
+    return issueTokens(grantId, row.client_id, row.resource, row.scopes, res);
+  }
+  if (body.grant_type === "refresh_token") {
+    const oldHash = sha256(String(body.refresh_token || ""));
+    const old = await dbDeleteReturning(TABLE.refresh, `token_hash=eq.${oldHash}&client_id=eq.${encodeURIComponent(String(body.client_id || ""))}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=token_hash,grant_id,resource,expires_at`);
+    if (!old) return oauthError(res, 400, "invalid_grant");
+    const grants = await dbGet(TABLE.grants, `id=eq.${encodeURIComponent(old.grant_id)}&revoked_at=is.null&select=id,scopes`);
+    if (!grants[0]) return oauthError(res, 400, "invalid_grant");
+    return issueTokens(old.grant_id, String(body.client_id), old.resource, grants[0].scopes || [], res);
+  }
+  return oauthError(res, 400, "unsupported_grant_type");
+}
+
+async function handleRevoke(req, res) {
+  if (req.method !== "POST") return oauthError(res, 405, "invalid_request");
+  const body = asForm(req);
+  const value = String(body.token || "");
+  if (!value) return res.status(200).end();
+  const digest = sha256(value);
+  const access = await dbGet(TABLE.access, `token_hash=eq.${digest}&select=grant_id`);
+  const refresh = await dbGet(TABLE.refresh, `token_hash=eq.${digest}&select=grant_id`);
+  const grantId = access[0]?.grant_id || refresh[0]?.grant_id;
+  if (grantId) {
+    await dbPatch(TABLE.grants, `id=eq.${encodeURIComponent(grantId)}`, { revoked_at: new Date().toISOString() });
+    await Promise.all([
+      dbRemove(TABLE.access, `grant_id=eq.${encodeURIComponent(grantId)}`),
+      dbRemove(TABLE.refresh, `grant_id=eq.${encodeURIComponent(grantId)}`)
+    ]);
+  }
+  return res.status(200).end();
+}
+
+async function tubexMcpAuthHandler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  const action = query(req, "oauth");
+  try {
+    if (action === "protected-resource") return res.status(200).json(publicResourceMetadata());
+    if (action === "metadata") return res.status(200).json(authorizationMetadata());
+    if (action === "register") return await handleRegister(req, res);
+    if (action === "authorize") return await handleAuthorize(req, res);
+    if (action === "google-callback") return await handleGoogleCallback(req, res);
+    if (action === "token") return await handleToken(req, res);
+    if (action === "revoke") return await handleRevoke(req, res);
+    return res.status(404).json({ error: "oauth_route_not_found" });
+  } catch (error) {
+    console.error("[TubeX MCP OAuth]", action, error?.message || error);
+    if (action === "authorize" || action === "token" || action === "register" || action === "revoke") return oauthError(res, 500, "server_error");
+    if (action === "google-callback") return res.status(500).send("Não foi possível completar a autorização. Tente conectar novamente.");
+    return res.status(503).json({ error: "oauth_service_unavailable" });
+  }
+}
+
 export default async function handler(req, res) {
+
+  const routeUrl = new URL(req.url || "/", "https://tubex-backend.vercel.app");
+  const mcpMode = String(req.query?.mcp || routeUrl.searchParams.get("mcp") || "");
+  const oauthMode = String(req.query?.oauth || routeUrl.searchParams.get("oauth") || "");
+  if (mcpMode === "1") return tubexMcpHandler(req, res);
+  if (oauthMode) return tubexMcpAuthHandler(req, res);
 
   // =========================
   // 🔥 CORS

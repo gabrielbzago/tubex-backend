@@ -2075,7 +2075,23 @@ const endDate =
 
                 "averageViewDuration",
 
-                "averageViewPercentage"
+                "averageViewPercentage",
+
+                "impressions",
+
+                "impressionClickThroughRate",
+
+                "likes",
+
+                "comments",
+
+                "subscribersGained",
+
+                "subscribersLost",
+
+                "shares",
+
+                "playlistAdds"
 
             ].join(",");
 
@@ -2186,26 +2202,28 @@ if (!row) {
 }
 else {
 
+    const headers = (analyticsJson?.columnHeaders || []).map(header => String(header?.name || ""));
+    const metricValue = name => {
+        const column = headers.indexOf(name);
+        const value = column >= 0 ? row[column] : null;
+        const number = value == null || value === "" ? null : Number(value);
+        return Number.isFinite(number) ? number : null;
+    };
+    const rawCtr = metricValue("impressionClickThroughRate");
     analytics = {
-
-        videoId: row[0],
-
-        views:
-            Number(row[1] ?? 0),
-
-        estimatedMinutesWatched:
-            Number(row[2] ?? 0),
-
-        averageViewDuration:
-            Number(row[3] ?? 0),
-
-        averageViewPercentage:
-            Number(row[4] ?? -1),
-
-        impressions: null,
-
-        ctr: null
-
+        videoId: video.id,
+        views: metricValue("views"),
+        estimatedMinutesWatched: metricValue("estimatedMinutesWatched"),
+        averageViewDuration: metricValue("averageViewDuration"),
+        averageViewPercentage: metricValue("averageViewPercentage"),
+        impressions: metricValue("impressions"),
+        ctr: rawCtr == null ? null : rawCtr * 100,
+        likes: metricValue("likes"),
+        comments: metricValue("comments"),
+        subscribersGained: metricValue("subscribersGained"),
+        subscribersLost: metricValue("subscribersLost"),
+        shares: metricValue("shares"),
+        playlistAdds: metricValue("playlistAdds")
     };
 
     console.log(
@@ -2549,11 +2567,13 @@ else {
           ageDays
 
         ),
-ctr:
-    analytics.ctr ?? 0,
+ctr: analytics.ctr,
 
-impressions:
-    analytics.impressions ?? 0,
+impressions: analytics.impressions,
+
+shares: analytics.shares,
+
+playlistAdds: analytics.playlistAdds,
 
 averageViewDuration:
 

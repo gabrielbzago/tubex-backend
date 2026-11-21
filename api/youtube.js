@@ -98,6 +98,21 @@ const TOOLS = [
   }
 ];
 
+const TOOL_REQUIRED_SCOPES = {
+  list_my_youtube_channels: ["channel.read"],
+  get_my_channel_analytics: ["channel.read", "analytics.read"],
+  get_public_youtube_channel: [],
+  search_public_youtube_videos: [],
+  compare_my_channel_with_public_channel: ["channel.read", "analytics.read", "public.youtube.read"]
+};
+for (const tool of TOOLS) {
+  const scopes = TOOL_REQUIRED_SCOPES[tool.name] || [];
+  tool._meta = {
+    ...(tool._meta || {}),
+    securitySchemes: scopes.length ? [{ type: "oauth2", scopes }] : [{ type: "noauth" }]
+  };
+}
+
 function jsonRpc(id, result) { return { jsonrpc: "2.0", id, result }; }
 function rpcError(id, code, message, data) {
   return { jsonrpc: "2.0", id, error: { code, message, ...(data ? { data } : {}) } };
@@ -304,16 +319,10 @@ async function searchPublicVideos(query, maxResults) {
 }
 
 async function executeTool(name, input, grant) {
-  const scopes = Array.isArray(grant.scopes) ? grant.scopes : [];
-  const requiredScopes = {
-    list_my_youtube_channels: ["channel.read"],
-    get_my_channel_analytics: ["channel.read", "analytics.read"],
-    get_public_youtube_channel: ["public.youtube.read"],
-    search_public_youtube_videos: ["public.youtube.read"],
-    compare_my_channel_with_public_channel: ["channel.read", "analytics.read", "public.youtube.read"]
-  }[name] || [];
+  const scopes = Array.isArray(grant?.scopes) ? grant.scopes : [];
+  const requiredScopes = TOOL_REQUIRED_SCOPES[name] || [];
   if (requiredScopes.some(scope => !scopes.includes(scope))) throw new Error("required_scope_not_granted");
-  const googleToken = await googleAccessToken(grant);
+  const googleToken = requiredScopes.includes("channel.read") ? await googleAccessToken(grant) : null;
   if (name === "list_my_youtube_channels") {
     return (await listOwnedChannels(googleToken)).map(({ uploadsPlaylistId, ...channel }) => channel);
   }
@@ -360,28 +369,19 @@ async function tubexMcpHandler(req, res) {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "method_not_allowed" });
   }
-  const token = bearer(req);
-  if (!token) {
-    // Advertise TubeX's MCP scopes to ChatGPT. The Google API scopes are
-    // requested later by our server during the Google consent redirect.
-    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", scope="${MCP_AUTH_SCOPES.join(" ")}"`);
-    return res.status(401).json({ error: "authorization_required" });
-  }
-  let grant;
-  try { grant = await findAccessToken(token); }
-  catch (error) {
-    console.error("[TubeX MCP] token store unavailable", error?.message || error);
-    return res.status(503).json({ error: "authorization_service_unavailable" });
-  }
-  if (!grant) {
-    res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", error="invalid_token"`);
-    return res.status(401).json({ error: "invalid_or_expired_token" });
-  }
-
   const request = bodyOf(req);
   if (request.jsonrpc !== "2.0" || !request.method) return res.status(400).json(rpcError(request.id ?? null, -32600, "Invalid Request"));
   if (request.method === "notifications/initialized") return res.status(202).end();
   if (!Object.prototype.hasOwnProperty.call(request, "id")) return res.status(202).end();
+  let grant = null;
+  const token = bearer(req);
+  if (token) {
+    try { grant = await findAccessToken(token); }
+    catch (error) {
+      console.error("[TubeX MCP] token store unavailable", error?.message || error);
+      return res.status(503).json({ error: "authorization_service_unavailable" });
+    }
+  }
   try {
     if (request.method === "initialize") {
       return res.status(200).json(jsonRpc(request.id, {
@@ -393,18 +393,7 @@ async function tubexMcpHandler(req, res) {
     }
     if (request.method === "ping") return res.status(200).json(jsonRpc(request.id, {}));
     if (request.method === "tools/list") {
-      const scopes = Array.isArray(grant.scopes) ? grant.scopes : [];
-      const tools = TOOLS.filter(tool => {
-        const required = {
-          list_my_youtube_channels: ["channel.read"],
-          get_my_channel_analytics: ["channel.read", "analytics.read"],
-          get_public_youtube_channel: ["public.youtube.read"],
-          search_public_youtube_videos: ["public.youtube.read"],
-          compare_my_channel_with_public_channel: ["channel.read", "analytics.read", "public.youtube.read"]
-        }[tool.name] || [];
-        return required.every(scope => scopes.includes(scope));
-      });
-      return res.status(200).json(jsonRpc(request.id, { tools }));
+      return res.status(200).json(jsonRpc(request.id, { tools: TOOLS }));
     }
     if (request.method === "tools/call") {
       const name = String(request.params?.name || "");
@@ -412,6 +401,16 @@ async function tubexMcpHandler(req, res) {
       if (!TOOLS.some(tool => tool.name === name)) return res.status(200).json(jsonRpc(request.id, {
         content: [{ type: "text", text: `Ferramenta desconhecida: ${name}` }], isError: true
       }));
+      const requiredScopes = TOOL_REQUIRED_SCOPES[name] || [];
+      const grantedScopes = Array.isArray(grant?.scopes) ? grant.scopes : [];
+      if (requiredScopes.some(scope => !grantedScopes.includes(scope))) {
+        const challenge = `Bearer resource_metadata="${SERVICE_URL}/.well-known/oauth-protected-resource/api/mcp", error="insufficient_scope", error_description="Conecte sua conta Google para usar esta ferramenta."`;
+        return res.status(200).json(jsonRpc(request.id, {
+          content: [{ type: "text", text: "Conecte sua conta Google para acessar as métricas privadas do seu canal." }],
+          _meta: { "mcp/www_authenticate": [challenge] },
+          isError: true
+        }));
+      }
       const output = await executeTool(name, input, grant);
       return res.status(200).json(jsonRpc(request.id, {
         content: [{ type: "text", text: JSON.stringify(output) }], structuredContent: output

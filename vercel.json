@@ -1,4 +1,22 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/mcp",
+      "destination": "/api/api/youtube?mcp=1"
+    },
+    {
+      "source": "/api/mcp-google-callback",
+      "destination": "/api/api/youtube?oauth=google-callback"
+    },
+    {
+      "source": "/.well-known/oauth-protected-resource/api/mcp",
+      "destination": "/api/api/youtube?oauth=protected-resource"
+    },
+    {
+      "source": "/.well-known/oauth-authorization-server",
+      "destination": "/api/api/youtube?oauth=metadata"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

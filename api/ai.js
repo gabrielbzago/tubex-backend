@@ -3221,7 +3221,7 @@ tipo === "tituloSEO" || tipo === "tituloSEO_panel"
 
 ? [
 
-    "video_analysis_v2",
+    "video_analysis_v3",
 
     String(youtube.videoId || youtube.id || "unknown-video"),
 
@@ -3998,8 +3998,10 @@ if (tipo === "video_analysis") {
         const metric = value => value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
         const impressions = metric(youtube.impressions);
         const ctr = metric(youtube.ctr);
-        const retention = metric(youtube.averageViewPercentage);
-        const averageDuration = metric(youtube.averageViewDuration);
+        const rawRetention = metric(youtube.averageViewPercentage);
+        const retention = rawRetention != null && rawRetention >= 0 ? rawRetention : null;
+        const rawAverageDuration = metric(youtube.averageViewDuration);
+        const averageDuration = rawAverageDuration != null && rawAverageDuration > 0 ? rawAverageDuration : null;
         const minutesWatched = metric(youtube.estimatedMinutesWatched);
         const views = metric(youtube.views);
         const available = [];
@@ -4545,3 +4547,4 @@ if (tipo !== "seo_workspace") {
     });
   }
 }
+

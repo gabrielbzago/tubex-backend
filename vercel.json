@@ -2,23 +2,23 @@
   "rewrites": [
     {
       "source": "/.well-known/openai-apps-challenge",
-      "destination": "/api/api/youtube?oauth=openai-apps-challenge"
+      "destination": "/api/youtube?oauth=openai-apps-challenge"
     },
     {
       "source": "/api/mcp",
-      "destination": "/api/api/youtube?mcp=1"
+      "destination": "/api/youtube?mcp=1"
     },
     {
       "source": "/api/mcp-google-callback",
-      "destination": "/api/api/youtube?oauth=google-callback"
+      "destination": "/api/youtube?oauth=google-callback"
     },
     {
       "source": "/.well-known/oauth-protected-resource/api/mcp",
-      "destination": "/api/api/youtube?oauth=protected-resource"
+      "destination": "/api/youtube?oauth=protected-resource"
     },
     {
       "source": "/.well-known/oauth-authorization-server",
-      "destination": "/api/api/youtube?oauth=metadata"
+      "destination": "/api/youtube?oauth=metadata"
     }
   ],
   "headers": [

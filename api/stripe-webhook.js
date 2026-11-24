@@ -48,71 +48,6 @@ for (const plan of ENV_PLANS) {
   }
 }
 
-// Mapeia os seis Payment Links STRIPE_LINK_* aos Price IDs reais.
-// O webhook usa esse mapa para identificar plano e ciclo sem IDs hardcoded.
-let paymentLinkPriceMapPromise = null;
-
-function normalizePaymentLinkUrl(value) {
-  try {
-    const url = new URL(String(value || "").trim());
-    return `${url.origin}${url.pathname}`.replace(/\/$/, "");
-  } catch (_) {
-    return "";
-  }
-}
-
-async function hydratePriceMapFromPaymentLinks() {
-  if (paymentLinkPriceMapPromise) return paymentLinkPriceMapPromise;
-
-  paymentLinkPriceMapPromise = (async () => {
-    const configured = new Map();
-    for (const plan of ["start", "pro", "expert"]) {
-      for (const [suffix, billing_cycle] of [["MONTHLY", "monthly"], ["ANNUAL", "annual"]]) {
-        const envName = `STRIPE_LINK_${plan.toUpperCase()}_${suffix}`;
-        const envUrl = normalizePaymentLinkUrl(process.env[envName]);
-        if (envUrl) configured.set(envUrl, { plan, billing_cycle, envName });
-      }
-    }
-    if (!configured.size) return { links: 0, prices: 0 };
-
-    let startingAfter;
-    let matchedLinks = 0;
-    let mappedPrices = 0;
-    while (true) {
-      const page = await stripe.paymentLinks.list({
-        limit: 100, active: true,
-        ...(startingAfter ? { starting_after: startingAfter } : {})
-      });
-
-      for (const paymentLink of page.data || []) {
-        const config = configured.get(normalizePaymentLinkUrl(paymentLink.url));
-        if (!config) continue;
-        matchedLinks += 1;
-
-        const lineItems = await stripe.paymentLinks.listLineItems(paymentLink.id, { limit: 100 });
-        for (const item of lineItems.data || []) {
-          const priceId = typeof item.price === "string" ? item.price : item.price?.id;
-          if (!priceId) continue;
-          PRICE_MAP[priceId] = { plan: config.plan, billing_cycle: config.billing_cycle };
-          mappedPrices += 1;
-        }
-      }
-
-      if (!page.has_more || !page.data?.length) break;
-      startingAfter = page.data[page.data.length - 1].id;
-    }
-
-    console.log("[TubeX] Payment Links Stripe sincronizados", { matchedLinks, mappedPrices });
-    return { links: matchedLinks, prices: mappedPrices };
-  })().catch(err => {
-    console.error("[TubeX] Falha ao mapear Payment Links:", err?.message);
-    paymentLinkPriceMapPromise = null;
-    return { links: 0, prices: 0, error: err?.message };
-  });
-
-  return paymentLinkPriceMapPromise;
-}
-
 // Última rede de segurança: valor do preço em BRL (centavos) quando o Price ID
 // ainda não foi cadastrado na Vercel e o produto não tem metadata tubex_plan.
 const AMOUNT_MAP = {
@@ -163,6 +98,26 @@ function getProductFromSubscription(subscription) {
 }
 
 function getPriceConfig(subscription) {
+  // Metadados gravados pelo planoSB.js na Checkout Session e na assinatura
+  // têm prioridade: permitem manter STRIPE_LINK_* com Price IDs sem depender
+  // de um mapa manual de IDs no webhook.
+  const subscriptionMetaPlan = String(
+    subscription?.metadata?.tubex_plan || ""
+  ).toLowerCase().trim();
+  const subscriptionMetaCycle = String(
+    subscription?.metadata?.tubex_billing_cycle || ""
+  ).toLowerCase().trim();
+
+  if (KNOWN_PLANS.has(subscriptionMetaPlan)) {
+    const billing_cycle = ["annual", "anual", "year", "yearly"].includes(subscriptionMetaCycle)
+      ? "annual"
+      : ["monthly", "mensal", "month"].includes(subscriptionMetaCycle)
+        ? "monthly"
+        : (subscription?.items?.data?.[0]?.price?.recurring?.interval === "year"
+          ? "annual" : "monthly");
+    return { plan: subscriptionMetaPlan, billing_cycle };
+  }
+
   const priceId = getPriceIdFromSubscription(subscription);
   if (priceId && PRICE_MAP[priceId]) return PRICE_MAP[priceId];
 
@@ -171,35 +126,24 @@ function getPriceConfig(subscription) {
   const price = subscription?.items?.data?.[0]?.price || {};
   const product = typeof price.product === "object" ? price.product : null;
   const metaPlan = String(
-    subscription?.metadata?.tubex_plan ||
-    price?.metadata?.tubex_plan ||
-    product?.metadata?.tubex_plan ||
-    ""
-  ).toLowerCase().trim();
-  const metaCycle = String(
-    subscription?.metadata?.tubex_billing_cycle ||
-    price?.metadata?.tubex_billing_cycle ||
-    product?.metadata?.tubex_billing_cycle ||
-    ""
+    price?.metadata?.tubex_plan || product?.metadata?.tubex_plan || ""
   ).toLowerCase().trim();
   const currency = String(price?.currency || "").toLowerCase();
   const amountPlan = currency === "brl" ? AMOUNT_MAP[Number(price?.unit_amount)] || null : null;
   const fallbackPlan =
-    (KNOWN_PLANS.has(metaPlan) ? metaPlan : null) ||
     (productId ? PRODUCT_MAP[productId] || null : null) ||
+    (KNOWN_PLANS.has(metaPlan) ? metaPlan : null) ||
     amountPlan;
   if (!fallbackPlan) return null;
-  if (amountPlan && fallbackPlan === amountPlan && !metaPlan) {
-    console.warn(`[TubeX] Preço ${priceId || "?"} reconhecido pelo valor (${price?.unit_amount}). Cadastre-o em STRIPE_PRICE_${amountPlan.toUpperCase()}_* ou configure metadata tubex_plan no Payment Link.`);
+  if (amountPlan && fallbackPlan === amountPlan) {
+    console.warn(`[TubeX] Preço ${priceId || "?"} reconhecido pelo valor (${price?.unit_amount}). Cadastre-o em STRIPE_PRICE_${amountPlan.toUpperCase()}_*.`);
   }
 
   const interval = price?.recurring?.interval;
-  const billing_cycle = ["annual", "anual", "year", "yearly"].includes(metaCycle)
-    ? "annual"
-    : (metaCycle === "monthly" || metaCycle === "mensal")
-      ? "monthly"
-      : interval === "year" ? "annual" : "monthly";
-  return { plan: fallbackPlan, billing_cycle };
+  return {
+    plan: fallbackPlan,
+    billing_cycle: interval === "year" ? "annual" : "monthly"
+  };
 }
 
 function getPlanFromSubscription(subscription) {
@@ -954,9 +898,6 @@ export default async function handler(req, res) {
   });
 
   try {
-    // Vincula os seis STRIPE_LINK_* aos Price IDs antes de reconciliar assinaturas.
-    await hydratePriceMapFromPaymentLinks();
-
     switch (event.type) {
       case "checkout.session.completed":
       case "checkout.session.async_payment_succeeded":

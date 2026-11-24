@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
 // ======================================================
@@ -5,31 +6,33 @@ import { createClient } from "@supabase/supabase-js";
 // ======================================================
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-// ======================================================
-// CHECKOUT — os seis Payment Links são controlados pela Vercel.
-// GET /api/checkout?plan=start&cycle=monthly (rewrite -> /api/planoSB)
-// Ausência de variável gera erro; nunca troca silenciosamente o ciclo.
+  process.env.S// ======================================================
+// CHECKOUT — STRIPE PRICE IDs nas variáveis STRIPE_LINK_*
+// Os nomes STRIPE_LINK_* foram mantidos para não exigir recadastro.
+// O VALOR de cada variável deve ser um Price ID (price_...), não uma URL.
+// GET /api/checkout?plan=start&cycle=monthly
 // ======================================================
 const CHECKOUT_PLANS = new Set(["start", "pro", "expert"]);
 const CHECKOUT_CYCLES = new Set(["monthly", "annual"]);
+let stripeCheckoutClient = null;
 
-function checkoutLink(plan, cycle){
-  const key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
-  const link = String(process.env[key] || "").trim();
-  if (!link) return null;
-  try {
-    const parsed = new URL(link);
-    if (parsed.protocol !== "https:") return null;
-    return parsed.toString();
-  } catch (_) {
-    return null;
-  }
+function getStripeCheckoutClient(){
+  if (stripeCheckoutClient) return stripeCheckoutClient;
+  const secret = String(process.env.STRIPE_SECRET_KEY || "").trim();
+  if (!secret) return null;
+  // Stripe já é dependência do backend (também utilizada pelo webhook).
+  stripeCheckoutClient = new Stripe(secret);
+  return stripeCheckoutClient;
 }
 
-function handleCheckout(req, res){
+function checkoutPriceId(plan, cycle){
+  const key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
+  const value = String(process.env[key] || "").trim();
+  // As variáveis mantêm o nome STRIPE_LINK_*, mas agora armazenam Price IDs.
+  return /^price_[A-Za-z0-9]+$/.test(value) ? value : null;
+}
+
+async function handleCheckout(req, res){
   const q = req.query || {};
   let plan = String(q.plan || q.checkout || "").toLowerCase().trim();
   if (plan === "starter" || plan === "basic") plan = "start";
@@ -41,16 +44,20 @@ function handleCheckout(req, res){
   };
   const cycle = cycleAliases[rawCycle];
 
-  // Diagnóstico seguro: informa apenas se cada variável está configurada.
+  // Diagnóstico: informa apenas se há um Price ID válido; nunca revela o ID.
   if (q.config) {
     const configured = {};
     for (const p of CHECKOUT_PLANS) {
       for (const c of CHECKOUT_CYCLES) {
-        const key = `STRIPE_LINK_${p.toUpperCase()}_${c.toUpperCase()}`;
-        configured[`${p}_${c}`] = Boolean(checkoutLink(p, c));
+        configured[`${p}_${c}`] = Boolean(checkoutPriceId(p, c));
       }
     }
-    return res.status(200).json({ success: true, configured });
+    return res.status(200).json({
+      success: true,
+      configured,
+      checkout_mode: "stripe_checkout_session",
+      variable_values: "price_id"
+    });
   }
 
   res.setHeader("Cache-Control", "no-store");
@@ -66,34 +73,78 @@ function handleCheckout(req, res){
     });
   }
 
-  const target = checkoutLink(plan, cycle);
-  if (!target) {
+  const priceId = checkoutPriceId(plan, cycle);
+  if (!priceId) {
     const env_key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
-    console.error(`[TubeX Checkout] Variável ausente ou inválida: ${env_key}`);
+    console.error(`[TubeX Checkout] Price ID ausente ou inválido: ${env_key}`);
     return res.status(503).json({
-      success: false, error: "checkout_not_configured", plan, cycle,
-      missing_variable: env_key
+      success: false,
+      error: "checkout_price_not_configured",
+      plan,
+      cycle,
+      missing_or_invalid_variable: env_key,
+      expected_value: "price_..."
     });
   }
 
-  // Repassa e-mail e referência de afiliado ao Stripe Payment Link.
+  const stripe = getStripeCheckoutClient();
+  if (!stripe) {
+    console.error("[TubeX Checkout] STRIPE_SECRET_KEY não configurada.");
+    return res.status(503).json({
+      success: false,
+      error: "stripe_secret_not_configured"
+    });
+  }
+
+  // Stripe Checkout Sessions é criado no servidor. O Price ID nunca é
+  // enviado ao navegador como destino de redirecionamento.
   try {
-    const url = new URL(target);
     const email = String(q.email || q.prefilled_email || "").trim();
-    if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      url.searchParams.set("prefilled_email", email);
-    }
+    const validEmail = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email);
     const ref = String(q.ref || q.client_reference_id || "")
       .replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200);
-    if (ref) url.searchParams.set("client_reference_id", ref);
-    res.statusCode = 302;
-    res.setHeader("Location", url.toString());
+
+    const appUrl = String(
+      process.env.TUBEX_APP_URL || process.env.APP_URL || "https://tubexai.com.br"
+    ).trim().replace(/\\/+$/, "");
+
+    const metadata = {
+      tubex_plan: plan,
+      tubex_billing_cycle: cycle,
+      tubex_source: "tubex_checkout"
+    };
+    if (ref) metadata.affiliate_ref = ref;
+
+    const sessionParams = {
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/?checkout=cancelled`,
+      allow_promotion_codes: true,
+      metadata,
+      subscription_data: { metadata: { ...metadata } }
+    };
+
+    if (validEmail) sessionParams.customer_email = email;
+    if (ref) sessionParams.client_reference_id = ref;
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+    if (!session?.url) {
+      throw new Error("Stripe não retornou a URL da Checkout Session.");
+    }
+
+    res.statusCode = 303;
+    res.setHeader("Location", session.url);
     return res.end();
   } catch (err) {
-    console.error("[TubeX Checkout] URL inválida:", err?.message);
-    return res.status(503).json({ success: false, error: "invalid_checkout_url" });
+    console.error("[TubeX Checkout] Falha ao criar sessão:", err?.message || err);
+    return res.status(502).json({
+      success: false,
+      error: "stripe_checkout_session_failed"
+    });
   }
 }
+
 // Legend/Corporate (futuros): para versões da extensão que ainda não conhecem
 // o nome, o plano efetivo é "expert" e o nome real vai em tier_name.
 const EXPERT_EQUIVALENT_PLANS = new Set(["legend", "corporate"]);

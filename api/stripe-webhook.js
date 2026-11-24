@@ -35,6 +35,29 @@ const PRICE_MAP = {
   }
 };
 
+// Novos preços (Start, Pro/Expert R$29,90/R$49,90, Legend) entram pelas
+// variáveis da Vercel STRIPE_PRICE_<PLANO>_<MONTHLY|ANNUAL> (aceita vários
+// IDs separados por vírgula). Assim nenhum preço novo exige mudar código.
+const ENV_PLANS = ["start", "pro", "expert", "legend"];
+for (const plan of ENV_PLANS) {
+  for (const [suffix, billing_cycle] of [["MONTHLY", "monthly"], ["ANNUAL", "annual"]]) {
+    const raw = process.env[`STRIPE_PRICE_${plan.toUpperCase()}_${suffix}`] || "";
+    for (const id of raw.split(",").map(v => v.trim()).filter(Boolean)) {
+      PRICE_MAP[id] = { plan, billing_cycle };
+    }
+  }
+}
+
+// Última rede de segurança: valor do preço em BRL (centavos) quando o Price ID
+// ainda não foi cadastrado na Vercel e o produto não tem metadata tubex_plan.
+const AMOUNT_MAP = {
+  1990: "start", 19900: "start",
+  2990: "pro", 2999: "pro", 29900: "pro", 29990: "pro",
+  4990: "expert", 4999: "expert", 49900: "expert", 49990: "expert",
+  9990: "legend", 99900: "legend"
+};
+const KNOWN_PLANS = new Set(["start", "pro", "expert", "legend"]);
+
 // Product IDs antigos continuam reconhecidos como fallback,
 // mas nunca têm prioridade sobre o Price ID.
 const PRODUCT_MAP = {
@@ -50,7 +73,7 @@ const CRON_CONCURRENCY = 4;
 
 // Regra de segurança: nunca considerar "canceled" como plano pago.
 // O acesso pago somente é mantido para active/trialing/past_due/unpaid. 
-const PAID_PLANS = new Set(["pro", "expert", "start"]);
+const PAID_PLANS = new Set(["pro", "expert", "start", "legend"]);
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -80,10 +103,23 @@ function getPriceConfig(subscription) {
 
   // Compatibilidade com assinaturas antigas ainda vinculadas por Product ID.
   const productId = getProductFromSubscription(subscription);
-  const fallbackPlan = productId ? PRODUCT_MAP[productId] || null : null;
+  const price = subscription?.items?.data?.[0]?.price || {};
+  const product = typeof price.product === "object" ? price.product : null;
+  const metaPlan = String(
+    price?.metadata?.tubex_plan || product?.metadata?.tubex_plan || ""
+  ).toLowerCase().trim();
+  const currency = String(price?.currency || "").toLowerCase();
+  const amountPlan = currency === "brl" ? AMOUNT_MAP[Number(price?.unit_amount)] || null : null;
+  const fallbackPlan =
+    (productId ? PRODUCT_MAP[productId] || null : null) ||
+    (KNOWN_PLANS.has(metaPlan) ? metaPlan : null) ||
+    amountPlan;
   if (!fallbackPlan) return null;
+  if (amountPlan && fallbackPlan === amountPlan) {
+    console.warn(`[TubeX] Preço ${priceId || "?"} reconhecido pelo valor (${price?.unit_amount}). Cadastre-o em STRIPE_PRICE_${amountPlan.toUpperCase()}_*.`);
+  }
 
-  const interval = subscription?.items?.data?.[0]?.price?.recurring?.interval;
+  const interval = price?.recurring?.interval;
   return {
     plan: fallbackPlan,
     billing_cycle: interval === "year" ? "annual" : "monthly"

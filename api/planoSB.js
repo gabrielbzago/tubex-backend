@@ -9,6 +9,72 @@ const supabase = createClient(
 );
 
 // ======================================================
+// 💳 CHECKOUT — links de pagamento vêm das variáveis da Vercel
+// ------------------------------------------------------
+// GET /api/checkout?plan=start&cycle=monthly  (rewrite para /api/planoSB)
+// Extensão, site e dashboard apontam para cá; trocar um link no Stripe
+// é só mudar a variável STRIPE_LINK_<PLANO>_<CICLO> na Vercel.
+// Sem a variável, Pro e Expert caem nos links antigos (nada quebra);
+// Start/Legend sem variável vão para a página de planos.
+// ======================================================
+const CHECKOUT_FALLBACK_LINKS = {
+  pro_monthly: "https://buy.stripe.com/3cI7sK7058OtdzDaUegjC01",
+  pro_annual: "https://buy.stripe.com/28E3cudote8NgLPd2mgjC03",
+  expert_monthly: "https://buy.stripe.com/dRmaEW98dggV3Z3d2mgjC02",
+  expert_annual: "https://buy.stripe.com/28E8wO3NTe8N67b2nIgjC04"
+};
+const CHECKOUT_PLANS = new Set(["start", "pro", "expert", "legend"]);
+const PLANS_PAGE_URL = "https://tubexai.com.br/#planos";
+
+function checkoutLink(plan, cycle){
+  const envValue = process.env[`STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`];
+  const link = String(envValue || "").trim();
+  if (/^https:\/\//i.test(link)) return link;
+  return CHECKOUT_FALLBACK_LINKS[`${plan}_${cycle}`] || null;
+}
+
+function handleCheckout(req, res){
+  const q = req.query || {};
+  let plan = String(q.plan || q.checkout || "").toLowerCase().trim();
+  if (plan === "starter" || plan === "basic") plan = "start";
+  const cycle = /^(annual|anual|year|yearly)$/i.test(String(q.cycle || "")) ? "annual" : "monthly";
+
+  // ?config=1 → JSON com o que está configurado (sem expor nada sensível).
+  if (q.config) {
+    const out = {};
+    for (const p of CHECKOUT_PLANS) for (const c of ["monthly", "annual"]) {
+      out[`${p}_${c}`] = Boolean(String(process.env[`STRIPE_LINK_${p.toUpperCase()}_${c.toUpperCase()}`] || "").trim());
+    }
+    return res.status(200).json({ success: true, configured: out });
+  }
+
+  let target = CHECKOUT_PLANS.has(plan) ? checkoutLink(plan, cycle) : null;
+  if (!target && CHECKOUT_PLANS.has(plan) && cycle === "annual") target = checkoutLink(plan, "monthly");
+  if (!target) target = PLANS_PAGE_URL;
+
+  // Repassa e-mail e código de afiliado para o Payment Link (Stripe aceita estes parâmetros).
+  try {
+    const url = new URL(target);
+    if (url.hostname.endsWith("stripe.com")) {
+      const email = String(q.email || q.prefilled_email || "").trim();
+      if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) url.searchParams.set("prefilled_email", email);
+      const ref = String(q.ref || q.client_reference_id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200);
+      if (ref) url.searchParams.set("client_reference_id", ref);
+    }
+    target = url.toString();
+  } catch (_) {}
+
+  res.setHeader("Cache-Control", "no-store");
+  res.statusCode = 302;
+  res.setHeader("Location", target);
+  return res.end();
+}
+
+// Legend/Corporate (futuros): para versões da extensão que ainda não conhecem
+// o nome, o plano efetivo é "expert" e o nome real vai em tier_name.
+const EXPERT_EQUIVALENT_PLANS = new Set(["legend", "corporate"]);
+
+// ======================================================
 // 🚀 HANDLER
 // ======================================================
 export default async function handler(req, res){
@@ -30,6 +96,10 @@ export default async function handler(req, res){
   // ====================================================
   // 🚫 METHOD
   // ====================================================
+  if(req.method === "GET" && (req.query?.plan || req.query?.checkout || req.query?.config)){
+    return handleCheckout(req, res);
+  }
+
   if(req.method !== "POST"){
 
     return res.status(405).json({
@@ -144,9 +214,11 @@ console.log(
         error
       );
 
+      // Erro técnico: não sabemos o plano. success:false faz a extensão manter
+      // o plano em cache em vez de rebaixar o assinante para FREE.
       return res.status(200).json({
-        success:true,
-        plan:"free",
+        success:false,
+        error:"plan_lookup_failed",
         fallback:true
       });
 
@@ -247,18 +319,38 @@ if(!data){
       plan = "start";
     }
 
+    let tierName = plan;
+    if(EXPERT_EQUIVALENT_PLANS.has(plan)){
+      plan = "expert";
+    }
+
     const status = String(
       data.status || "inactive"
     )
     .toLowerCase()
     .trim();
 
+    // O plano owner é permanente e não depende do status de cobrança.
+    if (plan === "owner") {
+      return res.status(200).json({
+        success: true,
+        fallback: false,
+        email: data.email,
+        plan: "owner",
+        plano: "owner",
+        status: "active",
+        affiliate_code: data.affiliate_code || null,
+        stripe_customer_id: data.stripe_customer_id || null
+      });
+    }
+
     // ==================================================
     // 🚫 INACTIVE
     // ==================================================
+// trialing/past_due: assinatura ainda válida (teste ou Stripe tentando cobrar
+// de novo). O webhook já trata esses status como período de carência.
 if(
-  status !== "active" &&
-  status !== "approved"
+  !["active","approved","trialing","past_due"].includes(status)
 ){
 
   return res.status(200).json({
@@ -283,6 +375,7 @@ if(
 
       plan,
       plano:plan,
+      tier_name:tierName,
 
       status,
 
@@ -305,9 +398,8 @@ if(
     // 🔥 FAILSAFE
     // ================================================
     return res.status(200).json({
-      success:true,
-      plan:"free",
-      plano:"free",
+      success:false,
+      error:"plan_lookup_failed",
       fallback:true
     });
 

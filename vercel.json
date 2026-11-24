@@ -19,6 +19,10 @@
     {
       "source": "/.well-known/oauth-authorization-server",
       "destination": "/api/youtube?oauth=metadata"
+    },
+    {
+      "source": "/api/checkout",
+      "destination": "/api/planoSB"
     }
   ],
   "headers": [

@@ -6,10 +6,13 @@ import { createClient } from "@supabase/supabase-js";
 // ======================================================
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.S// ======================================================
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// ======================================================
 // CHECKOUT — STRIPE PRICE IDs nas variáveis STRIPE_LINK_*
-// Os nomes STRIPE_LINK_* foram mantidos para não exigir recadastro.
-// O VALOR de cada variável deve ser um Price ID (price_...), não uma URL.
+// Mantemos os nomes já cadastrados na Vercel para evitar recadastro.
+// O valor de cada variável deve ser um Price ID (price_...), não uma URL.
 // GET /api/checkout?plan=start&cycle=monthly
 // ======================================================
 const CHECKOUT_PLANS = new Set(["start", "pro", "expert"]);
@@ -20,7 +23,6 @@ function getStripeCheckoutClient(){
   if (stripeCheckoutClient) return stripeCheckoutClient;
   const secret = String(process.env.STRIPE_SECRET_KEY || "").trim();
   if (!secret) return null;
-  // Stripe já é dependência do backend (também utilizada pelo webhook).
   stripeCheckoutClient = new Stripe(secret);
   return stripeCheckoutClient;
 }
@@ -28,7 +30,6 @@ function getStripeCheckoutClient(){
 function checkoutPriceId(plan, cycle){
   const key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
   const value = String(process.env[key] || "").trim();
-  // As variáveis mantêm o nome STRIPE_LINK_*, mas agora armazenam Price IDs.
   return /^price_[A-Za-z0-9]+$/.test(value) ? value : null;
 }
 
@@ -44,7 +45,7 @@ async function handleCheckout(req, res){
   };
   const cycle = cycleAliases[rawCycle];
 
-  // Diagnóstico: informa apenas se há um Price ID válido; nunca revela o ID.
+  // Diagnóstico seguro: informa se há Price IDs válidos, sem revelar valores.
   if (q.config) {
     const configured = {};
     for (const p of CHECKOUT_PLANS) {
@@ -91,22 +92,19 @@ async function handleCheckout(req, res){
   if (!stripe) {
     console.error("[TubeX Checkout] STRIPE_SECRET_KEY não configurada.");
     return res.status(503).json({
-      success: false,
-      error: "stripe_secret_not_configured"
+      success: false, error: "stripe_secret_not_configured"
     });
   }
 
-  // Stripe Checkout Sessions é criado no servidor. O Price ID nunca é
-  // enviado ao navegador como destino de redirecionamento.
   try {
     const email = String(q.email || q.prefilled_email || "").trim();
-    const validEmail = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email);
+    const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
     const ref = String(q.ref || q.client_reference_id || "")
       .replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200);
 
     const appUrl = String(
       process.env.TUBEX_APP_URL || process.env.APP_URL || "https://tubexai.com.br"
-    ).trim().replace(/\\/+$/, "");
+    ).trim().replace(/\/+$/, "");
 
     const metadata = {
       tubex_plan: plan,
@@ -129,9 +127,7 @@ async function handleCheckout(req, res){
     if (ref) sessionParams.client_reference_id = ref;
 
     const session = await stripe.checkout.sessions.create(sessionParams);
-    if (!session?.url) {
-      throw new Error("Stripe não retornou a URL da Checkout Session.");
-    }
+    if (!session?.url) throw new Error("Stripe não retornou a URL da Checkout Session.");
 
     res.statusCode = 303;
     res.setHeader("Location", session.url);
@@ -139,12 +135,10 @@ async function handleCheckout(req, res){
   } catch (err) {
     console.error("[TubeX Checkout] Falha ao criar sessão:", err?.message || err);
     return res.status(502).json({
-      success: false,
-      error: "stripe_checkout_session_failed"
+      success: false, error: "stripe_checkout_session_failed"
     });
   }
 }
-
 // Legend/Corporate (futuros): para versões da extensão que ainda não conhecem
 // o nome, o plano efetivo é "expert" e o nome real vai em tier_name.
 const EXPERT_EQUIVALENT_PLANS = new Set(["legend", "corporate"]);

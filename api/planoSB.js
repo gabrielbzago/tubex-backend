@@ -9,67 +9,91 @@ const supabase = createClient(
 );
 
 // ======================================================
-// 💳 CHECKOUT — links de pagamento vêm das variáveis da Vercel
-// ------------------------------------------------------
-// GET /api/checkout?plan=start&cycle=monthly  (rewrite para /api/planoSB)
-// Extensão, site e dashboard apontam para cá; trocar um link no Stripe
-// é só mudar a variável STRIPE_LINK_<PLANO>_<CICLO> na Vercel.
-// Sem a variável, Pro e Expert caem nos links antigos (nada quebra);
-// Start/Legend sem variável vão para a página de planos.
+// CHECKOUT — os seis Payment Links são controlados pela Vercel.
+// GET /api/checkout?plan=start&cycle=monthly (rewrite -> /api/planoSB)
+// Ausência de variável gera erro; nunca troca silenciosamente o ciclo.
 // ======================================================
-const CHECKOUT_FALLBACK_LINKS = {
-  pro_monthly: "https://buy.stripe.com/3cI7sK7058OtdzDaUegjC01",
-  pro_annual: "https://buy.stripe.com/28E3cudote8NgLPd2mgjC03",
-  expert_monthly: "https://buy.stripe.com/dRmaEW98dggV3Z3d2mgjC02",
-  expert_annual: "https://buy.stripe.com/28E8wO3NTe8N67b2nIgjC04"
-};
-const CHECKOUT_PLANS = new Set(["start", "pro", "expert", "legend"]);
-const PLANS_PAGE_URL = "https://tubexai.com.br/#planos";
+const CHECKOUT_PLANS = new Set(["start", "pro", "expert"]);
+const CHECKOUT_CYCLES = new Set(["monthly", "annual"]);
 
 function checkoutLink(plan, cycle){
-  const envValue = process.env[`STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`];
-  const link = String(envValue || "").trim();
-  if (/^https:\/\//i.test(link)) return link;
-  return CHECKOUT_FALLBACK_LINKS[`${plan}_${cycle}`] || null;
+  const key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
+  const link = String(process.env[key] || "").trim();
+  if (!link) return null;
+  try {
+    const parsed = new URL(link);
+    if (parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch (_) {
+    return null;
+  }
 }
 
 function handleCheckout(req, res){
   const q = req.query || {};
   let plan = String(q.plan || q.checkout || "").toLowerCase().trim();
   if (plan === "starter" || plan === "basic") plan = "start";
-  const cycle = /^(annual|anual|year|yearly)$/i.test(String(q.cycle || "")) ? "annual" : "monthly";
 
-  // ?config=1 → JSON com o que está configurado (sem expor nada sensível).
+  const rawCycle = String(q.cycle || "monthly").toLowerCase().trim();
+  const cycleAliases = {
+    monthly: "monthly", month: "monthly", mensal: "monthly",
+    annual: "annual", anual: "annual", year: "annual", yearly: "annual"
+  };
+  const cycle = cycleAliases[rawCycle];
+
+  // Diagnóstico seguro: informa apenas se cada variável está configurada.
   if (q.config) {
-    const out = {};
-    for (const p of CHECKOUT_PLANS) for (const c of ["monthly", "annual"]) {
-      out[`${p}_${c}`] = Boolean(String(process.env[`STRIPE_LINK_${p.toUpperCase()}_${c.toUpperCase()}`] || "").trim());
+    const configured = {};
+    for (const p of CHECKOUT_PLANS) {
+      for (const c of CHECKOUT_CYCLES) {
+        const key = `STRIPE_LINK_${p.toUpperCase()}_${c.toUpperCase()}`;
+        configured[`${p}_${c}`] = Boolean(checkoutLink(p, c));
+      }
     }
-    return res.status(200).json({ success: true, configured: out });
+    return res.status(200).json({ success: true, configured });
   }
 
-  let target = CHECKOUT_PLANS.has(plan) ? checkoutLink(plan, cycle) : null;
-  if (!target && CHECKOUT_PLANS.has(plan) && cycle === "annual") target = checkoutLink(plan, "monthly");
-  if (!target) target = PLANS_PAGE_URL;
+  res.setHeader("Cache-Control", "no-store");
 
-  // Repassa e-mail e código de afiliado para o Payment Link (Stripe aceita estes parâmetros).
+  if (!CHECKOUT_PLANS.has(plan)) {
+    return res.status(400).json({
+      success: false, error: "invalid_plan", allowed_plans: [...CHECKOUT_PLANS]
+    });
+  }
+  if (!cycle) {
+    return res.status(400).json({
+      success: false, error: "invalid_billing_cycle", allowed_cycles: [...CHECKOUT_CYCLES]
+    });
+  }
+
+  const target = checkoutLink(plan, cycle);
+  if (!target) {
+    const env_key = `STRIPE_LINK_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
+    console.error(`[TubeX Checkout] Variável ausente ou inválida: ${env_key}`);
+    return res.status(503).json({
+      success: false, error: "checkout_not_configured", plan, cycle,
+      missing_variable: env_key
+    });
+  }
+
+  // Repassa e-mail e referência de afiliado ao Stripe Payment Link.
   try {
     const url = new URL(target);
-    if (url.hostname.endsWith("stripe.com")) {
-      const email = String(q.email || q.prefilled_email || "").trim();
-      if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) url.searchParams.set("prefilled_email", email);
-      const ref = String(q.ref || q.client_reference_id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200);
-      if (ref) url.searchParams.set("client_reference_id", ref);
+    const email = String(q.email || q.prefilled_email || "").trim();
+    if (email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      url.searchParams.set("prefilled_email", email);
     }
-    target = url.toString();
-  } catch (_) {}
-
-  res.setHeader("Cache-Control", "no-store");
-  res.statusCode = 302;
-  res.setHeader("Location", target);
-  return res.end();
+    const ref = String(q.ref || q.client_reference_id || "")
+      .replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200);
+    if (ref) url.searchParams.set("client_reference_id", ref);
+    res.statusCode = 302;
+    res.setHeader("Location", url.toString());
+    return res.end();
+  } catch (err) {
+    console.error("[TubeX Checkout] URL inválida:", err?.message);
+    return res.status(503).json({ success: false, error: "invalid_checkout_url" });
+  }
 }
-
 // Legend/Corporate (futuros): para versões da extensão que ainda não conhecem
 // o nome, o plano efetivo é "expert" e o nome real vai em tier_name.
 const EXPERT_EQUIVALENT_PLANS = new Set(["legend", "corporate"]);

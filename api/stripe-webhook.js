@@ -625,7 +625,100 @@ async function handleCheckoutCompleted(session) {
   });
 }
 
-async function handleSubscriptionEvent(subscription) {
+function escapeEmailHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[char]);
+}
+
+async function sendCancellationCompletionEmail(request) {
+  const apiKey = String(process.env.RESEND_API_KEY || "").trim();
+  const from = String(process.env.RESEND_FROM_EMAIL || "").trim();
+  const to = normalizeEmail(request?.account_email);
+
+  if (!apiKey || !from || !to) {
+    console.warn("[TubeX cancellation] E-mail final não enviado: RESEND_API_KEY, RESEND_FROM_EMAIL ou account_email ausente.");
+    return false;
+  }
+
+  const accessEndedAt = request.period_end
+    ? new Date(request.period_end).toLocaleString("pt-BR", {
+        dateStyle: "long", timeStyle: "short", timeZone: "America/Sao_Paulo"
+      })
+    : "a data de encerramento da assinatura";
+  const name = request.account_name
+    ? `, ${escapeEmailHtml(request.account_name)}`
+    : "";
+
+  const html = `
+    <h2>Sua assinatura TubeX foi encerrada</h2>
+    <p>Olá${name}!</p>
+    <p>Confirmamos que sua assinatura TubeX foi encerrada e a renovação automática permanece desativada.</p>
+    <p>O período de acesso pago terminou em <strong>${escapeEmailHtml(accessEndedAt)}</strong>.</p>
+    <p>Sua conta poderá continuar utilizando os recursos disponíveis no plano gratuito.</p>
+    <p>Obrigado por ter utilizado o TubeX. Será um prazer receber você novamente.</p>
+    <p>Equipe TubeX</p>
+  `;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: "TubeX — sua assinatura foi encerrada",
+      html
+    })
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    console.error("[TubeX cancellation] Resend falhou ao enviar confirmação:", response.status, detail.slice(0, 500));
+    return false;
+  }
+  return true;
+}
+
+async function completeCancellationRequest(subscription) {
+  const subscriptionId = String(subscription?.id || "").trim();
+  if (!subscriptionId) return;
+
+  // A atualização condicional torna o processamento idempotente: reenvios do
+  // mesmo evento pelo Stripe não devem disparar novamente o e-mail de conclusão.
+  const { data: completedRequest, error } = await supabase
+    .from("cancellation_requests")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("stripe_subscription_id", subscriptionId)
+    .in("status", ["processing", "scheduled"])
+    .select("id,account_email,account_name,period_end")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!completedRequest) {
+    console.log("ℹ️ Nenhuma solicitação de cancelamento pendente para a assinatura", subscriptionId);
+    return;
+  }
+
+  try {
+    const sent = await sendCancellationCompletionEmail(completedRequest);
+    console.log("✉️ CONFIRMAÇÃO DE CANCELAMENTO", {
+      requestId: completedRequest.id,
+      emailSent: sent
+    });
+  } catch (emailError) {
+    // Não falhar a entrega do webhook por uma indisponibilidade do provedor de e-mail.
+    console.error("[TubeX cancellation] Erro inesperado ao enviar e-mail final:", emailError?.message || emailError);
+  }
+}
+
+async function handleSubscriptionEvent(subscription, eventType = "") {
   const customerId = getCustomerId(subscription.customer);
 
   if (!customerId) {
@@ -638,6 +731,12 @@ async function handleSubscriptionEvent(subscription) {
     eventSubscriptionId: subscription.id,
     ...result
   });
+
+  // A confirmação só é enviada no evento de encerramento efetivo, nunca no
+  // cancel_at_period_end (que mantém a assinatura ativa até o fim do período).
+  if (eventType === "customer.subscription.deleted") {
+    await completeCancellationRequest(subscription);
+  }
 }
 
 async function handleInvoiceEvent(invoice) {
@@ -907,7 +1006,7 @@ export default async function handler(req, res) {
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
-        await handleSubscriptionEvent(event.data.object);
+        await handleSubscriptionEvent(event.data.object, event.type);
         break;
 
       case "invoice.paid":

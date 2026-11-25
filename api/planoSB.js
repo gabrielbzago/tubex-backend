@@ -236,6 +236,27 @@ export default async function handler(req, res){
       .toLowerCase()
       .trim();
 
+    // Cache curto por e-mail para reduzir leituras repetidas sem deixar
+    // alterações de assinatura presas por muito tempo. Erros nunca são cacheados.
+    global.tubexPlanLookupCache = global.tubexPlanLookupCache || new Map();
+    const planCache = global.tubexPlanLookupCache;
+    const cachedPlan = planCache.get(email);
+    if (cachedPlan && cachedPlan.expiresAt > Date.now()) {
+      return res.status(200).json(cachedPlan.payload);
+    }
+    if (cachedPlan) planCache.delete(email);
+
+    const sendPlanResponse = payload => {
+      if (payload && payload.success === true) {
+        if (planCache.size >= 1000) {
+          const oldestKey = planCache.keys().next().value;
+          if (oldestKey) planCache.delete(oldestKey);
+        }
+        planCache.set(email, { payload, expiresAt: Date.now() + 30_000 });
+      }
+      return res.status(200).json(payload);
+    };
+
     console.log(
       "📧 consultando plano:",
       email
@@ -328,7 +349,7 @@ if(!data){
       sheetData.plano !== "free"
     ){
 
-      return res.status(200).json({
+      return sendPlanResponse({
 
         success:true,
 
@@ -362,7 +383,7 @@ if(!data){
   // ==============================================
   // 🚫 FREE FINAL
   // ==============================================
-  return res.status(200).json({
+  return sendPlanResponse({
 
     success:true,
 
@@ -401,7 +422,7 @@ if(!data){
 
     // O plano owner é permanente e não depende do status de cobrança.
     if (plan === "owner") {
-      return res.status(200).json({
+      return sendPlanResponse({
         success: true,
         fallback: false,
         email: data.email,
@@ -422,7 +443,7 @@ if(
   !["active","approved","trialing","past_due"].includes(status)
 ){
 
-  return res.status(200).json({
+  return sendPlanResponse({
     success:true,
     plan:"free",
     status,
@@ -434,7 +455,7 @@ if(
     // ==================================================
     // ✅ SUCCESS
     // ==================================================
-    return res.status(200).json({
+    return sendPlanResponse({
 
       success:true,
 

@@ -1329,9 +1329,29 @@ if(
     global.tubexSeoCache = global.tubexSeoCache || {};
     global.tubexChannelCache = global.tubexChannelCache || {};
 
-    const normalizedPlan = String(body?.plan || "free").toLowerCase();
+    const normalizedPlan = String(body?.plan || "free").toLowerCase().trim();
     const cachePlan = normalizedPlan === "owner" ? "expert" : normalizedPlan;
-    const cacheKey = keyword ? `seo_v7_contextual_related_${cachePlan}_${keyword.toLowerCase()}` : null;
+    // A chave representa todos os parâmetros que alteram o pipeline SEO.
+    // Mantemos o termo exato (sem lower-case) para nunca misturar consultas
+    // diferentes por normalização agressiva. O modo SEO é isolado dos demais.
+    const seoCacheIdentity = keyword ? JSON.stringify({
+      version: "seo_v8_exact_query",
+      mode: "seo",
+      keyword: String(keyword).trim(),
+      // Campos de contexto entram na identidade mesmo quando opcionais:
+      // se a interface enviar título/região/idioma/categoria, uma alteração
+      // nesses dados nunca reaproveita o resultado de outra pesquisa.
+      title: String(body?.title || body?.videoTitle || "").trim(),
+      category: String(body?.category || "").trim(),
+      niche: String(body?.niche || "").trim(),
+      context: String(body?.context || "").trim(),
+      language: String(body?.language || body?.relevanceLanguage || "").trim(),
+      region: String(body?.region || body?.country || body?.regionCode || "").trim(),
+      plan: cachePlan
+    }) : "";
+    const cacheKey = seoCacheIdentity
+      ? `seo_v8_${createHash("sha256").update(seoCacheIdentity).digest("hex")}`
+      : null;
 
     // O cache SEO só pode atender ao modo SEO padrão.
     // Modos isolados (tags, keyword_insights etc.) nunca devem receber
@@ -1394,7 +1414,7 @@ if(
       }
 
       global.tubexKeywordInsightsCache = global.tubexKeywordInsightsCache || {};
-      const insightCacheKey = "v1_" + normalizeInsight(query);
+      const insightCacheKey = "v2_" + createHash("sha256").update(JSON.stringify({ mode: "keyword_insights", query: String(query).trim() })).digest("hex");
       const cachedInsight = global.tubexKeywordInsightsCache[insightCacheKey];
       if (cachedInsight && cachedInsight.expires > Date.now()) {
         return res.status(200).json({ ...cachedInsight.data, cached: true });
@@ -1508,7 +1528,7 @@ if(
       }
 
       global.tubexTagSuggestionsCache = global.tubexTagSuggestionsCache || {};
-      const tagCacheKey = "v5_context_" + query.toLocaleLowerCase("pt-BR");
+      const tagCacheKey = "v6_context_" + createHash("sha256").update(JSON.stringify({ mode: "tag_suggestions", query: String(query).trim() })).digest("hex");
       const cachedTags = global.tubexTagSuggestionsCache[tagCacheKey];
       if (cachedTags && cachedTags.expires > Date.now() && Array.isArray(cachedTags.tags) && cachedTags.tags.length) {
         return res.status(200).json({

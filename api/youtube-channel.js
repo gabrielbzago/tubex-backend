@@ -188,29 +188,62 @@ export async function recordCronChannelSnapshot(channel) {
 
 async function attachPublicHistory(responseData, channelId) {
   try {
+    global.tubexPublicSnapshotDays = global.tubexPublicSnapshotDays || new Map();
+    global.tubexPublicHistoryCache = global.tubexPublicHistoryCache || new Map();
     const channel = responseData?.data?.channel;
     const stats = channel?.statistics || {};
     const totalViews = Number(stats.viewCount ?? responseData?.data?.metrics?.totalChannelViews ?? 0);
     const subscribers = Number(stats.subscriberCount ?? responseData?.data?.metrics?.subscribers ?? 0);
     const videoCount = Number(stats.videoCount ?? responseData?.data?.metrics?.totalVideos ?? 0);
 
-    if (channelId && Number.isFinite(totalViews) && totalViews >= 0) {
-      await recordChannelSnapshot({
-        channelId,
-        title: channel?.snippet?.title || channel?.snippet?.localized?.title || "",
-        customUrl: channel?.snippet?.customUrl || "",
-        thumbnailUrl:
-          channel?.snippet?.thumbnails?.high?.url ||
-          channel?.snippet?.thumbnails?.medium?.url ||
-          channel?.snippet?.thumbnails?.default?.url ||
-          "",
-        totalViews,
-        subscribers,
-        videoCount
-      });
+    const snapshotDay = saoPauloDate();
+    const snapshotKey = `${channelId}:${snapshotDay}`;
+    const snapshotDays = global.tubexPublicSnapshotDays;
+    if (channelId && Number.isFinite(totalViews) && totalViews >= 0 && !snapshotDays.has(snapshotKey)) {
+      // Marca em andamento antes do I/O para evitar duplicidade em requisições
+      // simultâneas na mesma instância. Em falha, libera nova tentativa.
+      snapshotDays.set(snapshotKey, "pending");
+      try {
+        await recordChannelSnapshot({
+          channelId,
+          title: channel?.snippet?.title || channel?.snippet?.localized?.title || "",
+          customUrl: channel?.snippet?.customUrl || "",
+          thumbnailUrl:
+            channel?.snippet?.thumbnails?.high?.url ||
+            channel?.snippet?.thumbnails?.medium?.url ||
+            channel?.snippet?.thumbnails?.default?.url ||
+            "",
+          totalViews,
+          subscribers,
+          videoCount
+        });
+        snapshotDays.set(snapshotKey, "done");
+      } catch (snapshotError) {
+        snapshotDays.delete(snapshotKey);
+        throw snapshotError;
+      }
+      // Mantém o mapa pequeno em instâncias de longa duração.
+      if (snapshotDays.size > 500) {
+        for (const key of snapshotDays.keys()) {
+          if (!key.endsWith(`:${snapshotDay}`)) snapshotDays.delete(key);
+          if (snapshotDays.size <= 350) break;
+        }
+      }
     }
 
-    const history = channelId ? await getChannelHistory(channelId, 28) : [];
+    const historyKey = `${channelId}:28:${snapshotDay}`;
+    const cachedHistory = global.tubexPublicHistoryCache.get(historyKey);
+    let history;
+    if (cachedHistory && cachedHistory.expiresAt > Date.now()) {
+      history = cachedHistory.value;
+    } else {
+      history = channelId ? await getChannelHistory(channelId, 28) : [];
+      global.tubexPublicHistoryCache.set(historyKey, { value: history, expiresAt: Date.now() + 5 * 60 * 1000 });
+      if (global.tubexPublicHistoryCache.size > 500) {
+        const firstKey = global.tubexPublicHistoryCache.keys().next().value;
+        if (firstKey) global.tubexPublicHistoryCache.delete(firstKey);
+      }
+    }
     return {
       ...responseData,
       data: {

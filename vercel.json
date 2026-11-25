@@ -23,6 +23,10 @@
     {
       "source": "/api/checkout",
       "destination": "/api/planoSB"
+    },
+    {
+      "source": "/api/google-token",
+      "destination": "/api/api?google_token=1"
     }
   ],
   "headers": [
